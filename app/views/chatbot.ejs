@@ -63,7 +63,7 @@
           <% if (message.sender === 'bot') { %>
           <span class="finbot-bubble__label">FinBot</span>
           <% } %>
-          <p><%= message.text %></p>
+          <div class="finbot-bubble__text"><%= message.text %></div>
         </article>
         <% }); %>
       </div>
