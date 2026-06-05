@@ -5,6 +5,11 @@ const {
   validateMonthlyBudget,
   buildBudgetSummary,
 } = require("./budgetHelpers");
+const {
+  validateItemInput,
+  getSpendingRecommendation,
+  getFinanceSnapshot,
+} = require("./recommendationHelpers");
 const sampleExpenses = require("./sampleExpenses");
 
 const app = express();
@@ -78,6 +83,72 @@ app.post("/budget", (req, res) => {
     errors: [],
     successMessage: "Monthly budget updated successfully.",
     formValues: { monthlyBudget: updated.summary.monthlyBudget },
+  });
+});
+
+function getRecommendationCategories() {
+  const categories = [];
+
+  for (let i = 0; i < sampleExpenses.length; i++) {
+    const cat = sampleExpenses[i].category;
+    if (!categories.includes(cat)) {
+      categories.push(cat);
+    }
+  }
+
+  categories.push("Other");
+  return categories;
+}
+
+app.get("/recommendation", (req, res) => {
+  const { summary } = getBudgetPageData();
+  const financeSnapshot = getFinanceSnapshot(summary, sampleExpenses);
+
+  res.render("recommendation", {
+    pageTitle: "Recommendations",
+    activePage: "recommendation",
+    summary,
+    financeSnapshot,
+    categories: getRecommendationCategories(),
+    errors: [],
+  });
+});
+
+app.post("/recommendation", (req, res) => {
+  const { itemName, itemPrice, category } = req.body;
+  const { summary } = getBudgetPageData();
+  const validation = validateItemInput(itemName, itemPrice, category);
+  const categories = getRecommendationCategories();
+
+  if (!validation.valid) {
+    const financeSnapshot = getFinanceSnapshot(summary, sampleExpenses);
+
+    return res.render("recommendation", {
+      pageTitle: "Recommendations",
+      activePage: "recommendation",
+      summary,
+      financeSnapshot,
+      categories,
+      errors: validation.errors,
+      formValues: { itemName, itemPrice, category },
+    });
+  }
+
+  const recommendation = getSpendingRecommendation(summary, sampleExpenses, {
+    itemName: validation.itemName,
+    itemPrice: validation.itemPrice,
+    category: validation.category,
+  });
+
+  res.render("recommendation", {
+    pageTitle: "Recommendations",
+    activePage: "recommendation",
+    summary,
+    financeSnapshot: recommendation.financeSnapshot,
+    categories,
+    errors: [],
+    recommendation,
+    formValues: { itemName, itemPrice, category },
   });
 });
 

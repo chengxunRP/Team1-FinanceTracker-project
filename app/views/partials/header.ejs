@@ -10,12 +10,13 @@
   <header class="site-header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <span class="logo-icon">$</span>
-        Finance Tracker
+        <span class="logo-icon" aria-hidden="true">₣</span>
+        <span class="logo-text">Finance Tracker</span>
       </a>
-      <nav class="nav">
-        <a href="/" class="<%= activePage === 'home' ? 'active' : '' %>">Home</a>
-        <a href="/budget" class="<%= activePage === 'budget' ? 'active' : '' %>">Budget</a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="/" class="nav-link <%= activePage === 'home' ? 'nav-link--active' : '' %>">Home</a>
+        <a href="/budget" class="nav-link <%= activePage === 'budget' ? 'nav-link--active' : '' %>">Budget</a>
+        <a href="/recommendation" class="nav-link <%= activePage === 'recommendation' ? 'nav-link--active' : '' %>">Recommendations</a>
       </nav>
     </div>
   </header>
