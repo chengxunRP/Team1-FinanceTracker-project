@@ -1,4 +1,4 @@
-// Finance Tracker - Express server with EJS views
+// Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
 const express = require("express");
 const path = require("path");
 const {
@@ -8,6 +8,7 @@ const {
 const {
   validateItemInput,
   getSpendingRecommendation,
+  getFinanceSnapshot,
 } = require("./recommendationHelpers");
 const sampleExpenses = require("./sampleExpenses");
 
@@ -30,20 +31,6 @@ function getBudgetPageData() {
     summary,
     expenses: sampleExpenses,
   };
-}
-
-function getRecommendationCategories() {
-  const categories = [];
-
-  for (let i = 0; i < sampleExpenses.length; i++) {
-    const cat = sampleExpenses[i].category;
-    if (!categories.includes(cat)) {
-      categories.push(cat);
-    }
-  }
-
-  categories.push("Other");
-  return categories;
 }
 
 app.get("/", (req, res) => {
@@ -99,13 +86,29 @@ app.post("/budget", (req, res) => {
   });
 });
 
+function getRecommendationCategories() {
+  const categories = [];
+
+  for (let i = 0; i < sampleExpenses.length; i++) {
+    const cat = sampleExpenses[i].category;
+    if (!categories.includes(cat)) {
+      categories.push(cat);
+    }
+  }
+
+  categories.push("Other");
+  return categories;
+}
+
 app.get("/recommendation", (req, res) => {
   const { summary } = getBudgetPageData();
+  const financeSnapshot = getFinanceSnapshot(summary, sampleExpenses);
 
   res.render("recommendation", {
     pageTitle: "Recommendations",
     activePage: "recommendation",
     summary,
+    financeSnapshot,
     categories: getRecommendationCategories(),
     errors: [],
   });
@@ -118,10 +121,13 @@ app.post("/recommendation", (req, res) => {
   const categories = getRecommendationCategories();
 
   if (!validation.valid) {
+    const financeSnapshot = getFinanceSnapshot(summary, sampleExpenses);
+
     return res.render("recommendation", {
       pageTitle: "Recommendations",
       activePage: "recommendation",
       summary,
+      financeSnapshot,
       categories,
       errors: validation.errors,
       formValues: { itemName, itemPrice, category },
@@ -138,6 +144,7 @@ app.post("/recommendation", (req, res) => {
     pageTitle: "Recommendations",
     activePage: "recommendation",
     summary,
+    financeSnapshot: recommendation.financeSnapshot,
     categories,
     errors: [],
     recommendation,

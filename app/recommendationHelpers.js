@@ -43,6 +43,46 @@ function getCategoryTotal(expenses, category) {
   return total;
 }
 
+function getFinanceSnapshot(summary, expenses) {
+  const categoryTotals = {};
+
+  for (let i = 0; i < expenses.length; i++) {
+    const cat = expenses[i].category;
+    categoryTotals[cat] = (categoryTotals[cat] || 0) + expenses[i].amount;
+  }
+
+  let highestCategory = "—";
+  let highestCategoryAmount = 0;
+
+  for (const category in categoryTotals) {
+    if (categoryTotals[category] > highestCategoryAmount) {
+      highestCategory = category;
+      highestCategoryAmount = categoryTotals[category];
+    }
+  }
+
+  return {
+    monthlyBudget: summary.monthlyBudget,
+    totalSpent: summary.totalSpent,
+    remainingBudget: summary.remainingBudget,
+    percentageUsed: summary.percentageUsed,
+    highestCategory,
+    highestCategoryAmount,
+  };
+}
+
+function calculateRecommendationScore(result, analysis) {
+  if (result === "Not recommended") {
+    return analysis.exceedsBudget ? 20 : 30;
+  }
+
+  if (result === "Risky") {
+    return analysis.newPercentageUsed >= 90 ? 50 : 60;
+  }
+
+  return analysis.newPercentageUsed < 50 ? 90 : 85;
+}
+
 function getSpendingRecommendation(summary, expenses, item) {
   const itemPrice = item.itemPrice;
   const newTotalSpent = summary.totalSpent + itemPrice;
@@ -61,21 +101,18 @@ function getSpendingRecommendation(summary, expenses, item) {
   let result = "Safe to buy";
   let resultBadge = "success";
 
-  // Not recommended — worst case first
   if (summary.percentageUsed >= 100) {
     result = "Not recommended";
     resultBadge = "danger";
     reasons.push(
-      "You have already used 100% or more of your monthly budget."
+      "You have already used more than 100% of your monthly budget."
     );
   }
 
   if (exceedsBudget) {
     result = "Not recommended";
     resultBadge = "danger";
-    reasons.push(
-      `Buying this item will exceed your budget. You would spend $${newTotalSpent}, but your budget is $${summary.monthlyBudget}.`
-    );
+    reasons.push("This purchase will exceed your monthly budget.");
   }
 
   if (itemPrice > summary.remainingBudget && result !== "Not recommended") {
@@ -86,20 +123,17 @@ function getSpendingRecommendation(summary, expenses, item) {
     );
   }
 
-  // Risky — only if not already not recommended
   if (result === "Safe to buy" && summary.percentageUsed >= 80) {
     result = "Risky";
     resultBadge = "warning";
-    reasons.push(
-      `You have already used ${summary.percentageUsed}% of your budget (80% warning level).`
-    );
+    reasons.push("You have already used more than 80% of your budget.");
   }
 
   if (result === "Safe to buy" && newPercentageUsed >= 80) {
     result = "Risky";
     resultBadge = "warning";
     reasons.push(
-      `This purchase would bring you to ${newPercentageUsed}% of your budget.`
+      `This purchase would bring your budget usage to ${newPercentageUsed}%.`
     );
   }
 
@@ -107,19 +141,28 @@ function getSpendingRecommendation(summary, expenses, item) {
     result = "Risky";
     resultBadge = "warning";
     reasons.push(
-      `${item.category} is already high spending ($${categoryTotal}, ${categoryPercent}% of budget).`
+      "This category is already one of your highest spending areas."
     );
   }
 
-  // Safe to buy — add positive reasons
   if (result === "Safe to buy") {
+    reasons.push("Item fits within your remaining budget.");
     reasons.push(
-      `Item is within your remaining budget. You would have $${newRemainingBudget} left after buying.`
-    );
-    reasons.push(
-      `Current spending: $${summary.totalSpent} of $${summary.monthlyBudget} (${summary.percentageUsed}% used).`
+      `You would have $${newRemainingBudget} left after this purchase.`
     );
   }
+
+  const analysis = {
+    totalSpent: summary.totalSpent,
+    remainingBudget: summary.remainingBudget,
+    percentageUsed: summary.percentageUsed,
+    newTotalSpent,
+    newRemainingBudget,
+    newPercentageUsed,
+    exceedsBudget,
+    categoryTotal,
+    categoryPercent,
+  };
 
   return {
     itemName: item.itemName,
@@ -127,23 +170,16 @@ function getSpendingRecommendation(summary, expenses, item) {
     category: item.category,
     result,
     resultBadge,
+    score: calculateRecommendationScore(result, analysis),
     reasons,
-    analysis: {
-      totalSpent: summary.totalSpent,
-      remainingBudget: summary.remainingBudget,
-      percentageUsed: summary.percentageUsed,
-      newTotalSpent,
-      newRemainingBudget,
-      newPercentageUsed,
-      exceedsBudget,
-      categoryTotal,
-      categoryPercent,
-    },
+    analysis,
+    financeSnapshot: getFinanceSnapshot(summary, expenses),
   };
 }
 
 module.exports = {
   validateItemInput,
   getCategoryTotal,
+  getFinanceSnapshot,
   getSpendingRecommendation,
 };
