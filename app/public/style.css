@@ -1136,6 +1136,229 @@ a.btn:hover { text-decoration: none; }
   color: var(--text-muted);
 }
 
+/* ----- FinBot chatbot page (Feature 8) ----- */
+.finbot-page { margin-bottom: 0.5rem; }
+
+.finbot-header {
+  margin-bottom: 1.5rem;
+}
+
+.finbot-header h1 {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.finbot-header p {
+  margin: 0;
+  color: var(--text-muted);
+  max-width: 36rem;
+}
+
+.finbot-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.finbot-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.finbot-card h2 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.finbot-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.finbot-stat {
+  background: var(--grey-50);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.9rem;
+}
+
+.finbot-stat--highlight {
+  background: linear-gradient(135deg, var(--blue-light), var(--teal-light));
+  border-color: transparent;
+}
+
+.finbot-stat__label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.2rem;
+}
+
+.finbot-stat__value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.finbot-stat__value--sm { font-size: 1rem; }
+.finbot-stat__value--blue { color: var(--blue-mid); }
+.finbot-stat__value--green { color: var(--green); }
+
+.finbot-stat__sub {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.finbot-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.finbot-suggestions form { margin: 0; }
+
+.finbot-suggestion-btn {
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--blue-mid);
+  background: var(--blue-light);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.finbot-suggestion-btn:hover {
+  background: var(--white);
+  border-color: var(--blue-mid);
+}
+
+.finbot-note {
+  margin: 0.85rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.finbot-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.finbot-chat__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--grey-200);
+  background: var(--grey-50);
+}
+
+.finbot-avatar {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  background: linear-gradient(135deg, var(--blue-light), var(--teal-light));
+  border-radius: 50%;
+  border: 1px solid var(--grey-200);
+}
+
+.finbot-status {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--green);
+  font-weight: 500;
+}
+
+.finbot-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.25rem;
+  overflow-y: auto;
+  max-height: 420px;
+  background: var(--white);
+}
+
+.finbot-bubble {
+  max-width: 85%;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.finbot-bubble p { margin: 0; }
+
+.finbot-bubble__label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+
+.finbot-bubble--assistant {
+  align-self: flex-start;
+  background: var(--grey-100);
+  border: 1px solid var(--grey-200);
+  border-bottom-left-radius: 0.25rem;
+}
+
+.finbot-bubble--user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--blue-mid), var(--teal));
+  color: var(--white);
+  border-bottom-right-radius: 0.25rem;
+}
+
+.finbot-input-row {
+  display: flex;
+  gap: 0.65rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--grey-200);
+  background: var(--grey-50);
+}
+
+.finbot-input-row input {
+  flex: 1;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  border: 1px solid var(--grey-300);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+}
+
+.finbot-input-row input:focus {
+  outline: none;
+  border-color: var(--blue-mid);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
 /* ----- Responsive ----- */
 @media (max-width: 960px) {
   .hero { grid-template-columns: 1fr; }
@@ -1147,6 +1370,8 @@ a.btn:hover { text-decoration: none; }
   .stat-card--wide { grid-column: span 2; }
   .split-layout,
   .split-layout--rec { grid-template-columns: 1fr; }
+  .finbot-layout { grid-template-columns: 1fr; }
+  .finbot-chat { min-height: 420px; }
   .card-panel--result { min-height: auto; }
 }
 

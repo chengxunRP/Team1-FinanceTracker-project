@@ -11,6 +11,11 @@ const {
   getFinanceSnapshot,
 } = require("./recommendationHelpers");
 const sampleExpenses = require("./sampleExpenses");
+const {
+  SUGGESTED_QUESTIONS,
+  buildFinBotReply,
+  getWelcomeMessage,
+} = require("./chatbotHelpers");
 
 const app = express();
 const PORT = 3000;
@@ -186,6 +191,46 @@ app.post("/recommendation", (req, res) => {
     recommendation,
     formValues: { itemName, itemPrice, category },
   });
+});
+
+function renderChatbotPage(res, summary, financeSnapshot, messages, inputText) {
+  res.render("chatbot", {
+    pageTitle: "FinBot",
+    activePage: "chatbot",
+    summary,
+    financeSnapshot,
+    messages,
+    suggestedQuestions: SUGGESTED_QUESTIONS,
+    inputText: inputText || "",
+  });
+}
+
+app.get("/chatbot", (req, res) => {
+  const { summary } = getBudgetPageData();
+  const financeSnapshot = ensureFinanceSnapshot(summary);
+
+  renderChatbotPage(res, summary, financeSnapshot, [
+    { role: "assistant", text: getWelcomeMessage() },
+  ]);
+});
+
+app.post("/chatbot", (req, res) => {
+  const { summary } = getBudgetPageData();
+  const financeSnapshot = ensureFinanceSnapshot(summary);
+  const rawMessage = (req.body.message || req.body.question || "").trim();
+
+  const messages = [{ role: "assistant", text: getWelcomeMessage() }];
+
+  if (rawMessage.length > 0) {
+    messages.push({ role: "user", text: rawMessage });
+    messages.push({
+      role: "assistant",
+      text: buildFinBotReply(rawMessage, summary, financeSnapshot),
+    });
+  }
+
+  // Future: connect Groq API here. Read the API key from .env, e.g. process.env.GROQ_API_KEY
+  renderChatbotPage(res, summary, financeSnapshot, messages);
 });
 
 app.listen(PORT, () => {
