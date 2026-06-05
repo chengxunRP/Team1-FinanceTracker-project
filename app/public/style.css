@@ -1329,7 +1329,10 @@ a.btn:hover { text-decoration: none; }
   line-height: 1.45;
 }
 
-.finbot-bubble p { margin: 0; }
+.finbot-bubble__text {
+  margin: 0;
+  white-space: pre-line;
+}
 
 .finbot-bubble__label {
   display: block;

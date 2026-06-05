@@ -3,6 +3,8 @@ require("./envConfig");
 
 const https = require("https");
 
+const { buildFormatRulesForPrompt } = require("./purchaseCheckHelpers");
+
 const GROQ_API_HOST = "api.groq.com";
 const GROQ_API_PATH = "/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.1-8b-instant";
@@ -35,9 +37,10 @@ function buildFinanceContext(summary, financeSnapshot, expenses) {
 function buildSystemPrompt(summary, financeSnapshot, expenses) {
   return [
     "You are FinBot, a friendly personal finance assistant.",
-    "Answer in 1-3 short sentences. Be practical and specific.",
-    "Base every answer only on the finance data below. Do not invent numbers.",
-    "If asked whether they can buy something, compare the price to remaining budget and say Safe, Risky, or Not recommended.",
+    "Use only the finance data below. Do not invent income, savings, or expenses.",
+    "Always use real dollar amounts and category names from the data.",
+    "",
+    buildFormatRulesForPrompt(),
     "",
     buildFinanceContext(summary, financeSnapshot, expenses),
   ].join("\n");
@@ -108,7 +111,7 @@ async function getGroqReply(userMessage, summary, financeSnapshot, expenses) {
       },
       { role: "user", content: userMessage },
     ],
-    max_tokens: 200,
+    max_tokens: 350,
     temperature: 0.4,
   });
 

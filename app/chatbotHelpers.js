@@ -2,6 +2,15 @@
 
 const { hasGroqApiKey } = require("./envConfig");
 const { getGroqReply } = require("./groqService");
+const {
+  extractItemPrice,
+  isPurchaseQuestion,
+  buildPurchaseCheckReply,
+  buildSpendingAdviceReply,
+  buildSavingTipsReply,
+  isSpendingAdviceQuestion,
+  isSavingTipsQuestion,
+} = require("./purchaseCheckHelpers");
 
 const SUGGESTED_QUESTIONS = [
   "How much have I spent this month?",
@@ -15,12 +24,36 @@ function buildFinBotReply(message, summary, financeSnapshot) {
   const highestCategory = financeSnapshot.highestCategory;
   const highestCategoryAmount = financeSnapshot.highestCategoryAmount;
 
+  const itemPrice = extractItemPrice(message);
+  if (itemPrice != null && isPurchaseQuestion(message)) {
+    return buildPurchaseCheckReply(summary, itemPrice);
+  }
+
+  if (isSavingTipsQuestion(message)) {
+    return buildSavingTipsReply(summary, financeSnapshot);
+  }
+
+  if (isSpendingAdviceQuestion(message)) {
+    return buildSpendingAdviceReply(summary, financeSnapshot);
+  }
+
   if (text.includes("spent")) {
-    return `You have spent $${summary.totalSpent} this month so far.`;
+    return [
+      "Summary:",
+      `- You have spent $${summary.totalSpent} out of $${summary.monthlyBudget}.`,
+      `- You have $${summary.remainingBudget} remaining.`,
+      `- You have used ${summary.percentageUsed}% of your budget.`,
+    ].join("\n");
   }
 
   if (text.includes("budget")) {
-    return `Your monthly budget is $${summary.monthlyBudget}. You currently have $${summary.remainingBudget} remaining (${summary.percentageUsed}% used).`;
+    return [
+      "Summary:",
+      `- Monthly budget: $${summary.monthlyBudget}`,
+      `- Current spent: $${summary.totalSpent}`,
+      `- Current remaining: $${summary.remainingBudget}`,
+      `- Budget used: ${summary.percentageUsed}%`,
+    ].join("\n");
   }
 
   if (
@@ -29,34 +62,27 @@ function buildFinBotReply(message, summary, financeSnapshot) {
     text.includes("most spend") ||
     text.includes("category did i spend")
   ) {
-    return `Your highest spending category is ${highestCategory} at $${highestCategoryAmount}.`;
-  }
-
-  const buyMatch = text.match(/can i buy\s*(?:a\s*)?\$?\s*(\d+(?:\.\d+)?)/i);
-  if (buyMatch) {
-    const itemPrice = Number(buyMatch[1]);
-    const remaining = summary.remainingBudget;
-    const afterPurchase = remaining - itemPrice;
-    const afterPercent = Math.round(
-      ((summary.totalSpent + itemPrice) / summary.monthlyBudget) * 100
-    );
-
-    if (itemPrice > remaining || afterPercent >= 100) {
-      return `Not recommended. A $${itemPrice} purchase would leave you with $${afterPurchase} and push usage to ${afterPercent}%.`;
-    }
-
-    if (afterPercent >= 80 || afterPurchase < summary.monthlyBudget * 0.15) {
-      return `Risky. You could buy it, but only $${afterPurchase} would remain and your budget would be ${afterPercent}% used.`;
-    }
-
-    return `Safe to buy. After $${itemPrice}, you would still have $${afterPurchase} left (${afterPercent}% used).`;
+    return [
+      "Main insight:",
+      `${highestCategory} is your highest spending category at $${highestCategoryAmount}.`,
+      "",
+      "Advice:",
+      `- Review your ${highestCategory} purchases first.`,
+      "- This is the best place to cut spending if you want to save more.",
+    ].join("\n");
   }
 
   if (text.includes("reduce spending") || text.includes("save")) {
-    return `Focus on ${highestCategory} first — it is your top category at $${highestCategoryAmount}. Try a weekly spending cap and cut one non-essential purchase there.`;
+    return buildSavingTipsReply(summary, financeSnapshot);
   }
 
-  return "I can help with spending totals, budget, top categories, purchase checks (e.g. “Can I buy $50?”), and saving tips.";
+  return [
+    "I can help with:",
+    "- Spending totals and budget",
+    "- Highest spending category",
+    "- Purchase checks (e.g. Can I buy $50?)",
+    "- Spending advice and saving tips",
+  ].join("\n");
 }
 
 function getWelcomeMessage() {
