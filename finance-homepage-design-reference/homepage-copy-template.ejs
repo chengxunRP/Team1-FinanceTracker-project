@@ -1,18 +1,30 @@
+<%#
+  CraveMatch Home page layout — reusable template for Finance Tracker.
+  Copy sections into your index.ejs. Replace placeholder text, images, and links.
+
+  Requires:
+  - Bootstrap 5 (grid + navbar collapse) OR equivalent layout
+  - homepage-copy-style.css
+  - homepage-copy-script.js
+  - header/footer partials (or inline equivalents)
+%>
+
 <%- include('partials/header') %>
 
-<div class="home-page-pro">
+<main class="site-main home-page-pro">
 
+  <!-- Hero slider -->
   <section class="hero-slider-section" id="heroSlider" aria-label="Home hero slider">
     <div class="hero-slides">
 
-      <div class="hero-slide active" style="background-image: url('/features/dashboard.png');">
+      <div class="hero-slide active" style="background-image: url('/hero/hero-budget.jpg');">
         <div class="hero-slide-overlay"></div>
-        <div class="hero-slide-inner">
+        <div class="container hero-slide-inner">
           <div class="hero-slide-content">
             <span class="hero-slide-kicker">Personal finance dashboard</span>
-            <h1 class="hero-slide-title">Manage your money with confidence</h1>
+            <h1 class="hero-slide-title">Manage Your Money With Confidence</h1>
             <p class="hero-slide-desc">
-              Track spending, set monthly budgets, get smart purchase recommendations, and ask FinBot for finance help.
+              Track spending, set monthly budgets with clear alerts, and make smarter purchase decisions in one place.
             </p>
             <div class="hero-slide-actions">
               <a href="/budget" class="hero-slide-btn hero-slide-btn-primary">Set Budget</a>
@@ -22,35 +34,35 @@
         </div>
       </div>
 
-      <div class="hero-slide" style="background-image: url('/features/recommendation.jpg');">
+      <div class="hero-slide" style="background-image: url('/hero/hero-insights.jpg');">
         <div class="hero-slide-overlay"></div>
-        <div class="hero-slide-inner">
+        <div class="container hero-slide-inner">
           <div class="hero-slide-content">
             <span class="hero-slide-kicker">Spending insight</span>
-            <h1 class="hero-slide-title">Know before you buy</h1>
+            <h1 class="hero-slide-title">Know Before You Buy</h1>
             <p class="hero-slide-desc">
-              Check whether a purchase is safe, risky, or not recommended based on your remaining budget.
+              Check whether a purchase fits your budget with safe, risky, or not recommended guidance.
             </p>
             <div class="hero-slide-actions">
-              <a href="/recommendation" class="hero-slide-btn hero-slide-btn-primary">View Recommendation</a>
-              <a href="/budget" class="hero-slide-btn hero-slide-btn-outline">Set Budget</a>
+              <a href="/recommendation" class="hero-slide-btn hero-slide-btn-primary">Try Recommendation</a>
+              <a href="/" class="hero-slide-btn hero-slide-btn-outline">View Dashboard</a>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="hero-slide" style="background-image: url('/features/cravebot.png');">
+      <div class="hero-slide" style="background-image: url('/hero/hero-finbot.jpg');">
         <div class="hero-slide-overlay"></div>
-        <div class="hero-slide-inner">
+        <div class="container hero-slide-inner">
           <div class="hero-slide-content">
             <span class="hero-slide-kicker">FinBot assistant</span>
-            <h1 class="hero-slide-title">Ask FinBot for finance help</h1>
+            <h1 class="hero-slide-title">Ask FinBot For Finance Help</h1>
             <p class="hero-slide-desc">
               Get AI-assisted answers based on your budget, spending habits, and savings goals.
             </p>
             <div class="hero-slide-actions">
               <a href="/chatbot" class="hero-slide-btn hero-slide-btn-primary">Open FinBot</a>
-              <a href="/" class="hero-slide-btn hero-slide-btn-outline">View Dashboard</a>
+              <a href="/budget" class="hero-slide-btn hero-slide-btn-outline">Open Budget</a>
             </div>
           </div>
         </div>
@@ -77,19 +89,20 @@
     </div>
   </section>
 
-  <div class="home-sections-wrap">
+  <div class="container home-sections-wrap">
 
+    <!-- Feature carousel -->
     <section class="home-section-block feature-slider-section">
-      <div class="home-section-head">
+      <div class="text-center mb-4 mb-lg-5">
         <p class="section-kicker">Features</p>
         <h2 class="home-section-title">What you can do</h2>
-        <p class="home-section-lead">Slide through the main Finance Tracker tools for managing your money.</p>
+        <p class="home-section-lead">Explore the main Finance Tracker features in our continuous showcase.</p>
       </div>
 
       <% const homeFeatures = [
         {
           title: 'Budget Alerts',
-          image: '/features/budgetalert.png',
+          image: '/features/budgetAlert.png',
           desc: 'Set a monthly budget and get warning alerts when spending reaches 80% or goes over 100%.',
           btn: 'Open Budget',
           link: '/budget',
@@ -138,14 +151,9 @@
       ]; %>
 
       <div class="feature-slider-wrap feature-carousel-wrapper" id="featureCarousel">
-        <button
-          id="featurePrevBtn"
-          class="feature-slider-arrow feature-slider-arrow-prev"
-          type="button"
-          aria-label="Previous features"
-        >
+        <button id="featurePrevBtn" class="feature-slider-arrow feature-slider-arrow-prev" type="button" aria-label="Previous features">
           <span class="feature-slider-arrow-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 24 24" fill="none">
               <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
@@ -156,41 +164,26 @@
             <% for (let i = 0; i < homeFeatures.length; i++) { %>
               <article class="feature-slide-card home-feature-card feature-slide-card-<%= homeFeatures[i].color %>">
                 <div class="feature-slide-img-wrap">
-                  <img
-                    src="<%= homeFeatures[i].image %>"
-                    class="feature-slide-img"
-                    alt="<%= homeFeatures[i].title %>"
-                  >
+                  <img src="<%= homeFeatures[i].image %>" class="feature-slide-img" alt="<%= homeFeatures[i].title %>">
                 </div>
                 <div class="feature-slide-body">
                   <h3 class="feature-slide-title"><%= homeFeatures[i].title %></h3>
                   <p class="feature-slide-desc"><%= homeFeatures[i].desc %></p>
-                  <a
-                    href="<%= homeFeatures[i].link %>"
-                    class="feature-slide-btn feature-slide-btn-<%= homeFeatures[i].color %>"
-                  >
+                  <a href="<%= homeFeatures[i].link %>" class="feature-slide-btn feature-slide-btn-<%= homeFeatures[i].color %>">
                     <%= homeFeatures[i].btn %>
                   </a>
                 </div>
               </article>
             <% } %>
-
             <% for (let i = 0; i < homeFeatures.length; i++) { %>
-              <article
-                class="feature-slide-card home-feature-card feature-slide-card-<%= homeFeatures[i].color %>"
-                aria-hidden="true"
-              >
+              <article class="feature-slide-card home-feature-card feature-slide-card-<%= homeFeatures[i].color %>" aria-hidden="true">
                 <div class="feature-slide-img-wrap">
                   <img src="<%= homeFeatures[i].image %>" class="feature-slide-img" alt="">
                 </div>
                 <div class="feature-slide-body">
                   <h3 class="feature-slide-title"><%= homeFeatures[i].title %></h3>
                   <p class="feature-slide-desc"><%= homeFeatures[i].desc %></p>
-                  <a
-                    href="<%= homeFeatures[i].link %>"
-                    class="feature-slide-btn feature-slide-btn-<%= homeFeatures[i].color %>"
-                    tabindex="-1"
-                  >
+                  <a href="<%= homeFeatures[i].link %>" class="feature-slide-btn feature-slide-btn-<%= homeFeatures[i].color %>" tabindex="-1">
                     <%= homeFeatures[i].btn %>
                   </a>
                 </div>
@@ -199,14 +192,9 @@
           </div>
         </div>
 
-        <button
-          id="featureNextBtn"
-          class="feature-slider-arrow feature-slider-arrow-next"
-          type="button"
-          aria-label="Next features"
-        >
+        <button id="featureNextBtn" class="feature-slider-arrow feature-slider-arrow-next" type="button" aria-label="Next features">
           <span class="feature-slider-arrow-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 24 24" fill="none">
               <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
@@ -214,42 +202,63 @@
       </div>
     </section>
 
+    <!-- Benefits / why section (optional — replace with Live snapshot in Finance Tracker) -->
+    <section class="home-section-block benefit-showcase">
+      <div class="row g-4 align-items-center">
+        <div class="col-lg-5">
+          <div class="benefit-showcase-image-wrap">
+            <img src="/features/dashboard.png" class="benefit-showcase-img" alt="Finance Tracker dashboard preview">
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="benefit-showcase-content">
+            <p class="section-kicker">Benefits</p>
+            <h2 class="home-section-title">Why Finance Tracker helps</h2>
+            <ul class="benefit-list-pro">
+              <li><span class="benefit-check">✓</span><span>Set a monthly budget and get clear 80% and 100% alerts</span></li>
+              <li><span class="benefit-check">✓</span><span>Check purchases before you buy with smart recommendations</span></li>
+              <li><span class="benefit-check">✓</span><span>See spending totals and remaining budget on your dashboard</span></li>
+              <li><span class="benefit-check">✓</span><span>Ask FinBot for quick finance guidance</span></li>
+              <li><span class="benefit-check">✓</span><span>Track goals and monthly reports as features expand</span></li>
+            </ul>
+            <a href="/budget" class="btn btn-hero-primary btn-sm mt-2">Open Budget</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </div>
 
-  <section class="home-section-block home-live-section">
-    <div class="home-section-head">
+  <%# Optional: Live snapshot — wire to your existing summary object %>
+  <% if (typeof summary !== 'undefined') { %>
+  <section class="home-section-block container">
+    <div class="text-center mb-4">
       <h2 class="home-section-title">Live snapshot</h2>
-      <p class="home-section-lead">Current numbers from your sample budget and expenses.</p>
+      <p class="home-section-lead">Current numbers from your budget and expenses.</p>
     </div>
-    <div class="stat-grid">
-      <article class="stat-card">
-        <span class="stat-card__label">Monthly budget</span>
-        <span class="stat-card__value stat-card__value--blue">$<%= summary.monthlyBudget %></span>
+    <div class="live-snapshot-grid">
+      <article class="live-snapshot-card">
+        <span class="live-snapshot-label">Monthly budget</span>
+        <span class="live-snapshot-value">$<%= summary.monthlyBudget %></span>
       </article>
-      <article class="stat-card">
-        <span class="stat-card__label">Total spent</span>
-        <span class="stat-card__value stat-card__value--blue">$<%= summary.totalSpent %></span>
+      <article class="live-snapshot-card">
+        <span class="live-snapshot-label">Total spent</span>
+        <span class="live-snapshot-value">$<%= summary.totalSpent %></span>
       </article>
-      <article class="stat-card">
-        <span class="stat-card__label">Remaining</span>
-        <span class="stat-card__value stat-card__value--green">$<%= summary.remainingBudget %></span>
+      <article class="live-snapshot-card">
+        <span class="live-snapshot-label">Remaining</span>
+        <span class="live-snapshot-value live-snapshot-value--green">$<%= summary.remainingBudget %></span>
       </article>
-      <article class="stat-card">
-        <span class="stat-card__label">Budget used</span>
-        <span class="stat-card__value"><%= summary.percentageUsed %>%</span>
-        <span class="pill pill--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
+      <article class="live-snapshot-card">
+        <span class="live-snapshot-label">Budget used</span>
+        <span class="live-snapshot-value"><%= summary.percentageUsed %>%</span>
       </article>
     </div>
-
-    <% if (summary.alert.type !== 'safe') { %>
-    <div class="alert-strip alert-strip--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %>">
-      <strong><%= summary.statusLabel %>:</strong> <%= summary.alert.message %>
-    </div>
-    <% } %>
   </section>
+  <% } %>
 
-</div>
+</main>
 
-<script src="/js/homepage.js"></script>
+<script src="/js/homepage-copy-script.js"></script>
 
 <%- include('partials/footer') %>
