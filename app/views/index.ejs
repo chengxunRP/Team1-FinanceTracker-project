@@ -32,27 +32,139 @@
 <section class="section-block">
   <div class="section-head">
     <h2>What you can do</h2>
-    <p>Three core tools to help you stay in control of your finances.</p>
+    <p>Explore the main Finance Tracker features in our continuous showcase.</p>
   </div>
-  <div class="feature-grid">
-    <article class="feature-card">
-      <div class="feature-card__icon feature-card__icon--blue">🔔</div>
-      <h3>Budget Alerts</h3>
-      <p>Set a monthly limit and get clear Safe, Warning, and Overspending alerts at 80% and 100%.</p>
-      <a href="/budget" class="feature-card__link">Manage budget →</a>
-    </article>
-    <article class="feature-card">
-      <div class="feature-card__icon feature-card__icon--green">💡</div>
-      <h3>Smart Recommendation</h3>
-      <p>Check if a purchase is safe, risky, or not recommended based on your remaining budget.</p>
-      <a href="/recommendation" class="feature-card__link">Try it now →</a>
-    </article>
-    <article class="feature-card">
-      <div class="feature-card__icon feature-card__icon--teal">📊</div>
-      <h3>Expense-based finance tracking</h3>
-      <p>See where your money goes with sample expenses that automatically calculate total spending.</p>
-      <a href="/budget" class="feature-card__link">View expenses →</a>
-    </article>
+
+  <div class="feature-carousel">
+    <div class="feature-carousel__stage">
+      <button type="button" class="feature-carousel__arrow feature-carousel__arrow--left" aria-label="Scroll features left">
+        <svg class="feature-carousel__arrow-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div class="feature-carousel__viewport">
+        <div class="feature-carousel__track" id="featureCarouselTrack">
+        <div class="feature-carousel__set">
+          <article class="feature-carousel__card">
+            <img src="/features/budgetAlert.png" alt="Budget Alerts" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Budget Alerts</h3>
+              <p>Set a monthly budget and get warning alerts when spending reaches 80% or goes over 100%.</p>
+              <a href="/budget" class="btn btn--primary btn--sm">Open Budget</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/recommendation.jpg" alt="Smart Recommendation" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Smart Recommendation</h3>
+              <p>Check whether a purchase is safe, risky, or not recommended based on your remaining budget.</p>
+              <a href="/recommendation" class="btn btn--primary btn--sm">Try Recommendation</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/cravebot.png" alt="FinBot Chatbot" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>FinBot Chatbot</h3>
+              <p>Ask finance questions and get AI-assisted replies based on your spending and budget data.</p>
+              <a href="/chatbot" class="btn btn--primary btn--sm">Open FinBot</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/dashboard.png" alt="Dashboard Analytics" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Dashboard Analytics</h3>
+              <p>View your total spending, remaining budget, and spending breakdown in one place.</p>
+              <a href="/" class="btn btn--primary btn--sm">View Dashboard</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/month_report_feature.jpg" alt="Monthly Report" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Monthly Report</h3>
+              <p>Review your monthly spending summary and understand where your money went.</p>
+              <a href="#" class="btn btn--primary btn--sm">Coming soon</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/saving_goal_feature.jpg" alt="Savings Goal" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Savings Goal</h3>
+              <p>Set a saving target and track your progress toward reaching it.</p>
+              <a href="#" class="btn btn--primary btn--sm">Coming soon</a>
+            </div>
+          </article>
+        </div>
+
+        <div class="feature-carousel__set" aria-hidden="true">
+          <article class="feature-carousel__card">
+            <img src="/features/budgetAlert.png" alt="" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Budget Alerts</h3>
+              <p>Set a monthly budget and get warning alerts when spending reaches 80% or goes over 100%.</p>
+              <a href="/budget" class="btn btn--primary btn--sm" tabindex="-1">Open Budget</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/recommendation.jpg" alt="" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Smart Recommendation</h3>
+              <p>Check whether a purchase is safe, risky, or not recommended based on your remaining budget.</p>
+              <a href="/recommendation" class="btn btn--primary btn--sm" tabindex="-1">Try Recommendation</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/cravebot.png" alt="" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>FinBot Chatbot</h3>
+              <p>Ask finance questions and get AI-assisted replies based on your spending and budget data.</p>
+              <a href="/chatbot" class="btn btn--primary btn--sm" tabindex="-1">Open FinBot</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/dashboard.png" alt="" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Dashboard Analytics</h3>
+              <p>View your total spending, remaining budget, and spending breakdown in one place.</p>
+              <a href="/" class="btn btn--primary btn--sm" tabindex="-1">View Dashboard</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/month_report_feature.jpg" alt="" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Monthly Report</h3>
+              <p>Review your monthly spending summary and understand where your money went.</p>
+              <a href="#" class="btn btn--primary btn--sm" tabindex="-1">Coming soon</a>
+            </div>
+          </article>
+
+          <article class="feature-carousel__card">
+            <img src="/features/saving_goal_feature.jpg" alt="" class="feature-carousel__img">
+            <div class="feature-carousel__body">
+              <h3>Savings Goal</h3>
+              <p>Set a saving target and track your progress toward reaching it.</p>
+              <a href="#" class="btn btn--primary btn--sm" tabindex="-1">Coming soon</a>
+            </div>
+          </article>
+        </div>
+      </div>
+      </div>
+
+      <button type="button" class="feature-carousel__arrow feature-carousel__arrow--right" aria-label="Scroll features right">
+        <svg class="feature-carousel__arrow-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </section>
 
@@ -87,5 +199,91 @@
   <strong><%= summary.statusLabel %>:</strong> <%= summary.alert.message %>
 </div>
 <% } %>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var track = document.getElementById("featureCarouselTrack");
+    var leftBtn = document.querySelector(".feature-carousel__arrow--left");
+    var rightBtn = document.querySelector(".feature-carousel__arrow--right");
+
+    if (!track || !leftBtn || !rightBtn) {
+      return;
+    }
+
+    var position = 0;
+    var lastTime = null;
+    var loopSeconds = 32;
+
+    function getLoopWidth() {
+      return track.offsetWidth / 2;
+    }
+
+    function getCardStep() {
+      var card = track.querySelector(".feature-carousel__card");
+      var set = track.querySelector(".feature-carousel__set");
+
+      if (!card) {
+        return 0;
+      }
+
+      var gap = set ? parseFloat(getComputedStyle(set).gap) || 16 : 16;
+      return card.offsetWidth + gap;
+    }
+
+    function wrapPosition() {
+      var loopWidth = getLoopWidth();
+
+      if (loopWidth <= 0) {
+        return;
+      }
+
+      while (position >= loopWidth) {
+        position -= loopWidth;
+      }
+
+      while (position < 0) {
+        position += loopWidth;
+      }
+    }
+
+    function applyTransform() {
+      track.style.transform = "translate3d(" + (-position) + "px, 0, 0)";
+    }
+
+    function nudge(direction) {
+      position += direction * getCardStep();
+      wrapPosition();
+      applyTransform();
+    }
+
+    function animate(time) {
+      if (!lastTime) {
+        lastTime = time;
+      }
+
+      var delta = time - lastTime;
+      lastTime = time;
+      var loopWidth = getLoopWidth();
+
+      if (loopWidth > 0) {
+        position += (loopWidth / (loopSeconds * 1000)) * delta;
+        wrapPosition();
+        applyTransform();
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    leftBtn.addEventListener("click", function () {
+      nudge(-1);
+    });
+
+    rightBtn.addEventListener("click", function () {
+      nudge(1);
+    });
+
+    requestAnimationFrame(animate);
+  });
+</script>
 
 <%- include('partials/footer') %>
