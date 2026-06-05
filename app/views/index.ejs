@@ -1,0 +1,85 @@
+<%- include('partials/header') %>
+
+<section class="dashboard-hero">
+  <span class="page-label">Dashboard</span>
+  <h1>Your finances at a glance</h1>
+  <p class="lead">
+    Track your monthly budget, see spending from sample expenses, and get alerts before you overspend.
+  </p>
+  <div class="cta-group">
+    <a href="/budget" class="btn btn--primary">Set Budget</a>
+  </div>
+</section>
+
+<h2 class="section-title">Budget overview</h2>
+<div class="card-grid">
+  <article class="card">
+    <div class="card__icon card__icon--blue">💰</div>
+    <span class="badge badge--blue">Monthly</span>
+    <h2>Monthly budget</h2>
+    <p class="stat stat--blue">$<%= summary.monthlyBudget %></p>
+    <p>Your planned spending limit for this month.</p>
+  </article>
+  <article class="card">
+    <div class="card__icon card__icon--blue">📊</div>
+    <h2>Total spent</h2>
+    <p class="stat stat--blue">$<%= summary.totalSpent %></p>
+    <p>Calculated from sample expenses on the Budget page.</p>
+  </article>
+  <article class="card">
+    <div class="card__icon card__icon--green">📈</div>
+    <span class="badge badge--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
+    <h2>Budget used</h2>
+    <p class="stat stat--<%= summary.statusBadge === 'success' ? 'green' : 'blue' %>"><%= summary.percentageUsed %>%</p>
+    <p>(<%= summary.totalSpent %> ÷ <%= summary.monthlyBudget %>) × 100</p>
+  </article>
+  <article class="card">
+    <div class="card__icon card__icon--green">🔔</div>
+    <h2>Remaining</h2>
+    <p class="stat stat--<%= summary.remainingBudget >= 0 ? 'green' : 'blue' %>">$<%= summary.remainingBudget %></p>
+    <p><%= summary.remainingBudget >= 0 ? 'Left in your monthly budget.' : 'You are over budget.' %></p>
+  </article>
+</div>
+
+<% if (summary.alert.type !== 'safe') { %>
+<section class="alert-banner alert-banner--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %>">
+  <strong><%= summary.statusLabel %> alert:</strong> <%= summary.alert.message %>
+</section>
+<% } %>
+
+<div class="dashboard-row">
+  <section class="panel">
+    <h2>How budget alerts work</h2>
+    <p class="panel-intro">
+      You set the monthly budget. Spending is added up from sample expenses in the backend.
+    </p>
+    <ul class="quick-link-list">
+      <li>
+        <span class="dot"></span>
+        <span><strong>Set your monthly budget</strong> — the only value you enter manually.</span>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <span><strong>Safe</strong> — below 80% of your budget used.</span>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <span><strong>Warning</strong> — 80% to 99% of budget used.</span>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <span><strong>Overspending</strong> — 100% or more of budget used.</span>
+      </li>
+    </ul>
+  </section>
+
+  <section class="panel">
+    <h2>Quick action</h2>
+    <p class="panel-intro">View sample expenses and update your monthly budget.</p>
+    <div class="cta-group cta-group--stacked">
+      <a href="/budget" class="btn btn--primary">Set Budget</a>
+    </div>
+  </section>
+</div>
+
+<%- include('partials/footer') %>
