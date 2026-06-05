@@ -1,6 +1,8 @@
 // Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
-const express = require("express");
+require("./envConfig").logGroqKeyStatus();
+
 const path = require("path");
+const express = require("express");
 const {
   validateMonthlyBudget,
   buildBudgetSummary,
@@ -11,6 +13,18 @@ const {
   getFinanceSnapshot,
 } = require("./recommendationHelpers");
 const sampleExpenses = require("./sampleExpenses");
+const {
+  SUGGESTED_QUESTIONS,
+  buildFinBotReply,
+  getFinBotReply,
+  getWelcomeMessage,
+} = require("./chatbotHelpers");
+const { getSessionId } = require("./sessionCookie");
+const {
+  getChatHistory,
+  addChatMessage,
+  clearChatHistory,
+} = require("./chatHistory");
 
 const app = express();
 const PORT = 3000;
@@ -186,6 +200,73 @@ app.post("/recommendation", (req, res) => {
     recommendation,
     formValues: { itemName, itemPrice, category },
   });
+});
+
+function renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode, inputText) {
+  res.render("chatbot", {
+    pageTitle: "FinBot",
+    activePage: "chatbot",
+    summary,
+    financeSnapshot,
+    messages,
+    suggestedQuestions: SUGGESTED_QUESTIONS,
+    inputText: inputText || "",
+    groqAiMode: Boolean(groqAiMode),
+  });
+}
+
+app.get("/chatbot", (req, res) => {
+  const { summary } = getBudgetPageData();
+  const financeSnapshot = ensureFinanceSnapshot(summary);
+  const sessionId = getSessionId(req, res);
+  const welcomeText = getWelcomeMessage();
+  const messages = getChatHistory(sessionId, welcomeText);
+
+  renderChatbotPage(res, summary, financeSnapshot, messages, false);
+});
+
+app.post("/chatbot/clear", (req, res) => {
+  const sessionId = getSessionId(req, res);
+  clearChatHistory(sessionId, getWelcomeMessage());
+  res.redirect("/chatbot");
+});
+
+app.post("/chatbot", async (req, res) => {
+  const { summary, expenses } = getBudgetPageData();
+  const financeSnapshot = ensureFinanceSnapshot(summary);
+  const rawMessage = (req.body.message || req.body.question || "").trim();
+  const sessionId = getSessionId(req, res);
+  const welcomeText = getWelcomeMessage();
+
+  let groqAiMode = false;
+
+  if (rawMessage.length > 0) {
+    addChatMessage(sessionId, "user", rawMessage, welcomeText);
+
+    try {
+      const reply = await getFinBotReply(
+        rawMessage,
+        summary,
+        financeSnapshot,
+        expenses
+      );
+      addChatMessage(sessionId, "bot", reply.text, welcomeText);
+      groqAiMode = reply.usedGroq;
+    } catch (error) {
+      console.log("Groq API failed, using fallback");
+      addChatMessage(
+        sessionId,
+        "bot",
+        buildFinBotReply(rawMessage, summary, financeSnapshot),
+        welcomeText
+      );
+      groqAiMode = false;
+    }
+  }
+
+  const messages = getChatHistory(sessionId, welcomeText);
+
+  renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode);
 });
 
 app.listen(PORT, () => {
