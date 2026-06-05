@@ -100,9 +100,45 @@ function getRecommendationCategories() {
   return categories;
 }
 
+function ensureFinanceSnapshot(summary) {
+  const snapshot = getFinanceSnapshot(summary, sampleExpenses) || {};
+
+  if (!Array.isArray(snapshot.spendingByCategory)) {
+    const totals = {};
+
+    for (let i = 0; i < sampleExpenses.length; i++) {
+      const expense = sampleExpenses[i];
+      totals[expense.category] = (totals[expense.category] || 0) + expense.amount;
+    }
+
+    snapshot.spendingByCategory = Object.keys(totals)
+      .map((category) => ({
+        category,
+        amount: totals[category],
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }
+
+  snapshot.monthlyBudget = snapshot.monthlyBudget ?? summary.monthlyBudget;
+  snapshot.totalSpent = snapshot.totalSpent ?? summary.totalSpent;
+  snapshot.remainingBudget = snapshot.remainingBudget ?? summary.remainingBudget;
+  snapshot.percentageUsed = snapshot.percentageUsed ?? summary.percentageUsed;
+
+  if (snapshot.spendingByCategory.length > 0) {
+    snapshot.highestCategory = snapshot.highestCategory ?? snapshot.spendingByCategory[0].category;
+    snapshot.highestCategoryAmount =
+      snapshot.highestCategoryAmount ?? snapshot.spendingByCategory[0].amount;
+  } else {
+    snapshot.highestCategory = snapshot.highestCategory ?? "—";
+    snapshot.highestCategoryAmount = snapshot.highestCategoryAmount ?? 0;
+  }
+
+  return snapshot;
+}
+
 app.get("/recommendation", (req, res) => {
   const { summary } = getBudgetPageData();
-  const financeSnapshot = getFinanceSnapshot(summary, sampleExpenses);
+  const financeSnapshot = ensureFinanceSnapshot(summary);
 
   res.render("recommendation", {
     pageTitle: "Recommendations",
@@ -121,7 +157,7 @@ app.post("/recommendation", (req, res) => {
   const categories = getRecommendationCategories();
 
   if (!validation.valid) {
-    const financeSnapshot = getFinanceSnapshot(summary, sampleExpenses);
+    const financeSnapshot = ensureFinanceSnapshot(summary);
 
     return res.render("recommendation", {
       pageTitle: "Recommendations",
@@ -144,7 +180,7 @@ app.post("/recommendation", (req, res) => {
     pageTitle: "Recommendations",
     activePage: "recommendation",
     summary,
-    financeSnapshot: recommendation.financeSnapshot,
+    financeSnapshot: ensureFinanceSnapshot(summary),
     categories,
     errors: [],
     recommendation,
