@@ -1,5 +1,8 @@
 // FinBot rule-based replies (Feature 8)
 
+const { hasGroqApiKey } = require("./envConfig");
+const { getGroqReply } = require("./groqService");
+
 const SUGGESTED_QUESTIONS = [
   "How much have I spent this month?",
   "What category did I spend the most on?",
@@ -60,8 +63,31 @@ function getWelcomeMessage() {
   return "Hey! I am FinBot, your finance assistant. Ask about spending, your budget, or whether a purchase fits your plan.";
 }
 
+async function getFinBotReply(message, summary, financeSnapshot, expenses) {
+  const fallbackReply = buildFinBotReply(message, summary, financeSnapshot);
+
+  if (!process.env.GROQ_API_KEY || !hasGroqApiKey()) {
+    return { text: fallbackReply, usedGroq: false };
+  }
+
+  try {
+    const aiReply = await getGroqReply(message, summary, financeSnapshot, expenses);
+
+    if (aiReply) {
+      return { text: aiReply, usedGroq: true };
+    }
+
+    console.log("Groq API failed, using fallback");
+    return { text: fallbackReply, usedGroq: false };
+  } catch (error) {
+    console.log("Groq API failed, using fallback");
+    return { text: fallbackReply, usedGroq: false };
+  }
+}
+
 module.exports = {
   SUGGESTED_QUESTIONS,
   buildFinBotReply,
+  getFinBotReply,
   getWelcomeMessage,
 };

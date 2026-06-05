@@ -1,6 +1,8 @@
 // Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
-const express = require("express");
+require("./envConfig").logGroqKeyStatus();
+
 const path = require("path");
+const express = require("express");
 const {
   validateMonthlyBudget,
   buildBudgetSummary,
@@ -14,6 +16,7 @@ const sampleExpenses = require("./sampleExpenses");
 const {
   SUGGESTED_QUESTIONS,
   buildFinBotReply,
+  getFinBotReply,
   getWelcomeMessage,
 } = require("./chatbotHelpers");
 
@@ -193,7 +196,7 @@ app.post("/recommendation", (req, res) => {
   });
 });
 
-function renderChatbotPage(res, summary, financeSnapshot, messages, inputText) {
+function renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode, inputText) {
   res.render("chatbot", {
     pageTitle: "FinBot",
     activePage: "chatbot",
@@ -202,6 +205,7 @@ function renderChatbotPage(res, summary, financeSnapshot, messages, inputText) {
     messages,
     suggestedQuestions: SUGGESTED_QUESTIONS,
     inputText: inputText || "",
+    groqAiMode: Boolean(groqAiMode),
   });
 }
 
@@ -209,28 +213,47 @@ app.get("/chatbot", (req, res) => {
   const { summary } = getBudgetPageData();
   const financeSnapshot = ensureFinanceSnapshot(summary);
 
-  renderChatbotPage(res, summary, financeSnapshot, [
-    { role: "assistant", text: getWelcomeMessage() },
-  ]);
+  renderChatbotPage(
+    res,
+    summary,
+    financeSnapshot,
+    [{ role: "assistant", text: getWelcomeMessage() }],
+    false
+  );
 });
 
-app.post("/chatbot", (req, res) => {
-  const { summary } = getBudgetPageData();
+app.post("/chatbot", async (req, res) => {
+  const { summary, expenses } = getBudgetPageData();
   const financeSnapshot = ensureFinanceSnapshot(summary);
   const rawMessage = (req.body.message || req.body.question || "").trim();
 
   const messages = [{ role: "assistant", text: getWelcomeMessage() }];
 
+  let groqAiMode = false;
+
   if (rawMessage.length > 0) {
     messages.push({ role: "user", text: rawMessage });
-    messages.push({
-      role: "assistant",
-      text: buildFinBotReply(rawMessage, summary, financeSnapshot),
-    });
+
+    try {
+      const reply = await getFinBotReply(
+        rawMessage,
+        summary,
+        financeSnapshot,
+        expenses
+      );
+      messages.push({ role: "assistant", text: reply.text });
+      groqAiMode = reply.usedGroq;
+    } catch (error) {
+      console.log("Groq API failed, using fallback");
+      messages.push({
+        role: "assistant",
+        text: buildFinBotReply(rawMessage, summary, financeSnapshot),
+      });
+      groqAiMode = false;
+    }
   }
 
-  // Future: connect Groq API here. Read the API key from .env, e.g. process.env.GROQ_API_KEY
-  renderChatbotPage(res, summary, financeSnapshot, messages);
+  renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode);
 });
 
 app.listen(PORT, () => {

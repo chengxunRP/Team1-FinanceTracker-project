@@ -41,7 +41,7 @@
           </form>
           <% }); %>
         </div>
-        <p class="finbot-note">Rule-based replies for now — sample data only.</p>
+        <p class="finbot-note"><%= groqAiMode ? 'Groq AI replies — sample data only.' : 'Rule-based replies — add GROQ_API_KEY in app/.env for Groq AI mode.' %></p>
       </section>
     </aside>
 
@@ -50,7 +50,7 @@
         <span class="finbot-avatar" aria-hidden="true">🤖</span>
         <div>
           <strong>FinBot</strong>
-          <span class="finbot-status">Online · demo mode</span>
+          <span class="finbot-status">Online · <%= groqAiMode ? 'Groq AI mode' : 'rule-based mode' %></span>
         </div>
       </div>
 
