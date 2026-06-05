@@ -19,6 +19,12 @@ const {
   getFinBotReply,
   getWelcomeMessage,
 } = require("./chatbotHelpers");
+const { getSessionId } = require("./sessionCookie");
+const {
+  getChatHistory,
+  addChatMessage,
+  clearChatHistory,
+} = require("./chatHistory");
 
 const app = express();
 const PORT = 3000;
@@ -212,27 +218,30 @@ function renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode, 
 app.get("/chatbot", (req, res) => {
   const { summary } = getBudgetPageData();
   const financeSnapshot = ensureFinanceSnapshot(summary);
+  const sessionId = getSessionId(req, res);
+  const welcomeText = getWelcomeMessage();
+  const messages = getChatHistory(sessionId, welcomeText);
 
-  renderChatbotPage(
-    res,
-    summary,
-    financeSnapshot,
-    [{ role: "assistant", text: getWelcomeMessage() }],
-    false
-  );
+  renderChatbotPage(res, summary, financeSnapshot, messages, false);
+});
+
+app.post("/chatbot/clear", (req, res) => {
+  const sessionId = getSessionId(req, res);
+  clearChatHistory(sessionId, getWelcomeMessage());
+  res.redirect("/chatbot");
 });
 
 app.post("/chatbot", async (req, res) => {
   const { summary, expenses } = getBudgetPageData();
   const financeSnapshot = ensureFinanceSnapshot(summary);
   const rawMessage = (req.body.message || req.body.question || "").trim();
-
-  const messages = [{ role: "assistant", text: getWelcomeMessage() }];
+  const sessionId = getSessionId(req, res);
+  const welcomeText = getWelcomeMessage();
 
   let groqAiMode = false;
 
   if (rawMessage.length > 0) {
-    messages.push({ role: "user", text: rawMessage });
+    addChatMessage(sessionId, "user", rawMessage, welcomeText);
 
     try {
       const reply = await getFinBotReply(
@@ -241,17 +250,21 @@ app.post("/chatbot", async (req, res) => {
         financeSnapshot,
         expenses
       );
-      messages.push({ role: "assistant", text: reply.text });
+      addChatMessage(sessionId, "bot", reply.text, welcomeText);
       groqAiMode = reply.usedGroq;
     } catch (error) {
       console.log("Groq API failed, using fallback");
-      messages.push({
-        role: "assistant",
-        text: buildFinBotReply(rawMessage, summary, financeSnapshot),
-      });
+      addChatMessage(
+        sessionId,
+        "bot",
+        buildFinBotReply(rawMessage, summary, financeSnapshot),
+        welcomeText
+      );
       groqAiMode = false;
     }
   }
+
+  const messages = getChatHistory(sessionId, welcomeText);
 
   renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode);
 });

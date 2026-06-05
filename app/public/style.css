@@ -1271,6 +1271,26 @@ a.btn:hover { text-decoration: none; }
   background: var(--grey-50);
 }
 
+.finbot-clear-form {
+  margin: 0 0 0 auto;
+}
+
+.finbot-clear-form .btn {
+  background: var(--white);
+  color: var(--text-muted);
+  border: 1px solid var(--grey-300);
+}
+
+.finbot-clear-form .btn:hover {
+  border-color: var(--blue-mid);
+  color: var(--blue-mid);
+}
+
+.btn--sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+}
+
 .finbot-avatar {
   width: 40px;
   height: 40px;

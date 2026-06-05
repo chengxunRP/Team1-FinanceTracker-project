@@ -52,12 +52,15 @@
           <strong>FinBot</strong>
           <span class="finbot-status">Online · <%= groqAiMode ? 'Groq AI mode' : 'rule-based mode' %></span>
         </div>
+        <form method="POST" action="/chatbot/clear" class="finbot-clear-form">
+          <button type="submit" class="btn btn--sm">Clear chat</button>
+        </form>
       </div>
 
       <div class="finbot-messages">
         <% messages.forEach(function(message) { %>
-        <article class="finbot-bubble finbot-bubble--<%= message.role %>">
-          <% if (message.role === 'assistant') { %>
+        <article class="finbot-bubble finbot-bubble--<%= message.sender === 'user' ? 'user' : 'assistant' %>">
+          <% if (message.sender === 'bot') { %>
           <span class="finbot-bubble__label">FinBot</span>
           <% } %>
           <p><%= message.text %></p>
