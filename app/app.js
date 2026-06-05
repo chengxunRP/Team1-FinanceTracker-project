@@ -1,10 +1,14 @@
-// Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
+// Finance Tracker - Express server with EJS views
 const express = require("express");
 const path = require("path");
 const {
   validateMonthlyBudget,
   buildBudgetSummary,
 } = require("./budgetHelpers");
+const {
+  validateItemInput,
+  getSpendingRecommendation,
+} = require("./recommendationHelpers");
 const sampleExpenses = require("./sampleExpenses");
 
 const app = express();
@@ -26,6 +30,20 @@ function getBudgetPageData() {
     summary,
     expenses: sampleExpenses,
   };
+}
+
+function getRecommendationCategories() {
+  const categories = [];
+
+  for (let i = 0; i < sampleExpenses.length; i++) {
+    const cat = sampleExpenses[i].category;
+    if (!categories.includes(cat)) {
+      categories.push(cat);
+    }
+  }
+
+  categories.push("Other");
+  return categories;
 }
 
 app.get("/", (req, res) => {
@@ -78,6 +96,52 @@ app.post("/budget", (req, res) => {
     errors: [],
     successMessage: "Monthly budget updated successfully.",
     formValues: { monthlyBudget: updated.summary.monthlyBudget },
+  });
+});
+
+app.get("/recommendation", (req, res) => {
+  const { summary } = getBudgetPageData();
+
+  res.render("recommendation", {
+    pageTitle: "Recommendations",
+    activePage: "recommendation",
+    summary,
+    categories: getRecommendationCategories(),
+    errors: [],
+  });
+});
+
+app.post("/recommendation", (req, res) => {
+  const { itemName, itemPrice, category } = req.body;
+  const { summary } = getBudgetPageData();
+  const validation = validateItemInput(itemName, itemPrice, category);
+  const categories = getRecommendationCategories();
+
+  if (!validation.valid) {
+    return res.render("recommendation", {
+      pageTitle: "Recommendations",
+      activePage: "recommendation",
+      summary,
+      categories,
+      errors: validation.errors,
+      formValues: { itemName, itemPrice, category },
+    });
+  }
+
+  const recommendation = getSpendingRecommendation(summary, sampleExpenses, {
+    itemName: validation.itemName,
+    itemPrice: validation.itemPrice,
+    category: validation.category,
+  });
+
+  res.render("recommendation", {
+    pageTitle: "Recommendations",
+    activePage: "recommendation",
+    summary,
+    categories,
+    errors: [],
+    recommendation,
+    formValues: { itemName, itemPrice, category },
   });
 });
 

@@ -710,3 +710,76 @@ a.btn:hover {
   font-weight: 600;
   color: var(--blue);
 }
+
+/* ----- Smart recommendation ----- */
+.recommendation-form {
+  max-width: 480px;
+}
+
+.form-group select {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--grey-300);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--white);
+}
+
+.form-group select:focus {
+  outline: 2px solid var(--blue-light);
+  border-color: var(--blue);
+}
+
+.recommendation-result {
+  border-left: 4px solid var(--green);
+}
+
+.recommendation-result--success {
+  border-left-color: var(--green);
+}
+
+.recommendation-result--warning {
+  border-left-color: var(--warning);
+}
+
+.recommendation-result--danger {
+  border-left-color: var(--danger);
+}
+
+.recommendation-badge {
+  margin-bottom: 1rem;
+}
+
+.recommendation-reasons {
+  margin: 0 0 1.5rem;
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+}
+
+.recommendation-reasons li {
+  margin-bottom: 0.5rem;
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.analysis-item {
+  background: var(--grey-100);
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+}
+
+.analysis-label {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.analysis-value {
+  font-weight: 600;
+  color: var(--text);
+}
