@@ -1,148 +1,188 @@
 <%- include('partials/header') %>
 
-<header class="page-header">
-  <span class="eyebrow">Spending insight</span>
-  <h1>Smart Spending Recommendation</h1>
-  <p>Check whether a purchase fits your budget before you buy.</p>
-</header>
+<div class="rec-page">
+  <header class="rec-hero">
+    <div>
+      <span class="eyebrow">Spending insight</span>
+      <h1>Should you buy this?</h1>
+      <p>Analyse a purchase against your budget and spending habits before you spend.</p>
+    </div>
+    <div class="rec-hero__badge">
+      <span class="rec-hero__badge-label">Powered by</span>
+      <span class="rec-hero__badge-value">Sample finance data</span>
+    </div>
+  </header>
 
-<section class="card-panel">
-  <h2>Current finance snapshot</h2>
-  <div class="stat-grid stat-grid--5">
-    <article class="stat-card">
-      <span class="stat-card__label">Monthly budget</span>
-      <span class="stat-card__value stat-card__value--blue">$<%= financeSnapshot.monthlyBudget %></span>
-    </article>
-    <article class="stat-card">
-      <span class="stat-card__label">Total spent</span>
-      <span class="stat-card__value stat-card__value--blue">$<%= financeSnapshot.totalSpent %></span>
-    </article>
-    <article class="stat-card">
-      <span class="stat-card__label">Remaining</span>
-      <span class="stat-card__value stat-card__value--green">$<%= financeSnapshot.remainingBudget %></span>
-    </article>
-    <article class="stat-card">
-      <span class="stat-card__label">Budget used</span>
-      <span class="stat-card__value"><%= financeSnapshot.percentageUsed %>%</span>
-    </article>
-    <article class="stat-card stat-card--wide">
-      <span class="stat-card__label">Highest spending category</span>
-      <span class="stat-card__value stat-card__value--sm"><%= financeSnapshot.highestCategory %> <span class="text-muted">($<%= financeSnapshot.highestCategoryAmount %>)</span></span>
-    </article>
-  </div>
-</section>
+  <section class="card-panel rec-snapshot">
+    <h2>Finance snapshot</h2>
+    <div class="rec-snapshot__grid">
+      <article class="rec-mini-card">
+        <span class="rec-mini-card__label">Monthly budget</span>
+        <span class="rec-mini-card__value rec-mini-card__value--blue">$<%= financeSnapshot.monthlyBudget %></span>
+      </article>
+      <article class="rec-mini-card">
+        <span class="rec-mini-card__label">Total spent</span>
+        <span class="rec-mini-card__value rec-mini-card__value--blue">$<%= financeSnapshot.totalSpent %></span>
+      </article>
+      <article class="rec-mini-card">
+        <span class="rec-mini-card__label">Remaining</span>
+        <span class="rec-mini-card__value rec-mini-card__value--green">$<%= financeSnapshot.remainingBudget %></span>
+      </article>
+      <article class="rec-mini-card">
+        <span class="rec-mini-card__label">Budget used</span>
+        <span class="rec-mini-card__value"><%= financeSnapshot.percentageUsed %>%</span>
+      </article>
+      <article class="rec-mini-card rec-mini-card--highlight">
+        <span class="rec-mini-card__label">Top category</span>
+        <span class="rec-mini-card__value rec-mini-card__value--sm"><%= financeSnapshot.highestCategory %></span>
+        <span class="rec-mini-card__sub">$<%= financeSnapshot.highestCategoryAmount %> spent</span>
+      </article>
+    </div>
 
-<div class="split-layout split-layout--rec">
-  <section class="card-panel">
-    <h2>Check an item</h2>
-    <p class="card-panel__intro">Enter the item you are thinking of buying.</p>
-
-    <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
-    <div class="form-errors">
-      <% errors.forEach(function(error) { %>
-        <p><%= error %></p>
+    <div class="rec-category-bars">
+      <h3>Spending by category</h3>
+      <% const spendingRows = Array.isArray(financeSnapshot.spendingByCategory) ? financeSnapshot.spendingByCategory : []; %>
+      <% if (spendingRows.length === 0) { %>
+      <p class="rec-insight-note">No category data available yet.</p>
+      <% } %>
+      <% spendingRows.forEach(function(row) { %>
+      <% const barPercent = Math.round((row.amount / financeSnapshot.monthlyBudget) * 100); %>
+      <div class="rec-category-bar">
+        <div class="rec-category-bar__meta">
+          <span><%= row.category %></span>
+          <span>$<%= row.amount %> (<%= barPercent %>%)</span>
+        </div>
+        <div class="rec-category-bar__track">
+          <div class="rec-category-bar__fill rec-category-bar__fill--w<%= Math.min(100, Math.round(barPercent / 5) * 5) %>"></div>
+        </div>
+      </div>
       <% }); %>
     </div>
-    <% } %>
-
-    <form class="form" method="POST" action="/recommendation">
-      <div class="form-group">
-        <label for="itemName">Item name</label>
-        <input type="text" id="itemName" name="itemName" placeholder="e.g. Wireless earbuds" required value="<%= typeof formValues !== 'undefined' && formValues.itemName ? formValues.itemName : '' %>">
-      </div>
-      <div class="form-group">
-        <label for="itemPrice">Item price ($)</label>
-        <input type="number" id="itemPrice" name="itemPrice" min="0" step="0.01" placeholder="e.g. 79.99" required value="<%= typeof formValues !== 'undefined' && formValues.itemPrice !== undefined ? formValues.itemPrice : '' %>">
-      </div>
-      <div class="form-group">
-        <label for="category">Category</label>
-        <select id="category" name="category" required>
-          <option value="">Select a category</option>
-          <% categories.forEach(function(cat) { %>
-          <option value="<%= cat %>" <%= typeof formValues !== 'undefined' && formValues.category === cat ? 'selected' : '' %>><%= cat %></option>
-          <% }); %>
-        </select>
-      </div>
-      <button type="submit" class="btn btn--primary btn--block">Get recommendation</button>
-    </form>
   </section>
 
-  <section class="card-panel card-panel--result">
-    <% if (typeof recommendation !== 'undefined' && recommendation) { %>
-    <% const progressStep = Math.min(100, Math.round(recommendation.analysis.newPercentageUsed / 5) * 5); %>
-    <div class="result-card result-card--<%= recommendation.resultBadge %>">
-      <div class="result-card__top">
-        <span class="pill pill--<%= recommendation.resultBadge %> pill--lg"><%= recommendation.result %></span>
-        <div class="result-score">
-          <span class="result-score__num"><%= recommendation.score %>%</span>
-          <span class="result-score__lbl">Score</span>
+  <div class="split-layout split-layout--rec">
+    <section class="card-panel rec-form-panel">
+      <h2>Check a purchase</h2>
+      <p class="card-panel__intro">Enter the item you are considering. We will compare it to your current budget.</p>
+
+      <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+      <div class="form-errors">
+        <% errors.forEach(function(error) { %>
+          <p><%= error %></p>
+        <% }); %>
+      </div>
+      <% } %>
+
+      <form class="form" method="POST" action="/recommendation">
+        <div class="form-group">
+          <label for="itemName">Item name</label>
+          <input type="text" id="itemName" name="itemName" placeholder="e.g. Running shoes" required value="<%= typeof formValues !== 'undefined' && formValues.itemName ? formValues.itemName : '' %>">
+        </div>
+        <div class="form-group">
+          <label for="itemPrice">Item price ($)</label>
+          <input type="number" id="itemPrice" name="itemPrice" min="0" step="0.01" placeholder="e.g. 89.00" required value="<%= typeof formValues !== 'undefined' && formValues.itemPrice !== undefined ? formValues.itemPrice : '' %>">
+        </div>
+        <div class="form-group">
+          <label for="category">Category</label>
+          <select id="category" name="category" required>
+            <option value="">Select a category</option>
+            <% categories.forEach(function(cat) { %>
+            <option value="<%= cat %>" <%= typeof formValues !== 'undefined' && formValues.category === cat ? 'selected' : '' %>><%= cat %></option>
+            <% }); %>
+          </select>
+        </div>
+        <button type="submit" class="btn btn--primary btn--block">Analyse purchase</button>
+      </form>
+    </section>
+
+    <section class="card-panel card-panel--result rec-result-panel">
+      <% if (typeof recommendation !== 'undefined' && recommendation) { %>
+      <% const progressStep = Math.min(100, Math.round(recommendation.analysis.newPercentageUsed / 5) * 5); %>
+      <div class="result-card result-card--<%= recommendation.resultBadge %>">
+        <div class="result-card__top">
+          <span class="pill pill--<%= recommendation.resultBadge %> pill--lg"><%= recommendation.result %></span>
+          <div class="rec-score-ring rec-score-ring--<%= recommendation.resultBadge %>">
+            <span class="rec-score-ring__num"><%= recommendation.score %>%</span>
+            <span class="rec-score-ring__lbl">Score</span>
+          </div>
+        </div>
+
+        <div class="result-card__item">
+          <h3><%= recommendation.itemName %></h3>
+          <p class="rec-item-price">$<%= recommendation.itemPrice %></p>
+          <span class="tag tag--blue"><%= recommendation.category %></span>
+        </div>
+
+        <div class="result-metrics">
+          <div class="result-metric">
+            <span class="result-metric__lbl">Remaining before</span>
+            <span class="result-metric__val">$<%= recommendation.analysis.remainingBudget %></span>
+          </div>
+          <div class="result-metric">
+            <span class="result-metric__lbl">Remaining after</span>
+            <span class="result-metric__val result-metric__val--<%= recommendation.analysis.newRemainingBudget >= 0 ? 'green' : 'red' %>">$<%= recommendation.analysis.newRemainingBudget %></span>
+          </div>
+          <div class="result-metric">
+            <span class="result-metric__lbl">Budget % after</span>
+            <span class="result-metric__val"><%= recommendation.analysis.newPercentageUsed %>%</span>
+          </div>
+        </div>
+
+        <div class="progress-meta">
+          <span>Budget impact</span>
+          <span><%= recommendation.analysis.percentageUsed %>% → <%= recommendation.analysis.newPercentageUsed %>%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar__fill <%= recommendation.resultBadge === 'warning' ? 'progress-bar__fill--warning' : '' %> <%= recommendation.resultBadge === 'danger' ? 'progress-bar__fill--danger' : '' %> progress-bar__fill--w<%= progressStep %>"></div>
+        </div>
+
+        <div class="result-section rec-why">
+          <h4>Why this recommendation?</h4>
+          <ul class="rec-reason-list">
+            <% recommendation.reasons.forEach(function(reason) { %>
+            <li><%= reason %></li>
+            <% }); %>
+          </ul>
+        </div>
+
+        <div class="result-section rec-insight">
+          <h4>Spending insight</h4>
+          <div class="rec-insight-grid">
+            <div class="rec-insight-item">
+              <span class="rec-insight-item__label">Highest category</span>
+              <span class="rec-insight-item__value"><%= recommendation.spendingInsight.highestCategory %></span>
+              <span class="rec-insight-item__sub">$<%= recommendation.spendingInsight.highestCategoryAmount %></span>
+            </div>
+            <div class="rec-insight-item">
+              <span class="rec-insight-item__label">This item category</span>
+              <span class="rec-insight-item__value"><%= recommendation.spendingInsight.itemCategory %></span>
+              <span class="rec-insight-item__sub">$<%= recommendation.spendingInsight.itemCategoryAmount %> (<%= recommendation.spendingInsight.itemCategoryPercent %>%)</span>
+            </div>
+          </div>
+          <% if (recommendation.spendingInsight.warningMessage) { %>
+          <p class="rec-insight-warning"><%= recommendation.spendingInsight.warningMessage %></p>
+          <% } else { %>
+          <p class="rec-insight-note">This category is not your top spending area right now.</p>
+          <% } %>
         </div>
       </div>
-
-      <div class="result-card__item">
-        <h3><%= recommendation.itemName %></h3>
-        <p>$<%= recommendation.itemPrice %> · <span class="tag tag--blue"><%= recommendation.category %></span></p>
-      </div>
-
-      <div class="result-metrics">
-        <div class="result-metric">
-          <span class="result-metric__lbl">Remaining before</span>
-          <span class="result-metric__val">$<%= recommendation.analysis.remainingBudget %></span>
+      <% } else { %>
+      <div class="result-empty">
+        <div class="rec-score-ring rec-score-ring--empty">
+          <span class="rec-score-ring__num">—</span>
+          <span class="rec-score-ring__lbl">Score</span>
         </div>
-        <div class="result-metric">
-          <span class="result-metric__lbl">Remaining after</span>
-          <span class="result-metric__val result-metric__val--<%= recommendation.analysis.newRemainingBudget >= 0 ? 'green' : 'red' %>">$<%= recommendation.analysis.newRemainingBudget %></span>
-        </div>
-        <div class="result-metric">
-          <span class="result-metric__lbl">Budget % after</span>
-          <span class="result-metric__val"><%= recommendation.analysis.newPercentageUsed %>%</span>
-        </div>
-      </div>
-
-      <div class="progress-meta">
-        <span>Budget impact</span>
-        <span><%= recommendation.analysis.percentageUsed %>% → <%= recommendation.analysis.newPercentageUsed %>%</span>
-      </div>
-      <div class="progress-bar">
-        <div class="progress-bar__fill <%= recommendation.resultBadge === 'warning' ? 'progress-bar__fill--warning' : '' %> <%= recommendation.resultBadge === 'danger' ? 'progress-bar__fill--danger' : '' %> progress-bar__fill--w<%= progressStep %>"></div>
-      </div>
-
-      <div class="result-section">
-        <h4>Why this recommendation?</h4>
-        <ul class="bullet-list">
-          <% recommendation.reasons.forEach(function(reason) { %>
-          <li><%= reason %></li>
-          <% }); %>
+        <h3>Your insight appears here</h3>
+        <p>Enter a purchase on the left and tap <strong>Analyse purchase</strong> to get a recommendation.</p>
+        <ul class="rule-list rule-list--center">
+          <li><span class="pill pill--success">Safe to buy</span></li>
+          <li><span class="pill pill--warning">Risky</span></li>
+          <li><span class="pill pill--danger">Not recommended</span></li>
         </ul>
       </div>
-
-      <div class="result-section category-insight">
-        <h4>Category insight</h4>
-        <p>
-          You have spent <strong>$<%= recommendation.analysis.categoryTotal %></strong>
-          on <strong><%= recommendation.category %></strong>
-          (<%= recommendation.analysis.categoryPercent %>% of budget).
-        </p>
-        <% if (recommendation.category === financeSnapshot.highestCategory) { %>
-        <p class="insight-note insight-note--warning">This is your highest spending category this month.</p>
-        <% } else { %>
-        <p class="insight-note">Your highest category is <strong><%= financeSnapshot.highestCategory %></strong> ($<%= financeSnapshot.highestCategoryAmount %>).</p>
-        <% } %>
-      </div>
-    </div>
-    <% } else { %>
-    <div class="result-empty">
-      <span class="result-empty__icon">💡</span>
-      <h3>Your recommendation appears here</h3>
-      <p>Enter an item on the left and click <strong>Get recommendation</strong> to see your score and advice.</p>
-      <ul class="rule-list rule-list--center">
-        <li><span class="pill pill--success">Safe to buy</span></li>
-        <li><span class="pill pill--warning">Risky</span></li>
-        <li><span class="pill pill--danger">Not recommended</span></li>
-      </ul>
-    </div>
-    <% } %>
-  </section>
+      <% } %>
+    </section>
+  </div>
 </div>
 
 <%- include('partials/footer') %>
