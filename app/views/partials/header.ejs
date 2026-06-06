@@ -3,21 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= pageTitle %> | Finance Tracker</title>
+  <title><%= pageTitle %> | spendWise</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body<% if (typeof activePage !== 'undefined' && activePage === 'home') { %> class="page-home"<% } %>>
   <header class="site-header">
     <div class="header-inner">
-      <a href="/" class="logo">
-        <span class="logo-icon" aria-hidden="true">₣</span>
-        <span class="logo-text">Finance Tracker</span>
+      <a href="/" class="logo" aria-label="spendWise home">
+        <span class="logo-icon" aria-hidden="true">
+          <svg class="logo-mark" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 9.5C3 7.567 4.567 6 6.5 6H17.5C19.433 6 21 7.567 21 9.5V18.5C21 20.433 19.433 22 17.5 22H6.5C4.567 22 3 20.433 3 18.5V9.5Z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+            <path d="M3 11H21" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M7 6V5.25C7 4.007 8.007 3 9.25 3H14.75C15.993 3 17 4.007 17 5.25V6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="17" cy="15.5" r="1.35" fill="currentColor"/>
+            <path d="M6.5 3.75L8.25 6.25L10.75 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="logo-text">spend<span class="logo-text-accent">Wise</span></span>
       </a>
       <nav class="nav" aria-label="Main navigation">
-        <a href="/" class="nav-link <%= activePage === 'home' ? 'nav-link--active' : '' %>">Home</a>
-        <a href="/budget" class="nav-link <%= activePage === 'budget' ? 'nav-link--active' : '' %>">Budget</a>
-        <a href="/recommendation" class="nav-link <%= activePage === 'recommendation' ? 'nav-link--active' : '' %>">Recommendations</a>
-        <a href="/chatbot" class="nav-link <%= activePage === 'chatbot' ? 'nav-link--active' : '' %>">FinBot</a>
+        <a href="/" class="nav-link<%= activePage === 'home' ? ' nav-link--active' : '' %>">Home</a>
+        <a href="/budget" class="nav-link<%= activePage === 'budget' ? ' nav-link--active' : '' %>">Budget</a>
+        <a href="/recommendation" class="nav-link<%= activePage === 'recommendation' ? ' nav-link--active' : '' %>">Recommendations</a>
+        <a href="/chatbot" class="nav-link<%= activePage === 'chatbot' ? ' nav-link--active' : '' %>">FinBot</a>
       </nav>
     </div>
   </header>

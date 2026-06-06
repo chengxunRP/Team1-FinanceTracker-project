@@ -270,5 +270,5 @@ app.post("/chatbot", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Finance Tracker running at http://localhost:${PORT}`);
+  console.log(`spendWise running at http://localhost:${PORT}`);
 });

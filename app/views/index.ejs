@@ -1,289 +1,251 @@
 <%- include('partials/header') %>
 
-<section class="hero">
-  <div class="hero__content">
-    <span class="eyebrow">Personal finance dashboard</span>
-    <h1>Manage your money with confidence</h1>
-    <p class="hero__lead">
-      Track spending from sample expenses, set your monthly budget with clear alerts,
-      and get smart purchase recommendations — all in one polished dashboard.
-    </p>
-    <div class="cta-row">
-      <a href="/budget" class="btn btn--primary">Set Budget</a>
-      <a href="/recommendation" class="btn btn--success">View Recommendation</a>
-    </div>
-  </div>
-  <div class="hero__stats">
-    <div class="hero-stat">
-      <span class="hero-stat__label">Budget used</span>
-      <span class="hero-stat__value"><%= summary.percentageUsed %>%</span>
-    </div>
-    <div class="hero-stat">
-      <span class="hero-stat__label">Remaining</span>
-      <span class="hero-stat__value hero-stat__value--green">$<%= summary.remainingBudget %></span>
-    </div>
-    <div class="hero-stat">
-      <span class="hero-stat__label">Status</span>
-      <span class="pill pill--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
-    </div>
-  </div>
-</section>
+<div class="home-page-pro">
 
-<section class="section-block">
-  <div class="section-head">
-    <h2>What you can do</h2>
-    <p>Explore the main Finance Tracker features in our continuous showcase.</p>
-  </div>
+  <section class="hero-slider-section" id="heroSlider" aria-label="Home hero slider">
+    <div class="hero-slides">
 
-  <div class="feature-carousel">
-    <div class="feature-carousel__stage">
-      <button type="button" class="feature-carousel__arrow feature-carousel__arrow--left" aria-label="Scroll features left">
-        <svg class="feature-carousel__arrow-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-
-      <div class="feature-carousel__viewport">
-        <div class="feature-carousel__track" id="featureCarouselTrack">
-        <div class="feature-carousel__set">
-          <article class="feature-carousel__card">
-            <img src="/features/budgetAlert.png" alt="Budget Alerts" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Budget Alerts</h3>
-              <p>Set a monthly budget and get warning alerts when spending reaches 80% or goes over 100%.</p>
-              <a href="/budget" class="btn btn--primary btn--sm">Open Budget</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/recommendation.jpg" alt="Smart Recommendation" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Smart Recommendation</h3>
-              <p>Check whether a purchase is safe, risky, or not recommended based on your remaining budget.</p>
-              <a href="/recommendation" class="btn btn--primary btn--sm">Try Recommendation</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/cravebot.png" alt="FinBot Chatbot" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>FinBot Chatbot</h3>
-              <p>Ask finance questions and get AI-assisted replies based on your spending and budget data.</p>
-              <a href="/chatbot" class="btn btn--primary btn--sm">Open FinBot</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/dashboard.png" alt="Dashboard Analytics" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Dashboard Analytics</h3>
-              <p>View your total spending, remaining budget, and spending breakdown in one place.</p>
-              <a href="/" class="btn btn--primary btn--sm">View Dashboard</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/month_report_feature.jpg" alt="Monthly Report" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Monthly Report</h3>
-              <p>Review your monthly spending summary and understand where your money went.</p>
-              <a href="#" class="btn btn--primary btn--sm">Coming soon</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/saving_goal_feature.jpg" alt="Savings Goal" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Savings Goal</h3>
-              <p>Set a saving target and track your progress toward reaching it.</p>
-              <a href="#" class="btn btn--primary btn--sm">Coming soon</a>
-            </div>
-          </article>
-        </div>
-
-        <div class="feature-carousel__set" aria-hidden="true">
-          <article class="feature-carousel__card">
-            <img src="/features/budgetAlert.png" alt="" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Budget Alerts</h3>
-              <p>Set a monthly budget and get warning alerts when spending reaches 80% or goes over 100%.</p>
-              <a href="/budget" class="btn btn--primary btn--sm" tabindex="-1">Open Budget</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/recommendation.jpg" alt="" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Smart Recommendation</h3>
-              <p>Check whether a purchase is safe, risky, or not recommended based on your remaining budget.</p>
-              <a href="/recommendation" class="btn btn--primary btn--sm" tabindex="-1">Try Recommendation</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/cravebot.png" alt="" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>FinBot Chatbot</h3>
-              <p>Ask finance questions and get AI-assisted replies based on your spending and budget data.</p>
-              <a href="/chatbot" class="btn btn--primary btn--sm" tabindex="-1">Open FinBot</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/dashboard.png" alt="" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Dashboard Analytics</h3>
-              <p>View your total spending, remaining budget, and spending breakdown in one place.</p>
-              <a href="/" class="btn btn--primary btn--sm" tabindex="-1">View Dashboard</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/month_report_feature.jpg" alt="" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Monthly Report</h3>
-              <p>Review your monthly spending summary and understand where your money went.</p>
-              <a href="#" class="btn btn--primary btn--sm" tabindex="-1">Coming soon</a>
-            </div>
-          </article>
-
-          <article class="feature-carousel__card">
-            <img src="/features/saving_goal_feature.jpg" alt="" class="feature-carousel__img">
-            <div class="feature-carousel__body">
-              <h3>Savings Goal</h3>
-              <p>Set a saving target and track your progress toward reaching it.</p>
-              <a href="#" class="btn btn--primary btn--sm" tabindex="-1">Coming soon</a>
-            </div>
-          </article>
+      <div class="hero-slide hero-slide--intro active" style="background-image: url('/hero section/introduction.png');">
+        <div class="hero-slide-overlay"></div>
+        <div class="hero-slide-inner">
+          <div class="hero-slide-content">
+            <span class="hero-slide-kicker">SpendWise Finance Tracker</span>
+            <h1 class="hero-slide-title">Take control of your money with SpendWise</h1>
+            <p class="hero-slide-desc">
+              Track your spending, manage budgets, view insights, and make smarter money decisions in one simple dashboard.
+            </p>
+          </div>
         </div>
       </div>
+
+      <div class="hero-slide hero-slide--budget" style="background-image: url('/hero section/hero-section1.avif');">
+        <div class="hero-slide-overlay"></div>
+        <div class="hero-slide-inner">
+          <div class="hero-slide-content">
+            <span class="hero-slide-kicker">Budget and Savings</span>
+            <h1 class="hero-slide-title">Plan your budget and stay on track</h1>
+            <p class="hero-slide-desc">
+              Set monthly budgets, monitor spending progress, receive alerts, review reports, and work toward your saving goals.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <button type="button" class="feature-carousel__arrow feature-carousel__arrow--right" aria-label="Scroll features right">
-        <svg class="feature-carousel__arrow-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
+      <div class="hero-slide hero-slide--assistant" style="background-image: url('/hero section/chatbot.webp');">
+        <div class="hero-slide-overlay"></div>
+        <div class="hero-slide-inner">
+          <div class="hero-slide-content">
+            <span class="hero-slide-kicker">Smart Money Assistant</span>
+            <h1 class="hero-slide-title">Get spending help from FinBot</h1>
+            <p class="hero-slide-desc">
+              Ask finance questions, check whether a purchase is safe, and get AI-assisted guidance based on your spending data.
+            </p>
+          </div>
+        </div>
+      </div>
+
     </div>
-  </div>
-</section>
 
-<section class="section-block">
-  <div class="section-head">
-    <h2>Live snapshot</h2>
-    <p>Current numbers from your sample budget and expenses.</p>
-  </div>
-  <div class="stat-grid">
-    <article class="stat-card">
-      <span class="stat-card__label">Monthly budget</span>
-      <span class="stat-card__value stat-card__value--blue">$<%= summary.monthlyBudget %></span>
-    </article>
-    <article class="stat-card">
-      <span class="stat-card__label">Total spent</span>
-      <span class="stat-card__value stat-card__value--blue">$<%= summary.totalSpent %></span>
-    </article>
-    <article class="stat-card">
-      <span class="stat-card__label">Remaining</span>
-      <span class="stat-card__value stat-card__value--green">$<%= summary.remainingBudget %></span>
-    </article>
-    <article class="stat-card">
-      <span class="stat-card__label">Budget used</span>
-      <span class="stat-card__value"><%= summary.percentageUsed %>%</span>
-      <span class="pill pill--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
-    </article>
-  </div>
-</section>
+    <button type="button" class="hero-slider-arrow hero-slider-arrow-prev" aria-label="Previous slide" data-hero-direction="prev">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
 
-<% if (summary.alert.type !== 'safe') { %>
-<div class="alert-strip alert-strip--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %>">
-  <strong><%= summary.statusLabel %>:</strong> <%= summary.alert.message %>
+    <button type="button" class="hero-slider-arrow hero-slider-arrow-next" aria-label="Next slide" data-hero-direction="next">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <div class="hero-slider-dots" role="tablist" aria-label="Hero slides">
+      <button type="button" class="hero-slider-dot active" data-hero-dot="0" aria-label="Slide 1"></button>
+      <button type="button" class="hero-slider-dot" data-hero-dot="1" aria-label="Slide 2"></button>
+      <button type="button" class="hero-slider-dot" data-hero-dot="2" aria-label="Slide 3"></button>
+    </div>
+  </section>
+
+  <div class="home-sections-wrap">
+
+    <section class="home-section-block feature-slider-section">
+      <div class="home-section-head">
+        <p class="section-kicker">Features</p>
+        <h2 class="home-section-title">What you can do</h2>
+        <p class="home-section-lead">Slide through the main spendWise tools for managing your money.</p>
+      </div>
+
+      <% const homeFeatures = [
+        {
+          title: 'Budget Alerts',
+          image: '/features/budgetalert.png',
+          desc: 'Set a monthly budget and get warning alerts when spending reaches 80% or goes over 100%.',
+          btn: 'Open Budget',
+          link: '/budget',
+          color: 'green'
+        },
+        {
+          title: 'Smart Recommendation',
+          image: '/features/recommendation.jpg',
+          desc: 'Check whether a purchase is safe, risky, or not recommended based on your remaining budget.',
+          btn: 'Try Recommendation',
+          link: '/recommendation',
+          color: 'blue'
+        },
+        {
+          title: 'Add Expenses',
+          image: '/features/addexpense.png',
+          desc: 'Add, view, edit, and delete expenses, then group them by categories such as food, transport, shopping, bills, and entertainment.',
+          btn: 'Coming soon',
+          link: '#',
+          color: 'orange'
+        },
+        {
+          title: 'FinBot Chatbot',
+          image: '/features/cravebot.png',
+          desc: 'Ask finance questions and get AI-assisted replies based on your budget and spending data.',
+          btn: 'Open FinBot',
+          link: '/chatbot',
+          color: 'dark'
+        },
+        {
+          title: 'Dashboard Analytics',
+          image: '/features/dashboard.png',
+          desc: 'View your total spending, remaining budget, and spending breakdown in one place.',
+          btn: 'View Dashboard',
+          link: '/',
+          color: 'orange'
+        },
+        {
+          title: 'Monthly Report',
+          image: '/features/month_report_feature.jpg',
+          desc: 'Review your monthly spending summary and understand where your money went.',
+          btn: 'Coming soon',
+          link: '#',
+          color: 'yellow'
+        },
+        {
+          title: 'Savings Goal',
+          image: '/features/saving_goal_feature.jpg',
+          desc: 'Set a saving target and track your progress toward reaching it.',
+          btn: 'Coming soon',
+          link: '#',
+          color: 'green'
+        }
+      ]; %>
+
+      <div class="feature-slider-wrap feature-carousel-wrapper" id="featureCarousel">
+        <button
+          id="featurePrevBtn"
+          class="feature-slider-arrow feature-slider-arrow-prev"
+          type="button"
+          aria-label="Previous features"
+        >
+          <span class="feature-slider-arrow-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+
+        <div class="feature-carousel-window">
+          <div class="feature-carousel-track" id="featureCarouselTrack">
+            <% for (let i = 0; i < homeFeatures.length; i++) { %>
+              <article class="feature-slide-card home-feature-card feature-slide-card-<%= homeFeatures[i].color %>">
+                <div class="feature-slide-img-wrap">
+                  <img
+                    src="<%= homeFeatures[i].image %>"
+                    class="feature-slide-img"
+                    alt="<%= homeFeatures[i].title %>"
+                  >
+                </div>
+                <div class="feature-slide-body">
+                  <h3 class="feature-slide-title"><%= homeFeatures[i].title %></h3>
+                  <p class="feature-slide-desc"><%= homeFeatures[i].desc %></p>
+                  <a
+                    href="<%= homeFeatures[i].link %>"
+                    class="feature-slide-btn feature-slide-btn-<%= homeFeatures[i].color %>"
+                  >
+                    <%= homeFeatures[i].btn %>
+                  </a>
+                </div>
+              </article>
+            <% } %>
+
+            <% for (let i = 0; i < homeFeatures.length; i++) { %>
+              <article
+                class="feature-slide-card home-feature-card feature-slide-card-<%= homeFeatures[i].color %>"
+                aria-hidden="true"
+              >
+                <div class="feature-slide-img-wrap">
+                  <img src="<%= homeFeatures[i].image %>" class="feature-slide-img" alt="">
+                </div>
+                <div class="feature-slide-body">
+                  <h3 class="feature-slide-title"><%= homeFeatures[i].title %></h3>
+                  <p class="feature-slide-desc"><%= homeFeatures[i].desc %></p>
+                  <a
+                    href="<%= homeFeatures[i].link %>"
+                    class="feature-slide-btn feature-slide-btn-<%= homeFeatures[i].color %>"
+                    tabindex="-1"
+                  >
+                    <%= homeFeatures[i].btn %>
+                  </a>
+                </div>
+              </article>
+            <% } %>
+          </div>
+        </div>
+
+        <button
+          id="featureNextBtn"
+          class="feature-slider-arrow feature-slider-arrow-next"
+          type="button"
+          aria-label="Next features"
+        >
+          <span class="feature-slider-arrow-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+      </div>
+    </section>
+
+  </div>
+
+  <section class="home-section-block home-live-section">
+    <div class="home-section-head">
+      <h2 class="home-section-title">Live snapshot</h2>
+      <p class="home-section-lead">Current numbers from your sample budget and expenses.</p>
+    </div>
+    <div class="stat-grid">
+      <article class="stat-card">
+        <span class="stat-card__label">Monthly budget</span>
+        <span class="stat-card__value stat-card__value--blue">$<%= summary.monthlyBudget %></span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-card__label">Total spent</span>
+        <span class="stat-card__value stat-card__value--blue">$<%= summary.totalSpent %></span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-card__label">Remaining</span>
+        <span class="stat-card__value stat-card__value--green">$<%= summary.remainingBudget %></span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-card__label">Budget used</span>
+        <span class="stat-card__value"><%= summary.percentageUsed %>%</span>
+        <span class="pill pill--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
+      </article>
+    </div>
+
+    <% if (summary.alert.type !== 'safe') { %>
+    <div class="alert-strip alert-strip--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %>">
+      <strong><%= summary.statusLabel %>:</strong> <%= summary.alert.message %>
+    </div>
+    <% } %>
+  </section>
+
 </div>
-<% } %>
 
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    var track = document.getElementById("featureCarouselTrack");
-    var leftBtn = document.querySelector(".feature-carousel__arrow--left");
-    var rightBtn = document.querySelector(".feature-carousel__arrow--right");
-
-    if (!track || !leftBtn || !rightBtn) {
-      return;
-    }
-
-    var position = 0;
-    var lastTime = null;
-    var loopSeconds = 32;
-
-    function getLoopWidth() {
-      return track.offsetWidth / 2;
-    }
-
-    function getCardStep() {
-      var card = track.querySelector(".feature-carousel__card");
-      var set = track.querySelector(".feature-carousel__set");
-
-      if (!card) {
-        return 0;
-      }
-
-      var gap = set ? parseFloat(getComputedStyle(set).gap) || 16 : 16;
-      return card.offsetWidth + gap;
-    }
-
-    function wrapPosition() {
-      var loopWidth = getLoopWidth();
-
-      if (loopWidth <= 0) {
-        return;
-      }
-
-      while (position >= loopWidth) {
-        position -= loopWidth;
-      }
-
-      while (position < 0) {
-        position += loopWidth;
-      }
-    }
-
-    function applyTransform() {
-      track.style.transform = "translate3d(" + (-position) + "px, 0, 0)";
-    }
-
-    function nudge(direction) {
-      position += direction * getCardStep();
-      wrapPosition();
-      applyTransform();
-    }
-
-    function animate(time) {
-      if (!lastTime) {
-        lastTime = time;
-      }
-
-      var delta = time - lastTime;
-      lastTime = time;
-      var loopWidth = getLoopWidth();
-
-      if (loopWidth > 0) {
-        position += (loopWidth / (loopSeconds * 1000)) * delta;
-        wrapPosition();
-        applyTransform();
-      }
-
-      requestAnimationFrame(animate);
-    }
-
-    leftBtn.addEventListener("click", function () {
-      nudge(-1);
-    });
-
-    rightBtn.addEventListener("click", function () {
-      nudge(1);
-    });
-
-    requestAnimationFrame(animate);
-  });
-</script>
+<script src="/js/homepage.js"></script>
 
 <%- include('partials/footer') %>
