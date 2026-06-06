@@ -195,11 +195,9 @@ a:hover { color: var(--blue); }
   max-width: 100%;
 }
 
-.app-content--home {
-  padding: 1.35rem 1.5rem 2rem;
-  max-width: var(--max-width);
-  margin-left: auto;
-  margin-right: auto;
+.app-content--landing {
+  padding: 0;
+  max-width: none;
   width: 100%;
 }
 
@@ -222,7 +220,7 @@ a:hover { color: var(--blue); }
   opacity: 0.85;
 }
 
-.app-content:not(.app-content--home) {
+.app-content:not(.app-content--landing) {
   width: 100%;
   max-width: var(--max-width);
   margin-left: auto;
@@ -913,11 +911,11 @@ a.btn:hover { text-decoration: none; }
   color: var(--text);
 }
 
-/* ----- Home page (legacy landing — unused) ----- */
+/* ----- Introduction Home page ----- */
 
 .home-page-pro {
-  --home-bg: var(--bg);
-  --home-border: var(--border-soft);
+  --home-bg: #faf6ef;
+  --home-border: #f3e7dc;
   --home-accent: var(--blue);
   --home-navy: #1a2332;
   background: var(--home-bg);

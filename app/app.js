@@ -47,12 +47,25 @@ function getBudgetPageData() {
   };
 }
 
-app.get("/", (req, res) => {
+function renderOverviewPage(req, res) {
   const { summary } = getBudgetPageData();
 
   res.render("index", {
     pageTitle: "Overview",
-    activePage: "home",
+    activePage: "overview",
+    summary,
+  });
+}
+
+app.get("/", renderOverviewPage);
+app.get("/dashboard", renderOverviewPage);
+
+app.get("/home", (req, res) => {
+  const { summary } = getBudgetPageData();
+
+  res.render("home", {
+    pageTitle: "Home",
+    activePage: "landing",
     summary,
   });
 });
