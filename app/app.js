@@ -159,7 +159,7 @@ function ensureFinanceSnapshot(summary) {
     snapshot.highestCategoryAmount =
       snapshot.highestCategoryAmount ?? snapshot.spendingByCategory[0].amount;
   } else {
-    snapshot.highestCategory = snapshot.highestCategory ?? "ΓÇö";
+    snapshot.highestCategory = snapshot.highestCategory ?? "-";
     snapshot.highestCategoryAmount = snapshot.highestCategoryAmount ?? 0;
   }
 
