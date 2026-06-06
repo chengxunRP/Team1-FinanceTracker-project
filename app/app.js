@@ -1,4 +1,4 @@
-// Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
+﻿// Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
 require("./envConfig").logGroqKeyStatus();
 
 const path = require("path");
@@ -159,7 +159,7 @@ function ensureFinanceSnapshot(summary) {
     snapshot.highestCategoryAmount =
       snapshot.highestCategoryAmount ?? snapshot.spendingByCategory[0].amount;
   } else {
-    snapshot.highestCategory = snapshot.highestCategory ?? "—";
+    snapshot.highestCategory = snapshot.highestCategory ?? "-";
     snapshot.highestCategoryAmount = snapshot.highestCategoryAmount ?? 0;
   }
 

@@ -1,4 +1,4 @@
-<%- include('partials/header') %>
+﻿<%- include('partials/header') %>
 
 <div class="dash-page" id="dashPage">
   <section class="dash-month-bar" aria-label="Selected month">
@@ -12,7 +12,7 @@
   </section>
 
   <section class="dash-summary-row" aria-label="Summary">
-    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Monthly Budget — open Budget Alerts">
+    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Monthly Budget - open Budget Alerts">
       <span class="dash-stat-label">Monthly Budget</span>
       <span class="dash-stat-value dash-stat-value--blue" id="dashStatBudget">$<%= summary.monthlyBudget %></span>
     </a>
@@ -21,11 +21,11 @@
       <span class="dash-stat-value dash-stat-value--red" id="dashStatSpent">$<%= summary.totalSpent %></span>
       <span class="dash-stat-sub" id="dashStatExpenseCount"><%= expenses.length %> expense<%= expenses.length === 1 ? '' : 's' %></span>
     </article>
-    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Remaining budget — open Budget Alerts">
+    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Remaining budget - open Budget Alerts">
       <span class="dash-stat-label">Remaining</span>
       <span class="dash-stat-value dash-stat-value--green" id="dashStatRemaining">$<%= summary.remainingBudget %></span>
     </a>
-    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Budget Used — open Budget Alerts">
+    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Budget Used - open Budget Alerts">
       <span class="dash-stat-label">Budget Used</span>
       <span class="dash-stat-value" id="dashStatUsed"><%= summary.percentageUsed %>%</span>
       <span class="pill pill--<%= summary.statusBadge %>" id="dashUsedPill"><%= summary.statusLabel %></span>
@@ -41,7 +41,7 @@
     <article class="dash-card dash-period-card">
       <div class="dash-card-head">
         <h2 class="dash-card-title">This Month</h2>
-        <button type="button" class="dash-card-menu" aria-label="This month options">⋯</button>
+        <button type="button" class="dash-card-menu" aria-label="This month options">&#8943;</button>
       </div>
       <div class="dash-period-body">
         <div class="dash-donut" id="dashDonutThis" style="--used: 64;" aria-hidden="true">
@@ -61,7 +61,7 @@
     <article class="dash-card dash-period-card">
       <div class="dash-card-head">
         <h2 class="dash-card-title">Last Month</h2>
-        <button type="button" class="dash-card-menu" aria-label="Last month options">⋯</button>
+        <button type="button" class="dash-card-menu" aria-label="Last month options">&#8943;</button>
       </div>
       <div class="dash-period-body">
         <div class="dash-donut dash-donut--muted" id="dashDonutLast" style="--used: 58;" aria-hidden="true">
@@ -81,7 +81,7 @@
     <article class="dash-card dash-highlight-card">
       <div class="dash-card-head">
         <h2 class="dash-card-title">Top Category</h2>
-        <button type="button" class="dash-card-menu" aria-label="Top category options">⋯</button>
+        <button type="button" class="dash-card-menu" aria-label="Top category options">&#8943;</button>
       </div>
       <p class="dash-highlight-name" id="dashTopName">Food</p>
       <p class="dash-highlight-value dash-val-red" id="dashTopSpent">$120 spent</p>
@@ -93,7 +93,7 @@
     <article class="dash-card dash-chart-card dash-chart-card--wide">
       <div class="dash-card-head">
         <h2 class="dash-card-title">Spending Trend</h2>
-        <button type="button" class="dash-card-menu" aria-label="Spending trend options">⋯</button>
+        <button type="button" class="dash-card-menu" aria-label="Spending trend options">&#8943;</button>
       </div>
       <div class="dash-line-chart">
         <svg viewBox="0 0 440 130" id="dashTrendSvg" role="img" aria-label="Spending trend chart"></svg>
@@ -103,17 +103,17 @@
     <article class="dash-card dash-chart-card">
       <div class="dash-card-head">
         <h2 class="dash-card-title">Last 7 Days</h2>
-        <button type="button" class="dash-card-menu" aria-label="Last 7 days options">⋯</button>
+        <button type="button" class="dash-card-menu" aria-label="Last 7 days options">&#8943;</button>
       </div>
       <div class="dash-bar-chart" id="dashBarChart" role="img" aria-label="Daily spending bar chart"></div>
     </article>
   </section>
 
   <section class="dash-row dash-row--split">
-    <article class="dash-card dash-card--clickable" data-dash-link="/budget" id="dashBudgetProgressCard" tabindex="0" role="link" aria-label="Budget Progress — open Budget Alerts">
+    <article class="dash-card dash-card--clickable" data-dash-link="/budget" id="dashBudgetProgressCard" tabindex="0" role="link" aria-label="Budget Progress - open Budget Alerts">
       <div class="dash-card-head">
         <h2 class="dash-card-title">Budget Progress</h2>
-        <button type="button" class="dash-card-menu" aria-label="Budget progress options">⋯</button>
+        <button type="button" class="dash-card-menu" aria-label="Budget progress options">&#8943;</button>
       </div>
       <div class="dash-budget-list" id="dashBudgetList"></div>
     </article>
@@ -121,7 +121,7 @@
     <article class="dash-card" id="dashTxnCard">
       <div class="dash-card-head">
         <h2 class="dash-card-title">Recent Transactions</h2>
-        <button type="button" class="dash-card-menu" aria-label="Transactions options">⋯</button>
+        <button type="button" class="dash-card-menu" aria-label="Transactions options">&#8943;</button>
       </div>
       <ul class="dash-txn-list" id="dashTxnList"></ul>
     </article>
@@ -131,7 +131,7 @@
     <article class="dash-card dash-cashflow-card">
       <div class="dash-card-head">
         <h2 class="dash-card-title">Cash Flow Summary</h2>
-        <button type="button" class="dash-card-menu" aria-label="Cash flow options">⋯</button>
+        <button type="button" class="dash-card-menu" aria-label="Cash flow options">&#8943;</button>
       </div>
       <table class="dash-cashflow-table">
         <tbody>
@@ -154,7 +154,7 @@
 
   <div class="dash-fab-group" aria-label="Quick actions">
     <a href="#" class="dash-fab dash-fab--add" id="dashFabAdd" aria-label="Add expense">+</a>
-    <button type="button" class="dash-fab dash-fab--remove" id="dashFabRemove" aria-label="Remove expense">−</button>
+    <button type="button" class="dash-fab dash-fab--remove" id="dashFabRemove" aria-label="Remove expense">&minus;</button>
   </div>
 </div>
 
