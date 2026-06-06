@@ -51,7 +51,7 @@ app.get("/", (req, res) => {
   const { summary } = getBudgetPageData();
 
   res.render("index", {
-    pageTitle: "Home",
+    pageTitle: "Overview",
     activePage: "home",
     summary,
   });

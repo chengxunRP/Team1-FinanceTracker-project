@@ -1,251 +1,214 @@
 <%- include('partials/header') %>
 
-<div class="home-page-pro">
+<% 
+  const dashTrend = [
+    { month: 'Jan', amount: 260 },
+    { month: 'Feb', amount: 300 },
+    { month: 'Mar', amount: 280 },
+    { month: 'Apr', amount: 350 },
+    { month: 'May', amount: 320 },
+    { month: 'Jun', amount: 320 }
+  ];
+  const trendMax = 350;
+  const trendPoints = dashTrend.map(function (row, i) {
+    const x = 20 + (i * 72);
+    const y = 110 - Math.round((row.amount / trendMax) * 90);
+    return x + ',' + y;
+  }).join(' ');
 
-  <section class="hero-slider-section" id="heroSlider" aria-label="Home hero slider">
-    <div class="hero-slides">
+  const dashWeek = [
+    { day: 'Mon', amount: 20 },
+    { day: 'Tue', amount: 35 },
+    { day: 'Wed', amount: 10 },
+    { day: 'Thu', amount: 50 },
+    { day: 'Fri', amount: 25 },
+    { day: 'Sat', amount: 80 },
+    { day: 'Sun', amount: 30 }
+  ];
+  const weekMax = 80;
 
-      <div class="hero-slide hero-slide--intro active" style="background-image: url('/hero section/introduction.png');">
-        <div class="hero-slide-overlay"></div>
-        <div class="hero-slide-inner">
-          <div class="hero-slide-content">
-            <span class="hero-slide-kicker">SpendWise Finance Tracker</span>
-            <h1 class="hero-slide-title">Take control of your money with SpendWise</h1>
-            <p class="hero-slide-desc">
-              Track your spending, manage budgets, view insights, and make smarter money decisions in one simple dashboard.
-            </p>
-          </div>
-        </div>
-      </div>
+  const dashBudgets = [
+    { name: 'Food', spent: 120, limit: 180 },
+    { name: 'Transport', spent: 60, limit: 100 },
+    { name: 'Shopping', spent: 80, limit: 120 },
+    { name: 'Bills', spent: 40, limit: 80 }
+  ];
 
-      <div class="hero-slide hero-slide--budget" style="background-image: url('/hero section/hero-section1.avif');">
-        <div class="hero-slide-overlay"></div>
-        <div class="hero-slide-inner">
-          <div class="hero-slide-content">
-            <span class="hero-slide-kicker">Budget and Savings</span>
-            <h1 class="hero-slide-title">Plan your budget and stay on track</h1>
-            <p class="hero-slide-desc">
-              Set monthly budgets, monitor spending progress, receive alerts, review reports, and work toward your saving goals.
-            </p>
-          </div>
-        </div>
-      </div>
+  const dashTransactions = [
+    { category: 'Food', amount: 12 },
+    { category: 'Transport', amount: 8 },
+    { category: 'Shopping', amount: 35 },
+    { category: 'Bills', amount: 40 },
+    { category: 'Entertainment', amount: 25 }
+  ];
 
-      <div class="hero-slide hero-slide--assistant" style="background-image: url('/hero section/chatbot.webp');">
-        <div class="hero-slide-overlay"></div>
-        <div class="hero-slide-inner">
-          <div class="hero-slide-content">
-            <span class="hero-slide-kicker">Smart Money Assistant</span>
-            <h1 class="hero-slide-title">Get spending help from FinBot</h1>
-            <p class="hero-slide-desc">
-              Ask finance questions, check whether a purchase is safe, and get AI-assisted guidance based on your spending data.
-            </p>
-          </div>
-        </div>
-      </div>
+  const thisMonthUsed = summary.percentageUsed;
+  const lastMonthUsed = 58;
+%>
 
-    </div>
-
-    <button type="button" class="hero-slider-arrow hero-slider-arrow-prev" aria-label="Previous slide" data-hero-direction="prev">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
-
-    <button type="button" class="hero-slider-arrow hero-slider-arrow-next" aria-label="Next slide" data-hero-direction="next">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
-
-    <div class="hero-slider-dots" role="tablist" aria-label="Hero slides">
-      <button type="button" class="hero-slider-dot active" data-hero-dot="0" aria-label="Slide 1"></button>
-      <button type="button" class="hero-slider-dot" data-hero-dot="1" aria-label="Slide 2"></button>
-      <button type="button" class="hero-slider-dot" data-hero-dot="2" aria-label="Slide 3"></button>
-    </div>
-  </section>
-
-  <div class="home-sections-wrap">
-
-    <section class="home-section-block feature-slider-section">
-      <div class="home-section-head">
-        <p class="section-kicker">Features</p>
-        <h2 class="home-section-title">What you can do</h2>
-        <p class="home-section-lead">Slide through the main spendWise tools for managing your money.</p>
-      </div>
-
-      <% const homeFeatures = [
-        {
-          title: 'Budget Alerts',
-          image: '/features/budgetalert.png',
-          desc: 'Set a monthly budget and get warning alerts when spending reaches 80% or goes over 100%.',
-          btn: 'Open Budget',
-          link: '/budget',
-          color: 'green'
-        },
-        {
-          title: 'Smart Recommendation',
-          image: '/features/recommendation.jpg',
-          desc: 'Check whether a purchase is safe, risky, or not recommended based on your remaining budget.',
-          btn: 'Try Recommendation',
-          link: '/recommendation',
-          color: 'blue'
-        },
-        {
-          title: 'Add Expenses',
-          image: '/features/addexpense.png',
-          desc: 'Add, view, edit, and delete expenses, then group them by categories such as food, transport, shopping, bills, and entertainment.',
-          btn: 'Coming soon',
-          link: '#',
-          color: 'orange'
-        },
-        {
-          title: 'FinBot Chatbot',
-          image: '/features/cravebot.png',
-          desc: 'Ask finance questions and get AI-assisted replies based on your budget and spending data.',
-          btn: 'Open FinBot',
-          link: '/chatbot',
-          color: 'dark'
-        },
-        {
-          title: 'Dashboard Analytics',
-          image: '/features/dashboard.png',
-          desc: 'View your total spending, remaining budget, and spending breakdown in one place.',
-          btn: 'View Dashboard',
-          link: '/',
-          color: 'orange'
-        },
-        {
-          title: 'Monthly Report',
-          image: '/features/month_report_feature.jpg',
-          desc: 'Review your monthly spending summary and understand where your money went.',
-          btn: 'Coming soon',
-          link: '#',
-          color: 'yellow'
-        },
-        {
-          title: 'Savings Goal',
-          image: '/features/saving_goal_feature.jpg',
-          desc: 'Set a saving target and track your progress toward reaching it.',
-          btn: 'Coming soon',
-          link: '#',
-          color: 'green'
-        }
-      ]; %>
-
-      <div class="feature-slider-wrap feature-carousel-wrapper" id="featureCarousel">
-        <button
-          id="featurePrevBtn"
-          class="feature-slider-arrow feature-slider-arrow-prev"
-          type="button"
-          aria-label="Previous features"
-        >
-          <span class="feature-slider-arrow-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-        </button>
-
-        <div class="feature-carousel-window">
-          <div class="feature-carousel-track" id="featureCarouselTrack">
-            <% for (let i = 0; i < homeFeatures.length; i++) { %>
-              <article class="feature-slide-card home-feature-card feature-slide-card-<%= homeFeatures[i].color %>">
-                <div class="feature-slide-img-wrap">
-                  <img
-                    src="<%= homeFeatures[i].image %>"
-                    class="feature-slide-img"
-                    alt="<%= homeFeatures[i].title %>"
-                  >
-                </div>
-                <div class="feature-slide-body">
-                  <h3 class="feature-slide-title"><%= homeFeatures[i].title %></h3>
-                  <p class="feature-slide-desc"><%= homeFeatures[i].desc %></p>
-                  <a
-                    href="<%= homeFeatures[i].link %>"
-                    class="feature-slide-btn feature-slide-btn-<%= homeFeatures[i].color %>"
-                  >
-                    <%= homeFeatures[i].btn %>
-                  </a>
-                </div>
-              </article>
-            <% } %>
-
-            <% for (let i = 0; i < homeFeatures.length; i++) { %>
-              <article
-                class="feature-slide-card home-feature-card feature-slide-card-<%= homeFeatures[i].color %>"
-                aria-hidden="true"
-              >
-                <div class="feature-slide-img-wrap">
-                  <img src="<%= homeFeatures[i].image %>" class="feature-slide-img" alt="">
-                </div>
-                <div class="feature-slide-body">
-                  <h3 class="feature-slide-title"><%= homeFeatures[i].title %></h3>
-                  <p class="feature-slide-desc"><%= homeFeatures[i].desc %></p>
-                  <a
-                    href="<%= homeFeatures[i].link %>"
-                    class="feature-slide-btn feature-slide-btn-<%= homeFeatures[i].color %>"
-                    tabindex="-1"
-                  >
-                    <%= homeFeatures[i].btn %>
-                  </a>
-                </div>
-              </article>
-            <% } %>
-          </div>
-        </div>
-
-        <button
-          id="featureNextBtn"
-          class="feature-slider-arrow feature-slider-arrow-next"
-          type="button"
-          aria-label="Next features"
-        >
-          <span class="feature-slider-arrow-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-        </button>
-      </div>
-    </section>
-
+<div class="dash-page">
+  <% if (summary.alert.type !== 'safe') { %>
+  <div class="alert-strip alert-strip--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %> dash-alert">
+    <strong><%= summary.statusLabel %>:</strong> <%= summary.alert.message %>
   </div>
+  <% } %>
 
-  <section class="home-section-block home-live-section">
-    <div class="home-section-head">
-      <h2 class="home-section-title">Live snapshot</h2>
-      <p class="home-section-lead">Current numbers from your sample budget and expenses.</p>
-    </div>
-    <div class="stat-grid">
-      <article class="stat-card">
-        <span class="stat-card__label">Monthly budget</span>
-        <span class="stat-card__value stat-card__value--blue">$<%= summary.monthlyBudget %></span>
-      </article>
-      <article class="stat-card">
-        <span class="stat-card__label">Total spent</span>
-        <span class="stat-card__value stat-card__value--blue">$<%= summary.totalSpent %></span>
-      </article>
-      <article class="stat-card">
-        <span class="stat-card__label">Remaining</span>
-        <span class="stat-card__value stat-card__value--green">$<%= summary.remainingBudget %></span>
-      </article>
-      <article class="stat-card">
-        <span class="stat-card__label">Budget used</span>
-        <span class="stat-card__value"><%= summary.percentageUsed %>%</span>
-        <span class="pill pill--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
-      </article>
-    </div>
-
-    <% if (summary.alert.type !== 'safe') { %>
-    <div class="alert-strip alert-strip--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %>">
-      <strong><%= summary.statusLabel %>:</strong> <%= summary.alert.message %>
-    </div>
-    <% } %>
+  <section class="dash-summary-row" aria-label="Summary">
+    <article class="dash-card dash-stat-card">
+      <span class="dash-stat-label">Monthly Budget</span>
+      <span class="dash-stat-value dash-stat-value--blue">$<%= summary.monthlyBudget %></span>
+    </article>
+    <article class="dash-card dash-stat-card">
+      <span class="dash-stat-label">Total Spent</span>
+      <span class="dash-stat-value dash-stat-value--red">$<%= summary.totalSpent %></span>
+    </article>
+    <article class="dash-card dash-stat-card">
+      <span class="dash-stat-label">Remaining</span>
+      <span class="dash-stat-value dash-stat-value--green">$<%= summary.remainingBudget %></span>
+    </article>
+    <article class="dash-card dash-stat-card">
+      <span class="dash-stat-label">Budget Used</span>
+      <span class="dash-stat-value"><%= summary.percentageUsed %>%</span>
+      <span class="pill pill--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
+    </article>
   </section>
 
-</div>
+  <section class="dash-row dash-row--period" aria-label="Monthly comparison">
+    <article class="dash-card dash-period-card">
+      <h2 class="dash-card-title">This Month</h2>
+      <div class="dash-period-body">
+        <div class="dash-donut" style="--used: <%= thisMonthUsed %>;" aria-hidden="true">
+          <div class="dash-donut__hole">
+            <span class="dash-donut__pct"><%= thisMonthUsed %>%</span>
+            <span class="dash-donut__lbl">used</span>
+          </div>
+        </div>
+        <ul class="dash-period-stats">
+          <li><span>Spent</span><strong class="dash-val-red">$<%= summary.totalSpent %></strong></li>
+          <li><span>Remaining</span><strong class="dash-val-green">$<%= summary.remainingBudget %></strong></li>
+          <li><span>Budget</span><strong>$<%= summary.monthlyBudget %></strong></li>
+        </ul>
+      </div>
+    </article>
 
-<script src="/js/homepage.js"></script>
+    <article class="dash-card dash-period-card">
+      <h2 class="dash-card-title">Last Month</h2>
+      <div class="dash-period-body">
+        <div class="dash-donut dash-donut--muted" style="--used: <%= lastMonthUsed %>;" aria-hidden="true">
+          <div class="dash-donut__hole">
+            <span class="dash-donut__pct"><%= lastMonthUsed %>%</span>
+            <span class="dash-donut__lbl">used</span>
+          </div>
+        </div>
+        <ul class="dash-period-stats">
+          <li><span>Spent</span><strong class="dash-val-red">$290</strong></li>
+          <li><span>Remaining</span><strong class="dash-val-green">$210</strong></li>
+          <li><span>Budget</span><strong>$500</strong></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="dash-card dash-highlight-card">
+      <h2 class="dash-card-title">Top Category</h2>
+      <p class="dash-highlight-name">Food</p>
+      <p class="dash-highlight-value dash-val-red">$120 spent</p>
+      <p class="dash-highlight-note">Highest spending category this month based on sample data.</p>
+    </article>
+  </section>
+
+  <section class="dash-row dash-row--charts">
+    <article class="dash-card dash-chart-card dash-chart-card--wide">
+      <h2 class="dash-card-title">Spending Trend</h2>
+      <div class="dash-line-chart">
+        <svg viewBox="0 0 440 130" role="img" aria-label="Spending trend from January to June">
+          <line x1="20" y1="110" x2="420" y2="110" class="dash-chart-axis"/>
+          <line x1="20" y1="20" x2="20" y2="110" class="dash-chart-axis"/>
+          <polyline points="<%= trendPoints %>" class="dash-chart-line"/>
+          <% dashTrend.forEach(function (row, i) { 
+            const x = 20 + (i * 72);
+            const y = 110 - Math.round((row.amount / trendMax) * 90);
+          %>
+          <circle cx="<%= x %>" cy="<%= y %>" r="4" class="dash-chart-dot"/>
+          <text x="<%= x %>" y="125" class="dash-chart-label" text-anchor="middle"><%= row.month %></text>
+          <% }); %>
+        </svg>
+      </div>
+    </article>
+
+    <article class="dash-card dash-chart-card">
+      <h2 class="dash-card-title">Last 7 Days</h2>
+      <div class="dash-bar-chart" role="img" aria-label="Daily spending for the last seven days">
+        <% dashWeek.forEach(function (row) { 
+          const h = Math.round((row.amount / weekMax) * 100);
+        %>
+        <div class="dash-bar-col">
+          <div class="dash-bar-track">
+            <div class="dash-bar-fill" style="height: <%= h %>%;"></div>
+          </div>
+          <span class="dash-bar-label"><%= row.day %></span>
+          <span class="dash-bar-amt">$<%= row.amount %></span>
+        </div>
+        <% }); %>
+      </div>
+    </article>
+  </section>
+
+  <section class="dash-row dash-row--split">
+    <article class="dash-card">
+      <h2 class="dash-card-title">Budget Progress</h2>
+      <div class="dash-budget-list">
+        <% dashBudgets.forEach(function (row) {
+          const pct = Math.round((row.spent / row.limit) * 100);
+          const barPct = Math.min(100, pct);
+        %>
+        <div class="dash-budget-row">
+          <div class="dash-budget-meta">
+            <span class="dash-budget-name"><%= row.name %></span>
+            <span class="dash-budget-amt">$<%= row.spent %> / $<%= row.limit %></span>
+          </div>
+          <div class="dash-budget-track">
+            <div class="dash-budget-fill" style="width: <%= barPct %>%;"></div>
+          </div>
+          <span class="dash-budget-pct"><%= pct %>%</span>
+        </div>
+        <% }); %>
+      </div>
+    </article>
+
+    <article class="dash-card">
+      <h2 class="dash-card-title">Recent Transactions</h2>
+      <ul class="dash-txn-list">
+        <% dashTransactions.forEach(function (row) { %>
+        <li class="dash-txn-item">
+          <span class="dash-txn-cat"><%= row.category %></span>
+          <span class="dash-txn-amt dash-val-red">-$<%= row.amount %></span>
+        </li>
+        <% }); %>
+      </ul>
+    </article>
+  </section>
+
+  <section class="dash-row dash-row--cashflow">
+    <article class="dash-card dash-cashflow-card">
+      <h2 class="dash-card-title">Cash Flow Summary</h2>
+      <table class="dash-cashflow-table">
+        <tbody>
+          <tr>
+            <th scope="row">Income</th>
+            <td class="dash-val-green">$<%= summary.monthlyBudget %></td>
+          </tr>
+          <tr>
+            <th scope="row">Expenses</th>
+            <td class="dash-val-red">$<%= summary.totalSpent %></td>
+          </tr>
+          <tr class="dash-cashflow-total">
+            <th scope="row">Remaining</th>
+            <td class="dash-val-green">$<%= summary.remainingBudget %></td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+</div>
 
 <%- include('partials/footer') %>
