@@ -48,12 +48,15 @@ function getBudgetPageData() {
 }
 
 function renderOverviewPage(req, res) {
-  const { summary } = getBudgetPageData();
+  const { summary, expenses } = getBudgetPageData();
+  const financeSnapshot = getFinanceSnapshot(summary, expenses);
 
   res.render("index", {
     pageTitle: "Overview",
     activePage: "overview",
     summary,
+    expenses,
+    financeSnapshot,
   });
 }
 
