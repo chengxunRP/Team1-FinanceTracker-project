@@ -3726,3 +3726,413 @@ a.dash-card--clickable {
     height: 22px;
   }
 }
+
+/* ================================================================
+   DASHBOARD REDESIGN — polished cards, stats, charts, cashflow
+   ================================================================ */
+
+/* Month bar: subtle gradient + icon support */
+.dash-month-bar {
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+}
+
+.dash-month-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.dash-month-icon svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+/* Card: more generous padding, rounder corners, richer shadow */
+.dash-card {
+  padding: 1.4rem 1.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 16px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.dash-card--clickable:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1), 0 12px 28px rgba(15, 23, 42, 0.09);
+  transform: translateY(-3px);
+}
+
+/* Card header: eyebrow label with visual separator */
+.dash-card-head {
+  padding-bottom: 0.85rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 1px solid var(--grey-100);
+  align-items: flex-start;
+}
+
+.dash-card-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+}
+
+.dash-card-head .dash-card-title {
+  margin: 0;
+}
+
+.dash-card-subtitle {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-top: 0.18rem;
+  opacity: 0.78;
+  line-height: 1.4;
+}
+
+/* ---- Stat cards ---- */
+.dash-stat-card {
+  gap: 0;
+  min-height: 118px;
+  justify-content: flex-start;
+}
+
+.dash-stat-top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.dash-stat-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-stat-badge svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+.dash-stat-badge--blue   { background: #dbeafe; color: #1d4ed8; }
+.dash-stat-badge--red    { background: #fee2e2; color: #dc2626; }
+.dash-stat-badge--green  { background: #dcfce7; color: #16a34a; }
+.dash-stat-badge--orange { background: #ffedd5; color: #ea580c; }
+.dash-stat-badge--purple { background: #ede9fe; color: #7c3aed; }
+
+.dash-stat-label {
+  font-size: 0.71rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* Larger, bolder stat numbers */
+.dash-stat-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-bottom: 0.25rem;
+}
+
+.dash-stat-value--sm {
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.dash-stat-caption {
+  display: block;
+  font-size: 0.71rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Summary row top-border color accents */
+.dash-summary-row .dash-stat-card:nth-child(1) { border-top: 3px solid #2196f3; }
+.dash-summary-row .dash-stat-card:nth-child(2) { border-top: 3px solid #ef4444; }
+.dash-summary-row .dash-stat-card:nth-child(3) { border-top: 3px solid #22c55e; }
+.dash-summary-row .dash-stat-card:nth-child(4) { border-top: 3px solid #f97316; }
+.dash-summary-row .dash-stat-card:nth-child(5) { border-top: 3px solid #8b5cf6; }
+
+/* ---- Period comparison cards ---- */
+.dash-period-card {
+  background: linear-gradient(165deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.dash-row--period .dash-period-card:first-child  { border-top: 3px solid var(--blue-mid); }
+.dash-row--period .dash-period-card:nth-child(2) { border-top: 3px solid var(--teal); }
+.dash-row--period .dash-highlight-card           { border-top: 3px solid #8b5cf6; }
+
+.dash-period-body {
+  gap: 1.5rem;
+}
+
+/* Slightly larger donut charts */
+.dash-donut {
+  width: 108px;
+  height: 108px;
+}
+
+.dash-donut__hole {
+  width: 70px;
+  height: 70px;
+}
+
+.dash-donut__pct {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.dash-period-stats li {
+  font-size: 0.875rem;
+  padding: 0.3rem 0;
+  gap: 0.5rem;
+}
+
+/* ---- Top Category highlight card ---- */
+.dash-highlight-card {
+  background: linear-gradient(145deg, #faf8ff 0%, #ffffff 55%, #f0f9ff 100%);
+}
+
+.dash-highlight-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: #ede9fe;
+  color: #7c3aed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.65rem;
+}
+
+.dash-highlight-icon svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.dash-highlight-name {
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.2rem;
+  color: var(--text);
+}
+
+.dash-highlight-value {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+}
+
+.dash-highlight-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ---- Chart cards ---- */
+.dash-chart-card {
+  background: linear-gradient(165deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.dash-chart-grid {
+  stroke: var(--grey-200);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.dash-chart-area {
+  fill: var(--blue-light);
+  opacity: 0.45;
+}
+
+.dash-chart-line {
+  stroke-width: 2.5;
+}
+
+.dash-chart-dot {
+  fill: var(--blue-mid);
+  stroke: var(--white);
+  stroke-width: 1.5;
+}
+
+/* Taller bar chart */
+.dash-bar-track {
+  height: 140px;
+  max-width: 42px;
+}
+
+/* Blue gradient bars instead of red */
+.dash-bar-fill {
+  background: linear-gradient(180deg, var(--blue-mid) 0%, var(--blue) 100%);
+  border-radius: 5px 5px 1px 1px;
+  min-height: 3px;
+}
+
+.dash-bar-amt {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+/* ---- Budget progress rows ---- */
+.dash-budget-row {
+  padding: 0.6rem 0.75rem;
+  margin: 0 -0.75rem;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.dash-budget-row:hover {
+  background: var(--grey-50);
+}
+
+.dash-budget-track {
+  height: 9px;
+  border-radius: 999px;
+}
+
+.dash-budget-cat-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 0.3rem;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.dash-budget-cat-dot--green  { background: #16a34a; }
+.dash-budget-cat-dot--orange { background: #ea580c; }
+.dash-budget-cat-dot--purple { background: #7c3aed; }
+.dash-budget-cat-dot--blue   { background: #1d4ed8; }
+.dash-budget-cat-dot--pink   { background: #db2777; }
+
+/* ---- Transaction items ---- */
+.dash-txn-item {
+  padding: 0.8rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+
+.dash-txn-item:hover {
+  background: var(--grey-50);
+}
+
+/* Transaction icon: gradient circle with letter initial */
+.dash-txn-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--white);
+  flex-shrink: 0;
+}
+
+.dash-txn-icon--green  { background: linear-gradient(135deg, #16a34a, #22c55e); }
+.dash-txn-icon--orange { background: linear-gradient(135deg, #ea580c, #f97316); }
+.dash-txn-icon--purple { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
+.dash-txn-icon--blue   { background: linear-gradient(135deg, #1d4ed8, #3b82f6); }
+.dash-txn-icon--pink   { background: linear-gradient(135deg, #db2777, #f472b6); }
+
+.dash-txn-cat {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.dash-txn-meta {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.dash-txn-amt {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* ---- Cash flow metrics (replaces plain table) ---- */
+.dash-cashflow-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.dash-cashflow-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem 1.1rem;
+  background: var(--grey-50);
+  border-radius: var(--radius);
+  border: 1px solid var(--grey-100);
+}
+
+.dash-cashflow-metric--total {
+  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+  border-color: #bfdbfe;
+}
+
+.dash-cashflow-metric__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.15rem;
+}
+
+.dash-cashflow-metric__icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.dash-cashflow-metric__icon--green { background: #dcfce7; color: #16a34a; }
+.dash-cashflow-metric__icon--red   { background: #fee2e2; color: #dc2626; }
+.dash-cashflow-metric__icon--blue  { background: #dbeafe; color: #1d4ed8; }
+
+.dash-cashflow-metric__label {
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.dash-cashflow-metric__value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+@media (max-width: 600px) {
+  .dash-cashflow-metrics { grid-template-columns: 1fr; gap: 0.65rem; }
+  .dash-stat-value { font-size: 1.4rem; }
+  .dash-stat-card { min-height: auto; }
+}

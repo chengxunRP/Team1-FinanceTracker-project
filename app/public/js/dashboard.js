@@ -17,6 +17,16 @@
     Entertainment: "pink"
   };
 
+  var CATEGORY_INITIALS = {
+    Food: "F",
+    Dining: "D",
+    Transport: "T",
+    Shopping: "S",
+    Utilities: "U",
+    Bills: "B",
+    Entertainment: "E"
+  };
+
   var monthlyBudget = 500;
   var allExpenses = [];
   var monthSlots = [];
@@ -408,22 +418,46 @@
       maxAmount = monthlyBudget || 1;
     }
 
-    var points = [];
-    var markup = "";
     var step = trend.length > 1 ? 400 / (trend.length - 1) : 0;
-
-    markup += '<line x1="20" y1="110" x2="420" y2="110" class="dash-chart-axis"/>';
-    markup += '<line x1="20" y1="20" x2="20" y2="110" class="dash-chart-axis"/>';
+    var pts = [];
 
     for (var j = 0; j < trend.length; j++) {
-      var x = 20 + (j * step);
-      var y = 110 - Math.round((trend[j].amount / maxAmount) * 90);
-      points.push(x + "," + y);
-      markup += '<circle cx="' + x + '" cy="' + y + '" r="4" class="dash-chart-dot"/>';
-      markup += '<text x="' + x + '" y="125" class="dash-chart-label" text-anchor="middle">' + trend[j].month + "</text>";
+      pts.push({
+        x: 20 + (j * step),
+        y: 110 - Math.round((trend[j].amount / maxAmount) * 86),
+        month: trend[j].month
+      });
     }
 
-    markup = '<polyline points="' + points.join(" ") + '" class="dash-chart-line"/>' + markup;
+    var markup = "";
+
+    // Horizontal grid lines
+    var gridRows = [28, 50, 72, 94];
+    for (var g = 0; g < gridRows.length; g++) {
+      markup += '<line x1="20" y1="' + gridRows[g] + '" x2="420" y2="' + gridRows[g] + '" class="dash-chart-grid"/>';
+    }
+
+    // Axes
+    markup += '<line x1="20" y1="110" x2="420" y2="110" class="dash-chart-axis"/>';
+    markup += '<line x1="20" y1="14" x2="20" y2="110" class="dash-chart-axis"/>';
+
+    // Area fill below the line
+    if (pts.length > 1) {
+      var areaPts = pts.map(function(p) { return p.x + "," + p.y; });
+      areaPts.push(pts[pts.length - 1].x + ",110");
+      areaPts.push("20,110");
+      markup += '<polygon points="' + areaPts.join(" ") + '" class="dash-chart-area"/>';
+    }
+
+    // Line
+    markup += '<polyline points="' + pts.map(function(p) { return p.x + "," + p.y; }).join(" ") + '" class="dash-chart-line"/>';
+
+    // Dots and labels
+    for (var k = 0; k < pts.length; k++) {
+      markup += '<circle cx="' + pts[k].x + '" cy="' + pts[k].y + '" r="4.5" class="dash-chart-dot"/>';
+      markup += '<text x="' + pts[k].x + '" y="126" class="dash-chart-label" text-anchor="middle">' + pts[k].month + "</text>";
+    }
+
     svg.innerHTML = markup;
   }
 
@@ -448,11 +482,12 @@
     var html = "";
 
     for (var j = 0; j < week.length; j++) {
-      var h = Math.round((week[j].amount / maxAmount) * 100);
+      var h = week[j].amount > 0 ? Math.max(3, Math.round((week[j].amount / maxAmount) * 100)) : 0;
+      var amtLabel = week[j].amount > 0 ? money(week[j].amount) : "";
       html += '<div class="dash-bar-col">';
       html += '<div class="dash-bar-track"><div class="dash-bar-fill" style="height:' + h + '%;"></div></div>';
       html += '<span class="dash-bar-label">' + week[j].day + "</span>";
-      html += '<span class="dash-bar-amt">' + money(week[j].amount) + "</span>";
+      html += '<span class="dash-bar-amt">' + amtLabel + "</span>";
       html += "</div>";
     }
 
@@ -478,7 +513,7 @@
       var barPct = Math.min(100, pct);
       var pctClass = pct >= 100 ? "danger" : pct >= 80 ? "warning" : "safe";
       html += '<div class="dash-budget-row">';
-      html += '<div class="dash-budget-meta"><span class="dash-budget-name">' + row.name + "</span>";
+      html += '<div class="dash-budget-meta"><span class="dash-budget-name"><span class="dash-budget-cat-dot dash-budget-cat-dot--' + getCategoryColor(row.name) + '" aria-hidden="true"></span>' + row.name + "</span>";
       html += '<span class="dash-budget-amt">' + money(row.spent) + " / " + money(row.limit) + "</span></div>";
       html += '<div class="dash-budget-track"><div class="dash-budget-fill ' + budgetBarClass(pct) + '" style="width:' + barPct + '%;"></div></div>';
       html += '<span class="dash-budget-pct dash-budget-pct--' + pctClass + '">' + pct + "%</span>";
@@ -503,11 +538,12 @@
 
     for (var i = 0; i < transactions.length; i++) {
       var row = transactions[i];
+      var initial = CATEGORY_INITIALS[row.category] || row.category.charAt(0).toUpperCase() || "?";
       html += '<li class="dash-txn-item">';
-      html += '<span class="dash-txn-icon dash-txn-icon--' + row.color + '" aria-hidden="true"></span>';
+      html += '<span class="dash-txn-icon dash-txn-icon--' + row.color + '" aria-hidden="true">' + initial + "</span>";
       html += '<div class="dash-txn-main">';
       html += '<span class="dash-txn-cat">' + row.description + "</span>";
-      html += '<span class="dash-txn-meta">' + row.category + " · " + row.source + " · " + row.date + "</span>";
+      html += '<span class="dash-txn-meta">' + row.category + " · " + row.date + "</span>";
       html += "</div>";
       html += '<div class="dash-txn-side">';
       html += '<span class="dash-txn-amt dash-val-red">-' + money(row.amount) + "</span>";

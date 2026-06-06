@@ -1,10 +1,13 @@
-﻿<%- include('partials/header') %>
+<%- include('partials/header') %>
 
 <div class="dash-page" id="dashPage">
   <section class="dash-month-bar" aria-label="Selected month">
     <button type="button" class="dash-month-arrow" id="dashMonthPrev" aria-label="Previous month">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
+    <span class="dash-month-icon" aria-hidden="true">
+      <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M3 8h14M7 3v2M13 3v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </span>
     <h2 class="dash-month-label" id="dashMonthLabel">June 2026</h2>
     <button type="button" class="dash-month-arrow" id="dashMonthNext" aria-label="Next month">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -13,25 +16,56 @@
 
   <section class="dash-summary-row" aria-label="Summary">
     <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Monthly Budget - open Budget Alerts">
-      <span class="dash-stat-label">Monthly Budget</span>
+      <div class="dash-stat-top">
+        <span class="dash-stat-badge dash-stat-badge--blue" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 9h16" stroke="currentColor" stroke-width="1.5"/><path d="M5 13h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </span>
+        <span class="dash-stat-label">Monthly Budget</span>
+      </div>
       <span class="dash-stat-value dash-stat-value--blue" id="dashStatBudget">$<%= summary.monthlyBudget %></span>
+      <span class="dash-stat-caption">Current limit</span>
     </a>
+
     <article class="dash-card dash-stat-card">
-      <span class="dash-stat-label">Total Spent</span>
+      <div class="dash-stat-top">
+        <span class="dash-stat-badge dash-stat-badge--red" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M7 9V7a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 9h12l-1 9H5L4 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="dash-stat-label">Total Spent</span>
+      </div>
       <span class="dash-stat-value dash-stat-value--red" id="dashStatSpent">$<%= summary.totalSpent %></span>
       <span class="dash-stat-sub" id="dashStatExpenseCount"><%= expenses.length %> expense<%= expenses.length === 1 ? '' : 's' %></span>
     </article>
+
     <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Remaining budget - open Budget Alerts">
-      <span class="dash-stat-label">Remaining</span>
+      <div class="dash-stat-top">
+        <span class="dash-stat-badge dash-stat-badge--green" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M7.5 10.5l1.5 1.5 3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="dash-stat-label">Remaining</span>
+      </div>
       <span class="dash-stat-value dash-stat-value--green" id="dashStatRemaining">$<%= summary.remainingBudget %></span>
+      <span class="dash-stat-caption">Available to spend</span>
     </a>
+
     <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Budget Used - open Budget Alerts">
-      <span class="dash-stat-label">Budget Used</span>
+      <div class="dash-stat-top">
+        <span class="dash-stat-badge dash-stat-badge--orange" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M4 10a6 6 0 1112 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 10l2.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="1" fill="currentColor"/></svg>
+        </span>
+        <span class="dash-stat-label">Budget Used</span>
+      </div>
       <span class="dash-stat-value" id="dashStatUsed"><%= summary.percentageUsed %>%</span>
       <span class="pill pill--<%= summary.statusBadge %>" id="dashUsedPill"><%= summary.statusLabel %></span>
     </a>
+
     <article class="dash-card dash-stat-card dash-stat-card--wide">
-      <span class="dash-stat-label">Highest Spending Category</span>
+      <div class="dash-stat-top">
+        <span class="dash-stat-badge dash-stat-badge--purple" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 2l1.8 5.4H17l-4.6 3.3 1.8 5.4L10 13l-4.2 3.1 1.8-5.4L3 7.4h5.2L10 2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="dash-stat-label">Top Category</span>
+      </div>
       <span class="dash-stat-value dash-stat-value--sm" id="dashStatTopCategory"><%= financeSnapshot.highestCategory %></span>
       <span class="dash-stat-sub" id="dashStatTopAmount">$<%= financeSnapshot.highestCategoryAmount %> spent</span>
     </article>
@@ -40,7 +74,10 @@
   <section class="dash-row dash-row--period" aria-label="Monthly comparison">
     <article class="dash-card dash-period-card">
       <div class="dash-card-head">
-        <h2 class="dash-card-title">This Month</h2>
+        <div>
+          <h2 class="dash-card-title">This Month</h2>
+          <span class="dash-card-subtitle">Current period spending</span>
+        </div>
         <button type="button" class="dash-card-menu" aria-label="This month options">&#8943;</button>
       </div>
       <div class="dash-period-body">
@@ -60,7 +97,10 @@
 
     <article class="dash-card dash-period-card">
       <div class="dash-card-head">
-        <h2 class="dash-card-title">Last Month</h2>
+        <div>
+          <h2 class="dash-card-title">Last Month</h2>
+          <span class="dash-card-subtitle">Previous period spending</span>
+        </div>
         <button type="button" class="dash-card-menu" aria-label="Last month options">&#8943;</button>
       </div>
       <div class="dash-period-body">
@@ -83,6 +123,9 @@
         <h2 class="dash-card-title">Top Category</h2>
         <button type="button" class="dash-card-menu" aria-label="Top category options">&#8943;</button>
       </div>
+      <div class="dash-highlight-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V10M8 19V5M12 19V12M16 19V8M20 19V3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      </div>
       <p class="dash-highlight-name" id="dashTopName">Food</p>
       <p class="dash-highlight-value dash-val-red" id="dashTopSpent">$120 spent</p>
       <p class="dash-highlight-note">Highest spending category for the selected month.</p>
@@ -92,7 +135,10 @@
   <section class="dash-row dash-row--charts">
     <article class="dash-card dash-chart-card dash-chart-card--wide">
       <div class="dash-card-head">
-        <h2 class="dash-card-title">Spending Trend</h2>
+        <div>
+          <h2 class="dash-card-title">Spending Trend</h2>
+          <span class="dash-card-subtitle">Monthly spend over the last 6 months</span>
+        </div>
         <button type="button" class="dash-card-menu" aria-label="Spending trend options">&#8943;</button>
       </div>
       <div class="dash-line-chart">
@@ -102,7 +148,10 @@
 
     <article class="dash-card dash-chart-card">
       <div class="dash-card-head">
-        <h2 class="dash-card-title">Last 7 Days</h2>
+        <div>
+          <h2 class="dash-card-title">Last 7 Days</h2>
+          <span class="dash-card-subtitle">Daily spending for the period</span>
+        </div>
         <button type="button" class="dash-card-menu" aria-label="Last 7 days options">&#8943;</button>
       </div>
       <div class="dash-bar-chart" id="dashBarChart" role="img" aria-label="Daily spending bar chart"></div>
@@ -112,7 +161,10 @@
   <section class="dash-row dash-row--split">
     <article class="dash-card dash-card--clickable" data-dash-link="/budget" id="dashBudgetProgressCard" tabindex="0" role="link" aria-label="Budget Progress - open Budget Alerts">
       <div class="dash-card-head">
-        <h2 class="dash-card-title">Budget Progress</h2>
+        <div>
+          <h2 class="dash-card-title">Budget Progress</h2>
+          <span class="dash-card-subtitle">Spending breakdown by category</span>
+        </div>
         <button type="button" class="dash-card-menu" aria-label="Budget progress options">&#8943;</button>
       </div>
       <div class="dash-budget-list" id="dashBudgetList"></div>
@@ -120,7 +172,10 @@
 
     <article class="dash-card" id="dashTxnCard">
       <div class="dash-card-head">
-        <h2 class="dash-card-title">Recent Transactions</h2>
+        <div>
+          <h2 class="dash-card-title">Recent Transactions</h2>
+          <span class="dash-card-subtitle">All expenses in the selected period</span>
+        </div>
         <button type="button" class="dash-card-menu" aria-label="Transactions options">&#8943;</button>
       </div>
       <ul class="dash-txn-list" id="dashTxnList"></ul>
@@ -130,25 +185,35 @@
   <section class="dash-row dash-row--cashflow">
     <article class="dash-card dash-cashflow-card">
       <div class="dash-card-head">
-        <h2 class="dash-card-title">Cash Flow Summary</h2>
+        <div>
+          <h2 class="dash-card-title">Cash Flow Summary</h2>
+          <span class="dash-card-subtitle">Budget vs. actual spending for the period</span>
+        </div>
         <button type="button" class="dash-card-menu" aria-label="Cash flow options">&#8943;</button>
       </div>
-      <table class="dash-cashflow-table">
-        <tbody>
-          <tr>
-            <th scope="row">Income</th>
-            <td class="dash-val-green" id="dashCashIncome">$500</td>
-          </tr>
-          <tr>
-            <th scope="row">Expenses</th>
-            <td class="dash-val-red" id="dashCashExpenses">$320</td>
-          </tr>
-          <tr class="dash-cashflow-total">
-            <th scope="row">Remaining</th>
-            <td class="dash-val-green" id="dashCashRemaining">$180</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="dash-cashflow-metrics">
+        <div class="dash-cashflow-metric">
+          <span class="dash-cashflow-metric__icon dash-cashflow-metric__icon--green" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v14M5 8l5-5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="dash-cashflow-metric__label">Income (Budget)</span>
+          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashIncome">$500</span>
+        </div>
+        <div class="dash-cashflow-metric">
+          <span class="dash-cashflow-metric__icon dash-cashflow-metric__icon--red" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 17V3M5 12l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="dash-cashflow-metric__label">Total Expenses</span>
+          <span class="dash-cashflow-metric__value dash-val-red" id="dashCashExpenses">$320</span>
+        </div>
+        <div class="dash-cashflow-metric dash-cashflow-metric--total">
+          <span class="dash-cashflow-metric__icon dash-cashflow-metric__icon--blue" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M7.5 10.5l1.5 1.5 3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="dash-cashflow-metric__label">Net Remaining</span>
+          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashRemaining">$180</span>
+        </div>
+      </div>
     </article>
   </section>
 
