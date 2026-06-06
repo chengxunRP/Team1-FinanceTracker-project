@@ -730,12 +730,16 @@ a.btn:hover { text-decoration: none; }
 .feature-slider-section {
   position: relative;
   overflow-x: clip;
+  width: min(90vw, 1300px);
+  max-width: 1300px;
+  margin-left: calc(50% - min(45vw, 650px));
+  margin-right: calc(50% - min(45vw, 650px));
 }
 
 .feature-slider-wrap,
 .feature-carousel-wrapper {
   position: relative;
-  padding: 0 72px;
+  padding: 0 56px;
 }
 
 .feature-carousel-window {
@@ -751,7 +755,7 @@ a.btn:hover { text-decoration: none; }
   position: absolute;
   top: 12px;
   height: 200px;
-  width: 40px;
+  width: 32px;
   z-index: 3;
   pointer-events: none;
 }
@@ -1860,9 +1864,16 @@ a.btn:hover { text-decoration: none; }
   .hero-slider-arrow-prev { left: 16px; }
   .hero-slider-arrow-next { right: 16px; }
 
+  .feature-slider-section {
+    width: min(94vw, 880px);
+    max-width: 880px;
+    margin-left: calc(50% - min(47vw, 440px));
+    margin-right: calc(50% - min(47vw, 440px));
+  }
+
   .feature-slider-wrap,
   .feature-carousel-wrapper {
-    padding: 0 60px;
+    padding: 0 56px;
   }
 
   .feature-slide-card,
@@ -1887,9 +1898,16 @@ a.btn:hover { text-decoration: none; }
   .hero-slider-arrow-prev { left: 8px; }
   .hero-slider-arrow-next { right: 8px; }
 
+  .feature-slider-section {
+    width: min(96vw, 400px);
+    max-width: 400px;
+    margin-left: calc(50% - min(48vw, 200px));
+    margin-right: calc(50% - min(48vw, 200px));
+  }
+
   .feature-slider-wrap,
   .feature-carousel-wrapper {
-    padding: 0 52px;
+    padding: 0 48px;
   }
 
   .feature-slide-card,
@@ -1925,6 +1943,7 @@ a.btn:hover { text-decoration: none; }
   .feature-carousel-window::before,
   .feature-carousel-window::after {
     height: 180px;
+    width: 28px;
   }
 }
 
