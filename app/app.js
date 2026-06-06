@@ -155,7 +155,7 @@ app.get("/recommendation", (req, res) => {
   const financeSnapshot = ensureFinanceSnapshot(summary);
 
   res.render("recommendation", {
-    pageTitle: "Recommendations",
+    pageTitle: "Purchase Checker",
     activePage: "recommendation",
     summary,
     financeSnapshot,
@@ -174,7 +174,7 @@ app.post("/recommendation", (req, res) => {
     const financeSnapshot = ensureFinanceSnapshot(summary);
 
     return res.render("recommendation", {
-      pageTitle: "Recommendations",
+      pageTitle: "Purchase Checker",
       activePage: "recommendation",
       summary,
       financeSnapshot,
@@ -191,7 +191,7 @@ app.post("/recommendation", (req, res) => {
   });
 
   res.render("recommendation", {
-    pageTitle: "Recommendations",
+    pageTitle: "Purchase Checker",
     activePage: "recommendation",
     summary,
     financeSnapshot: ensureFinanceSnapshot(summary),
