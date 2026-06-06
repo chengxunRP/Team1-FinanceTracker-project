@@ -1,0 +1,171 @@
+<%- include('partials/header') %>
+
+<div class="spc-page">
+  <header class="spc-header">
+    <span class="spc-eyebrow">Budget-aware spending insight</span>
+    <h1 class="spc-title">Smart Purchase Checker</h1>
+    <p class="spc-subtitle">Check whether a purchase fits your budget before you spend.</p>
+  </header>
+
+  <section class="spc-snapshot" aria-label="Finance snapshot">
+    <div class="stat-grid stat-grid--spc">
+      <article class="stat-card">
+        <span class="stat-card__label">Monthly Budget</span>
+        <span class="stat-card__value stat-card__value--blue">$<%= financeSnapshot.monthlyBudget %></span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-card__label">Total Spent</span>
+        <span class="stat-card__value stat-card__value--blue">$<%= financeSnapshot.totalSpent %></span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-card__label">Remaining Budget</span>
+        <span class="stat-card__value stat-card__value--green">$<%= financeSnapshot.remainingBudget %></span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-card__label">Budget Used</span>
+        <span class="stat-card__value"><%= financeSnapshot.percentageUsed %>%</span>
+      </article>
+      <article class="stat-card stat-card--wide spc-stat-highlight">
+        <span class="stat-card__label">Highest Spending Category</span>
+        <span class="stat-card__value stat-card__value--sm"><%= financeSnapshot.highestCategory %></span>
+        <span class="spc-stat-sub">$<%= financeSnapshot.highestCategoryAmount %> spent so far</span>
+      </article>
+    </div>
+  </section>
+
+  <div class="split-layout split-layout--rec spc-main">
+    <section class="card-panel spc-form-panel">
+      <div class="spc-panel-head">
+        <h2>Enter purchase details</h2>
+        <p class="card-panel__intro">Add the item you are thinking about buying. SpendWise will check it against your current budget and spending patterns.</p>
+      </div>
+
+      <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+      <div class="form-errors">
+        <% errors.forEach(function(error) { %>
+          <p><%= error %></p>
+        <% }); %>
+      </div>
+      <% } %>
+
+      <form class="form spc-form" method="POST" action="/recommendation">
+        <div class="form-group">
+          <label for="itemName">Item name</label>
+          <input type="text" id="itemName" name="itemName" placeholder="e.g. Running shoes" required value="<%= typeof formValues !== 'undefined' && formValues.itemName ? formValues.itemName : '' %>">
+        </div>
+        <div class="form-group">
+          <label for="itemPrice">Item price ($)</label>
+          <input type="number" id="itemPrice" name="itemPrice" min="0" step="0.01" placeholder="e.g. 89.00" required value="<%= typeof formValues !== 'undefined' && formValues.itemPrice !== undefined ? formValues.itemPrice : '' %>">
+        </div>
+        <div class="form-group">
+          <label for="category">Category</label>
+          <select id="category" name="category" required>
+            <option value="">Select a category</option>
+            <% categories.forEach(function(cat) { %>
+            <option value="<%= cat %>" <%= typeof formValues !== 'undefined' && formValues.category === cat ? 'selected' : '' %>><%= cat %></option>
+            <% }); %>
+          </select>
+        </div>
+        <button type="submit" class="btn btn--primary btn--block">Check purchase</button>
+      </form>
+    </section>
+
+    <section class="card-panel card-panel--result spc-result-panel">
+      <% if (typeof recommendation !== 'undefined' && recommendation) { %>
+      <% const progressStep = Math.min(100, Math.round(recommendation.analysis.newPercentageUsed / 5) * 5); %>
+      <% 
+        let displayStatus = recommendation.result;
+        if (recommendation.result === 'Safe to buy') { displayStatus = 'Safe'; }
+      %>
+      <div class="spc-insight-card result-card result-card--<%= recommendation.resultBadge %>">
+        <div class="spc-insight-card__header">
+          <div>
+            <span class="spc-insight-label">Purchase insight</span>
+            <span class="pill pill--<%= recommendation.resultBadge %> pill--lg"><%= displayStatus %></span>
+          </div>
+          <div class="rec-score-ring rec-score-ring--<%= recommendation.resultBadge %>" aria-label="Recommendation score">
+            <span class="rec-score-ring__num"><%= recommendation.score %>%</span>
+            <span class="rec-score-ring__lbl">Score</span>
+          </div>
+        </div>
+
+        <div class="spc-item-summary">
+          <h3 class="spc-item-name"><%= recommendation.itemName %></h3>
+          <p class="spc-item-price">$<%= recommendation.itemPrice %></p>
+          <span class="tag tag--blue"><%= recommendation.category %></span>
+        </div>
+
+        <div class="spc-metrics result-metrics">
+          <div class="result-metric spc-metric">
+            <span class="result-metric__lbl">Remaining before purchase</span>
+            <span class="result-metric__val">$<%= recommendation.analysis.remainingBudget %></span>
+          </div>
+          <div class="result-metric spc-metric">
+            <span class="result-metric__lbl">Remaining after purchase</span>
+            <span class="result-metric__val result-metric__val--<%= recommendation.analysis.newRemainingBudget >= 0 ? 'green' : 'red' %>">$<%= recommendation.analysis.newRemainingBudget %></span>
+          </div>
+          <div class="result-metric spc-metric">
+            <span class="result-metric__lbl">Budget used after purchase</span>
+            <span class="result-metric__val"><%= recommendation.analysis.newPercentageUsed %>%</span>
+          </div>
+        </div>
+
+        <div class="spc-budget-impact">
+          <div class="progress-meta">
+            <span>Budget impact</span>
+            <span><%= recommendation.analysis.percentageUsed %>% → <%= recommendation.analysis.newPercentageUsed %>%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-bar__fill <%= recommendation.resultBadge === 'warning' ? 'progress-bar__fill--warning' : '' %> <%= recommendation.resultBadge === 'danger' ? 'progress-bar__fill--danger' : '' %> progress-bar__fill--w<%= progressStep %>"></div>
+          </div>
+        </div>
+
+        <div class="result-section spc-why">
+          <h4>Why this result?</h4>
+          <ul class="rec-reason-list spc-reason-list">
+            <% recommendation.reasons.forEach(function(reason) { %>
+            <li><%= reason %></li>
+            <% }); %>
+          </ul>
+        </div>
+
+        <div class="result-section spc-spending rec-insight">
+          <h4>Spending insight</h4>
+          <div class="rec-insight-grid">
+            <div class="rec-insight-item">
+              <span class="rec-insight-item__label">Highest spending category</span>
+              <span class="rec-insight-item__value"><%= recommendation.spendingInsight.highestCategory %></span>
+              <span class="rec-insight-item__sub">$<%= recommendation.spendingInsight.highestCategoryAmount %> spent</span>
+            </div>
+            <div class="rec-insight-item">
+              <span class="rec-insight-item__label">This purchase category</span>
+              <span class="rec-insight-item__value"><%= recommendation.spendingInsight.itemCategory %></span>
+              <span class="rec-insight-item__sub">$<%= recommendation.spendingInsight.itemCategoryAmount %> (<%= recommendation.spendingInsight.itemCategoryPercent %>% of budget)</span>
+            </div>
+          </div>
+          <% if (recommendation.spendingInsight.warningMessage) { %>
+          <p class="rec-insight-warning"><%= recommendation.spendingInsight.warningMessage %></p>
+          <% } else { %>
+          <p class="rec-insight-note">This category is not your highest spending area right now, which may give you more room for this purchase.</p>
+          <% } %>
+        </div>
+      </div>
+      <% } else { %>
+      <div class="spc-empty result-empty">
+        <div class="spc-empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/><path d="M16 24h16M24 16v16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Your purchase insight appears here</h3>
+        <p>Enter an item on the left and tap <strong>Check purchase</strong> to see whether it is safe, risky, or not recommended.</p>
+        <ul class="rule-list rule-list--center spc-status-preview">
+          <li><span class="pill pill--success">Safe</span></li>
+          <li><span class="pill pill--warning">Risky</span></li>
+          <li><span class="pill pill--danger">Not recommended</span></li>
+        </ul>
+      </div>
+      <% } %>
+    </section>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

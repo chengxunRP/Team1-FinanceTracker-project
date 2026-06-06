@@ -1,85 +1,164 @@
-<%- include('partials/header') %>
+﻿<%- include('partials/header') %>
 
-<section class="dashboard-hero">
-  <span class="page-label">Dashboard</span>
-  <h1>Your finances at a glance</h1>
-  <p class="lead">
-    Track your monthly budget, see spending from sample expenses, and get alerts before you overspend.
-  </p>
-  <div class="cta-group">
-    <a href="/budget" class="btn btn--primary">Set Budget</a>
+<div class="dash-page" id="dashPage">
+  <section class="dash-month-bar" aria-label="Selected month">
+    <button type="button" class="dash-month-arrow" id="dashMonthPrev" aria-label="Previous month">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h2 class="dash-month-label" id="dashMonthLabel">June 2026</h2>
+    <button type="button" class="dash-month-arrow" id="dashMonthNext" aria-label="Next month">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </section>
+
+  <section class="dash-summary-row" aria-label="Summary">
+    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Monthly Budget ΓÇö open Budget Alerts">
+      <span class="dash-stat-label">Monthly Budget</span>
+      <span class="dash-stat-value dash-stat-value--blue" id="dashStatBudget">$<%= summary.monthlyBudget %></span>
+    </a>
+    <article class="dash-card dash-stat-card">
+      <span class="dash-stat-label">Total Spent</span>
+      <span class="dash-stat-value dash-stat-value--red" id="dashStatSpent">$<%= summary.totalSpent %></span>
+      <span class="dash-stat-sub" id="dashStatExpenseCount"><%= expenses.length %> expense<%= expenses.length === 1 ? '' : 's' %></span>
+    </article>
+    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Remaining budget ΓÇö open Budget Alerts">
+      <span class="dash-stat-label">Remaining</span>
+      <span class="dash-stat-value dash-stat-value--green" id="dashStatRemaining">$<%= summary.remainingBudget %></span>
+    </a>
+    <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Budget Used ΓÇö open Budget Alerts">
+      <span class="dash-stat-label">Budget Used</span>
+      <span class="dash-stat-value" id="dashStatUsed"><%= summary.percentageUsed %>%</span>
+      <span class="pill pill--<%= summary.statusBadge %>" id="dashUsedPill"><%= summary.statusLabel %></span>
+    </a>
+    <article class="dash-card dash-stat-card dash-stat-card--wide">
+      <span class="dash-stat-label">Highest Spending Category</span>
+      <span class="dash-stat-value dash-stat-value--sm" id="dashStatTopCategory"><%= financeSnapshot.highestCategory %></span>
+      <span class="dash-stat-sub" id="dashStatTopAmount">$<%= financeSnapshot.highestCategoryAmount %> spent</span>
+    </article>
+  </section>
+
+  <section class="dash-row dash-row--period" aria-label="Monthly comparison">
+    <article class="dash-card dash-period-card">
+      <div class="dash-card-head">
+        <h2 class="dash-card-title">This Month</h2>
+        <button type="button" class="dash-card-menu" aria-label="This month options">Γï»</button>
+      </div>
+      <div class="dash-period-body">
+        <div class="dash-donut" id="dashDonutThis" style="--used: 64;" aria-hidden="true">
+          <div class="dash-donut__hole">
+            <span class="dash-donut__pct" id="dashThisUsedPct">64%</span>
+            <span class="dash-donut__lbl">used</span>
+          </div>
+        </div>
+        <ul class="dash-period-stats">
+          <li><span>Spent</span><strong class="dash-val-red" id="dashThisSpent">$320</strong></li>
+          <li><span>Remaining</span><strong class="dash-val-green" id="dashThisRemaining">$180</strong></li>
+          <li><span>Budget</span><strong id="dashThisBudget">$500</strong></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="dash-card dash-period-card">
+      <div class="dash-card-head">
+        <h2 class="dash-card-title">Last Month</h2>
+        <button type="button" class="dash-card-menu" aria-label="Last month options">Γï»</button>
+      </div>
+      <div class="dash-period-body">
+        <div class="dash-donut dash-donut--muted" id="dashDonutLast" style="--used: 58;" aria-hidden="true">
+          <div class="dash-donut__hole">
+            <span class="dash-donut__pct" id="dashLastUsedPct">58%</span>
+            <span class="dash-donut__lbl">used</span>
+          </div>
+        </div>
+        <ul class="dash-period-stats">
+          <li><span>Spent</span><strong class="dash-val-red" id="dashLastSpent">$290</strong></li>
+          <li><span>Remaining</span><strong class="dash-val-green" id="dashLastRemaining">$210</strong></li>
+          <li><span>Budget</span><strong id="dashLastBudget">$500</strong></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="dash-card dash-highlight-card">
+      <div class="dash-card-head">
+        <h2 class="dash-card-title">Top Category</h2>
+        <button type="button" class="dash-card-menu" aria-label="Top category options">Γï»</button>
+      </div>
+      <p class="dash-highlight-name" id="dashTopName">Food</p>
+      <p class="dash-highlight-value dash-val-red" id="dashTopSpent">$120 spent</p>
+      <p class="dash-highlight-note">Highest spending category for the selected month.</p>
+    </article>
+  </section>
+
+  <section class="dash-row dash-row--charts">
+    <article class="dash-card dash-chart-card dash-chart-card--wide">
+      <div class="dash-card-head">
+        <h2 class="dash-card-title">Spending Trend</h2>
+        <button type="button" class="dash-card-menu" aria-label="Spending trend options">Γï»</button>
+      </div>
+      <div class="dash-line-chart">
+        <svg viewBox="0 0 440 130" id="dashTrendSvg" role="img" aria-label="Spending trend chart"></svg>
+      </div>
+    </article>
+
+    <article class="dash-card dash-chart-card">
+      <div class="dash-card-head">
+        <h2 class="dash-card-title">Last 7 Days</h2>
+        <button type="button" class="dash-card-menu" aria-label="Last 7 days options">Γï»</button>
+      </div>
+      <div class="dash-bar-chart" id="dashBarChart" role="img" aria-label="Daily spending bar chart"></div>
+    </article>
+  </section>
+
+  <section class="dash-row dash-row--split">
+    <article class="dash-card dash-card--clickable" data-dash-link="/budget" id="dashBudgetProgressCard" tabindex="0" role="link" aria-label="Budget Progress ΓÇö open Budget Alerts">
+      <div class="dash-card-head">
+        <h2 class="dash-card-title">Budget Progress</h2>
+        <button type="button" class="dash-card-menu" aria-label="Budget progress options">Γï»</button>
+      </div>
+      <div class="dash-budget-list" id="dashBudgetList"></div>
+    </article>
+
+    <article class="dash-card" id="dashTxnCard">
+      <div class="dash-card-head">
+        <h2 class="dash-card-title">Recent Transactions</h2>
+        <button type="button" class="dash-card-menu" aria-label="Transactions options">Γï»</button>
+      </div>
+      <ul class="dash-txn-list" id="dashTxnList"></ul>
+    </article>
+  </section>
+
+  <section class="dash-row dash-row--cashflow">
+    <article class="dash-card dash-cashflow-card">
+      <div class="dash-card-head">
+        <h2 class="dash-card-title">Cash Flow Summary</h2>
+        <button type="button" class="dash-card-menu" aria-label="Cash flow options">Γï»</button>
+      </div>
+      <table class="dash-cashflow-table">
+        <tbody>
+          <tr>
+            <th scope="row">Income</th>
+            <td class="dash-val-green" id="dashCashIncome">$500</td>
+          </tr>
+          <tr>
+            <th scope="row">Expenses</th>
+            <td class="dash-val-red" id="dashCashExpenses">$320</td>
+          </tr>
+          <tr class="dash-cashflow-total">
+            <th scope="row">Remaining</th>
+            <td class="dash-val-green" id="dashCashRemaining">$180</td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+
+  <div class="dash-fab-group" aria-label="Quick actions">
+    <a href="#" class="dash-fab dash-fab--add" id="dashFabAdd" aria-label="Add expense">+</a>
+    <button type="button" class="dash-fab dash-fab--remove" id="dashFabRemove" aria-label="Remove expense">ΓêÆ</button>
   </div>
-</section>
-
-<h2 class="section-title">Budget overview</h2>
-<div class="card-grid">
-  <article class="card">
-    <div class="card__icon card__icon--blue">💰</div>
-    <span class="badge badge--blue">Monthly</span>
-    <h2>Monthly budget</h2>
-    <p class="stat stat--blue">$<%= summary.monthlyBudget %></p>
-    <p>Your planned spending limit for this month.</p>
-  </article>
-  <article class="card">
-    <div class="card__icon card__icon--blue">📊</div>
-    <h2>Total spent</h2>
-    <p class="stat stat--blue">$<%= summary.totalSpent %></p>
-    <p>Calculated from sample expenses on the Budget page.</p>
-  </article>
-  <article class="card">
-    <div class="card__icon card__icon--green">📈</div>
-    <span class="badge badge--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
-    <h2>Budget used</h2>
-    <p class="stat stat--<%= summary.statusBadge === 'success' ? 'green' : 'blue' %>"><%= summary.percentageUsed %>%</p>
-    <p>(<%= summary.totalSpent %> ÷ <%= summary.monthlyBudget %>) × 100</p>
-  </article>
-  <article class="card">
-    <div class="card__icon card__icon--green">🔔</div>
-    <h2>Remaining</h2>
-    <p class="stat stat--<%= summary.remainingBudget >= 0 ? 'green' : 'blue' %>">$<%= summary.remainingBudget %></p>
-    <p><%= summary.remainingBudget >= 0 ? 'Left in your monthly budget.' : 'You are over budget.' %></p>
-  </article>
 </div>
 
-<% if (summary.alert.type !== 'safe') { %>
-<section class="alert-banner alert-banner--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %>">
-  <strong><%= summary.statusLabel %> alert:</strong> <%= summary.alert.message %>
-</section>
-<% } %>
-
-<div class="dashboard-row">
-  <section class="panel">
-    <h2>How budget alerts work</h2>
-    <p class="panel-intro">
-      You set the monthly budget. Spending is added up from sample expenses in the backend.
-    </p>
-    <ul class="quick-link-list">
-      <li>
-        <span class="dot"></span>
-        <span><strong>Set your monthly budget</strong> — the only value you enter manually.</span>
-      </li>
-      <li>
-        <span class="dot"></span>
-        <span><strong>Safe</strong> — below 80% of your budget used.</span>
-      </li>
-      <li>
-        <span class="dot"></span>
-        <span><strong>Warning</strong> — 80% to 99% of budget used.</span>
-      </li>
-      <li>
-        <span class="dot"></span>
-        <span><strong>Overspending</strong> — 100% or more of budget used.</span>
-      </li>
-    </ul>
-  </section>
-
-  <section class="panel">
-    <h2>Quick action</h2>
-    <p class="panel-intro">View sample expenses and update your monthly budget.</p>
-    <div class="cta-group cta-group--stacked">
-      <a href="/budget" class="btn btn--primary">Set Budget</a>
-    </div>
-  </section>
-</div>
+<script id="dashData" type="application/json"><%- JSON.stringify({ monthlyBudget: summary.monthlyBudget, expenses: expenses }) %></script>
+<script src="/js/dashboard.js"></script>
 
 <%- include('partials/footer') %>

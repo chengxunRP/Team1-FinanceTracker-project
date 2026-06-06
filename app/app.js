@@ -1,11 +1,30 @@
-// Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
-const express = require("express");
+﻿// Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
+require("./envConfig").logGroqKeyStatus();
+
 const path = require("path");
+const express = require("express");
 const {
   validateMonthlyBudget,
   buildBudgetSummary,
 } = require("./budgetHelpers");
+const {
+  validateItemInput,
+  getSpendingRecommendation,
+  getFinanceSnapshot,
+} = require("./recommendationHelpers");
 const sampleExpenses = require("./sampleExpenses");
+const {
+  SUGGESTED_QUESTIONS,
+  buildFinBotReply,
+  getFinBotReply,
+  getWelcomeMessage,
+} = require("./chatbotHelpers");
+const { getSessionId } = require("./sessionCookie");
+const {
+  getChatHistory,
+  addChatMessage,
+  clearChatHistory,
+} = require("./chatHistory");
 
 const app = express();
 const PORT = 3000;
@@ -28,12 +47,28 @@ function getBudgetPageData() {
   };
 }
 
-app.get("/", (req, res) => {
-  const { summary } = getBudgetPageData();
+function renderOverviewPage(req, res) {
+  const { summary, expenses } = getBudgetPageData();
+  const financeSnapshot = getFinanceSnapshot(summary, expenses);
 
   res.render("index", {
+    pageTitle: "Overview",
+    activePage: "overview",
+    summary,
+    expenses,
+    financeSnapshot,
+  });
+}
+
+app.get("/", renderOverviewPage);
+app.get("/dashboard", renderOverviewPage);
+
+app.get("/home", (req, res) => {
+  const { summary } = getBudgetPageData();
+
+  res.render("home", {
     pageTitle: "Home",
-    activePage: "home",
+    activePage: "landing",
     summary,
   });
 });
@@ -81,6 +116,175 @@ app.post("/budget", (req, res) => {
   });
 });
 
+function getRecommendationCategories() {
+  const categories = [];
+
+  for (let i = 0; i < sampleExpenses.length; i++) {
+    const cat = sampleExpenses[i].category;
+    if (!categories.includes(cat)) {
+      categories.push(cat);
+    }
+  }
+
+  categories.push("Other");
+  return categories;
+}
+
+function ensureFinanceSnapshot(summary) {
+  const snapshot = getFinanceSnapshot(summary, sampleExpenses) || {};
+
+  if (!Array.isArray(snapshot.spendingByCategory)) {
+    const totals = {};
+
+    for (let i = 0; i < sampleExpenses.length; i++) {
+      const expense = sampleExpenses[i];
+      totals[expense.category] = (totals[expense.category] || 0) + expense.amount;
+    }
+
+    snapshot.spendingByCategory = Object.keys(totals)
+      .map((category) => ({
+        category,
+        amount: totals[category],
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }
+
+  snapshot.monthlyBudget = snapshot.monthlyBudget ?? summary.monthlyBudget;
+  snapshot.totalSpent = snapshot.totalSpent ?? summary.totalSpent;
+  snapshot.remainingBudget = snapshot.remainingBudget ?? summary.remainingBudget;
+  snapshot.percentageUsed = snapshot.percentageUsed ?? summary.percentageUsed;
+
+  if (snapshot.spendingByCategory.length > 0) {
+    snapshot.highestCategory = snapshot.highestCategory ?? snapshot.spendingByCategory[0].category;
+    snapshot.highestCategoryAmount =
+      snapshot.highestCategoryAmount ?? snapshot.spendingByCategory[0].amount;
+  } else {
+    snapshot.highestCategory = snapshot.highestCategory ?? "ΓÇö";
+    snapshot.highestCategoryAmount = snapshot.highestCategoryAmount ?? 0;
+  }
+
+  return snapshot;
+}
+
+app.get("/recommendation", (req, res) => {
+  const { summary } = getBudgetPageData();
+  const financeSnapshot = ensureFinanceSnapshot(summary);
+
+  res.render("recommendation", {
+    pageTitle: "Purchase Checker",
+    activePage: "recommendation",
+    summary,
+    financeSnapshot,
+    categories: getRecommendationCategories(),
+    errors: [],
+  });
+});
+
+app.post("/recommendation", (req, res) => {
+  const { itemName, itemPrice, category } = req.body;
+  const { summary } = getBudgetPageData();
+  const validation = validateItemInput(itemName, itemPrice, category);
+  const categories = getRecommendationCategories();
+
+  if (!validation.valid) {
+    const financeSnapshot = ensureFinanceSnapshot(summary);
+
+    return res.render("recommendation", {
+      pageTitle: "Purchase Checker",
+      activePage: "recommendation",
+      summary,
+      financeSnapshot,
+      categories,
+      errors: validation.errors,
+      formValues: { itemName, itemPrice, category },
+    });
+  }
+
+  const recommendation = getSpendingRecommendation(summary, sampleExpenses, {
+    itemName: validation.itemName,
+    itemPrice: validation.itemPrice,
+    category: validation.category,
+  });
+
+  res.render("recommendation", {
+    pageTitle: "Purchase Checker",
+    activePage: "recommendation",
+    summary,
+    financeSnapshot: ensureFinanceSnapshot(summary),
+    categories,
+    errors: [],
+    recommendation,
+    formValues: { itemName, itemPrice, category },
+  });
+});
+
+function renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode, inputText) {
+  res.render("chatbot", {
+    pageTitle: "FinBot",
+    activePage: "chatbot",
+    summary,
+    financeSnapshot,
+    messages,
+    suggestedQuestions: SUGGESTED_QUESTIONS,
+    inputText: inputText || "",
+    groqAiMode: Boolean(groqAiMode),
+  });
+}
+
+app.get("/chatbot", (req, res) => {
+  const { summary } = getBudgetPageData();
+  const financeSnapshot = ensureFinanceSnapshot(summary);
+  const sessionId = getSessionId(req, res);
+  const welcomeText = getWelcomeMessage();
+  const messages = getChatHistory(sessionId, welcomeText);
+
+  renderChatbotPage(res, summary, financeSnapshot, messages, false);
+});
+
+app.post("/chatbot/clear", (req, res) => {
+  const sessionId = getSessionId(req, res);
+  clearChatHistory(sessionId, getWelcomeMessage());
+  res.redirect("/chatbot");
+});
+
+app.post("/chatbot", async (req, res) => {
+  const { summary, expenses } = getBudgetPageData();
+  const financeSnapshot = ensureFinanceSnapshot(summary);
+  const rawMessage = (req.body.message || req.body.question || "").trim();
+  const sessionId = getSessionId(req, res);
+  const welcomeText = getWelcomeMessage();
+
+  let groqAiMode = false;
+
+  if (rawMessage.length > 0) {
+    addChatMessage(sessionId, "user", rawMessage, welcomeText);
+
+    try {
+      const reply = await getFinBotReply(
+        rawMessage,
+        summary,
+        financeSnapshot,
+        expenses
+      );
+      addChatMessage(sessionId, "bot", reply.text, welcomeText);
+      groqAiMode = reply.usedGroq;
+    } catch (error) {
+      console.log("Groq API failed, using fallback");
+      addChatMessage(
+        sessionId,
+        "bot",
+        buildFinBotReply(rawMessage, summary, financeSnapshot),
+        welcomeText
+      );
+      groqAiMode = false;
+    }
+  }
+
+  const messages = getChatHistory(sessionId, welcomeText);
+
+  renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode);
+});
+
 app.listen(PORT, () => {
-  console.log(`Finance Tracker running at http://localhost:${PORT}`);
+  console.log(`spendWise running at http://localhost:${PORT}`);
 });

@@ -1,0 +1,86 @@
+<%- include('partials/header') %>
+
+<div class="finbot-page">
+  <header class="finbot-header">
+    <span class="eyebrow">Finance assistant</span>
+    <h1>FinBot</h1>
+    <p>Your friendly finance helper — ask about spending, budget, and whether a purchase makes sense.</p>
+  </header>
+
+  <div class="finbot-layout">
+    <aside class="finbot-sidebar">
+      <section class="card-panel finbot-card">
+        <h2>Your snapshot</h2>
+        <div class="finbot-stats">
+          <div class="finbot-stat">
+            <span class="finbot-stat__label">Monthly budget</span>
+            <span class="finbot-stat__value finbot-stat__value--blue">$<%= summary.monthlyBudget %></span>
+          </div>
+          <div class="finbot-stat">
+            <span class="finbot-stat__label">Total spent</span>
+            <span class="finbot-stat__value finbot-stat__value--blue">$<%= summary.totalSpent %></span>
+          </div>
+          <div class="finbot-stat">
+            <span class="finbot-stat__label">Remaining</span>
+            <span class="finbot-stat__value finbot-stat__value--green">$<%= summary.remainingBudget %></span>
+          </div>
+          <div class="finbot-stat finbot-stat--highlight">
+            <span class="finbot-stat__label">Top category</span>
+            <span class="finbot-stat__value finbot-stat__value--sm"><%= financeSnapshot.highestCategory %></span>
+            <span class="finbot-stat__sub">$<%= financeSnapshot.highestCategoryAmount %> spent</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card-panel finbot-card">
+        <h2>Try asking</h2>
+        <div class="finbot-suggestions">
+          <% suggestedQuestions.forEach(function(question) { %>
+          <form method="POST" action="/chatbot">
+            <button type="submit" class="finbot-suggestion-btn" name="question" value="<%= question %>"><%= question %></button>
+          </form>
+          <% }); %>
+        </div>
+        <p class="finbot-note"><%= groqAiMode ? 'Groq AI replies — sample data only.' : 'Rule-based replies — add GROQ_API_KEY in app/.env for Groq AI mode.' %></p>
+      </section>
+    </aside>
+
+    <section class="card-panel finbot-chat">
+      <div class="finbot-chat__header">
+        <span class="finbot-avatar" aria-hidden="true">🤖</span>
+        <div>
+          <strong>FinBot</strong>
+          <span class="finbot-status">Online · <%= groqAiMode ? 'Groq AI mode' : 'rule-based mode' %></span>
+        </div>
+        <form method="POST" action="/chatbot/clear" class="finbot-clear-form">
+          <button type="submit" class="btn btn--sm">Clear chat</button>
+        </form>
+      </div>
+
+      <div class="finbot-messages">
+        <% messages.forEach(function(message) { %>
+        <article class="finbot-bubble finbot-bubble--<%= message.sender === 'user' ? 'user' : 'assistant' %>">
+          <% if (message.sender === 'bot') { %>
+          <span class="finbot-bubble__label">FinBot</span>
+          <% } %>
+          <div class="finbot-bubble__text"><%= message.text %></div>
+        </article>
+        <% }); %>
+      </div>
+
+      <form class="finbot-input-row" method="POST" action="/chatbot">
+        <input
+          type="text"
+          name="message"
+          placeholder="Type your question…"
+          value="<%= inputText %>"
+          autocomplete="off"
+          required
+        >
+        <button type="submit" class="btn btn--primary">Send</button>
+      </form>
+    </section>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

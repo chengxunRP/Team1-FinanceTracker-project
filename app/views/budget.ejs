@@ -1,139 +1,127 @@
-<%- include('partials/header') %>
+﻿<%- include('partials/header') %>
 
-<section class="page-hero">
-  <span class="page-label">Budget</span>
-  <h1>Budget &amp; Alerts</h1>
-  <p>Set your monthly budget. Total spending is calculated automatically from sample expenses until the database is ready.</p>
-</section>
+<header class="page-header">
+  <span class="eyebrow">Budget &amp; alerts</span>
+  <h1>Monthly budget overview</h1>
+  <p>Set your budget limit. Total spending is calculated from sample expenses automatically.</p>
+</header>
 
-<section class="panel">
-  <h2>Monthly budget setup</h2>
-  <p class="panel-intro">Enter your monthly budget only. Spending comes from the sample expense list below (no database yet).</p>
-
-  <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
-  <div class="form-errors">
-    <% errors.forEach(function(error) { %>
-      <p><%= error %></p>
-    <% }); %>
+<div class="status-banner status-banner--<%= summary.statusBadge %>">
+  <div class="status-banner__icon">
+    <% if (summary.statusBadge === 'success') { %>Γ£ô<% } %>
+    <% if (summary.statusBadge === 'warning') { %>ΓÜá<% } %>
+    <% if (summary.statusBadge === 'danger') { %>Γ£ò<% } %>
   </div>
-  <% } %>
+  <div>
+    <strong>Alert status: <%= summary.statusLabel %></strong>
+    <% if (summary.alert.message) { %>
+    <p><%= summary.alert.message %></p>
+    <% } else { %>
+    <p>You are below 80% of your monthly budget. Spending is under control.</p>
+    <% } %>
+  </div>
+</div>
 
-  <% if (typeof successMessage !== 'undefined' && successMessage) { %>
-  <div class="form-success"><%= successMessage %></div>
-  <% } %>
-
-  <form class="budget-form" method="POST" action="/budget">
-    <div class="form-group">
-      <label for="monthlyBudget">Monthly budget ($)</label>
-      <input
-        type="number"
-        id="monthlyBudget"
-        name="monthlyBudget"
-        min="0.01"
-        step="0.01"
-        required
-        value="<%= typeof formValues !== 'undefined' && formValues.monthlyBudget !== undefined ? formValues.monthlyBudget : summary.monthlyBudget %>"
-      >
-    </div>
-    <button type="submit" class="btn btn--primary">Update budget</button>
-  </form>
-</section>
-
-<% if (summary.alert.type !== 'safe') { %>
-<section class="alert-banner alert-banner--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %>">
-  <strong><%= summary.statusLabel %> alert:</strong> <%= summary.alert.message %>
-</section>
-<% } %>
-
-<div class="card-grid">
-  <article class="card">
-    <div class="card__icon card__icon--blue">📅</div>
-    <h2>Monthly budget</h2>
-    <p class="stat stat--blue">$<%= summary.monthlyBudget %></p>
-    <p>Your current monthly spending limit.</p>
+<div class="stat-grid">
+  <article class="stat-card">
+    <span class="stat-card__label">Monthly budget</span>
+    <span class="stat-card__value stat-card__value--blue">$<%= summary.monthlyBudget %></span>
   </article>
-  <article class="card">
-    <div class="card__icon card__icon--blue">🛒</div>
-    <h2>Total spent</h2>
-    <p class="stat stat--blue">$<%= summary.totalSpent %></p>
-    <p>Sum of all sample expenses below.</p>
+  <article class="stat-card">
+    <span class="stat-card__label">Total spent</span>
+    <span class="stat-card__value stat-card__value--blue">$<%= summary.totalSpent %></span>
   </article>
-  <article class="card">
-    <div class="card__icon card__icon--green">📈</div>
-    <span class="badge badge--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
-    <h2>Budget used</h2>
-    <p class="stat stat--<%= summary.statusBadge === 'success' ? 'green' : 'blue' %>"><%= summary.percentageUsed %>%</p>
-    <p>(<%= summary.totalSpent %> ÷ <%= summary.monthlyBudget %>) × 100</p>
+  <article class="stat-card">
+    <span class="stat-card__label">Remaining budget</span>
+    <span class="stat-card__value stat-card__value--<%= summary.remainingBudget >= 0 ? 'green' : 'red' %>">$<%= summary.remainingBudget %></span>
   </article>
-  <article class="card">
-    <div class="card__icon card__icon--green">🔔</div>
-    <h2>Remaining</h2>
-    <p class="stat stat--<%= summary.remainingBudget >= 0 ? 'green' : 'blue' %>">$<%= summary.remainingBudget %></p>
-    <p><%= summary.remainingBudget >= 0 ? 'Amount left in your budget.' : 'Amount over your budget.' %></p>
+  <article class="stat-card">
+    <span class="stat-card__label">Budget used</span>
+    <span class="stat-card__value"><%= summary.percentageUsed %>%</span>
+    <span class="pill pill--<%= summary.statusBadge %>"><%= summary.statusLabel %></span>
   </article>
 </div>
 
-<section class="panel">
-  <h2>Sample expenses</h2>
-  <p class="panel-intro">These demo expenses are stored in the backend. Total spent = sum of all amounts.</p>
-  <table class="expense-table">
-    <thead>
-      <tr>
-        <th>Description</th>
-        <th>Category</th>
-        <th>Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% expenses.forEach(function(expense) { %>
-      <tr>
-        <td><%= expense.description %></td>
-        <td><span class="badge badge--blue"><%= expense.category %></span></td>
-        <td class="expense-table__amount">$<%= expense.amount %></td>
-      </tr>
-      <% }); %>
-    </tbody>
-    <tfoot>
-      <tr>
-        <td colspan="2"><strong>Total spent</strong></td>
-        <td class="expense-table__amount"><strong>$<%= summary.totalSpent %></strong></td>
-      </tr>
-    </tfoot>
-  </table>
-</section>
+<div class="split-layout">
+  <section class="card-panel">
+    <h2>Monthly budget setup</h2>
+    <p class="card-panel__intro">Set your spending limit for the month. This is the only value you enter manually.</p>
 
-<div class="panel-grid">
-  <section class="panel">
+    <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+    <div class="form-errors">
+      <% errors.forEach(function(error) { %>
+        <p><%= error %></p>
+      <% }); %>
+    </div>
+    <% } %>
+
+    <% if (typeof successMessage !== 'undefined' && successMessage) { %>
+    <div class="form-success"><%= successMessage %></div>
+    <% } %>
+
+    <form class="form form--budget" method="POST" action="/budget">
+      <div class="form-group">
+        <label for="monthlyBudget">Monthly budget ($)</label>
+        <input
+          type="number"
+          id="monthlyBudget"
+          name="monthlyBudget"
+          min="0.01"
+          step="0.01"
+          required
+          value="<%= typeof formValues !== 'undefined' && formValues.monthlyBudget !== undefined ? formValues.monthlyBudget : summary.monthlyBudget %>"
+        >
+      </div>
+      <button type="submit" class="btn btn--primary btn--block">Save monthly budget</button>
+    </form>
+  </section>
+
+  <section class="card-panel">
     <h2>Spending progress</h2>
-    <div class="progress-header">
+    <div class="progress-meta">
       <strong>$<%= summary.totalSpent %> of $<%= summary.monthlyBudget %></strong>
-      <span class="badge badge--<%= summary.statusBadge %>"><%= summary.percentageUsed %>% used</span>
+      <span class="pill pill--<%= summary.statusBadge %>"><%= summary.percentageUsed %>%</span>
     </div>
     <div class="progress-bar">
       <div class="progress-bar__fill <%= summary.progressClass %> <%= summary.progressWidthClass %>"></div>
     </div>
-    <p class="note note--inline">
-      <strong>Safe</strong> below 80%. <strong>Warning</strong> from 80% to 99%. <strong>Overspending</strong> at 100% or more.
-    </p>
-  </section>
-
-  <section class="panel">
-    <h2>Status rules</h2>
-    <div class="alert-rules">
-      <div class="alert-rule">
-        <span class="badge badge--success">Below 80%</span>
-        <span>Safe — spending is under control</span>
-      </div>
-      <div class="alert-rule">
-        <span class="badge badge--warning">80% – 99%</span>
-        <span>Warning — consider slowing down spending</span>
-      </div>
-      <div class="alert-rule">
-        <span class="badge badge--danger">100%+</span>
-        <span>Overspending — review your expenses</span>
-      </div>
-    </div>
+    <ul class="rule-list">
+      <li><span class="pill pill--success">Safe</span> Below 80% used</li>
+      <li><span class="pill pill--warning">Warning</span> 80% ΓÇô 99% used</li>
+      <li><span class="pill pill--danger">Overspending</span> 100% or more</li>
+    </ul>
   </section>
 </div>
+
+<section class="card-panel">
+  <h2>Sample expenses</h2>
+  <p class="card-panel__intro">Demo transactions from the backend. Total spent = sum of all amounts below.</p>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Category</th>
+          <th class="data-table__right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% expenses.forEach(function(expense) { %>
+        <tr>
+          <td><%= expense.description %></td>
+          <td><span class="tag tag--blue"><%= expense.category %></span></td>
+          <td class="data-table__right data-table__amount">$<%= expense.amount %></td>
+        </tr>
+        <% }); %>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2"><strong>Total spent</strong></td>
+          <td class="data-table__right data-table__amount"><strong>$<%= summary.totalSpent %></strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</section>
 
 <%- include('partials/footer') %>

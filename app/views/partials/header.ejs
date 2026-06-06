@@ -1,22 +1,70 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= pageTitle %> | Finance Tracker</title>
+  <title><%= pageTitle %> | spendWise</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <header class="site-header">
-    <div class="header-inner">
-      <a href="/" class="logo">
-        <span class="logo-icon">$</span>
-        Finance Tracker
+<body class="app-body">
+  <div class="app-shell">
+    <aside class="app-sidebar" id="appSidebar" aria-label="Main navigation">
+      <a href="/" class="sidebar-brand" aria-label="spendWise home">
+        <span class="logo-icon" aria-hidden="true">
+          <svg class="logo-mark" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 9.5C3 7.567 4.567 6 6.5 6H17.5C19.433 6 21 7.567 21 9.5V18.5C21 20.433 19.433 22 17.5 22H6.5C4.567 22 3 20.433 3 18.5V9.5Z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+            <path d="M3 11H21" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M7 6V5.25C7 4.007 8.007 3 9.25 3H14.75C15.993 3 17 4.007 17 5.25V6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="17" cy="15.5" r="1.35" fill="currentColor"/>
+            <path d="M6.5 3.75L8.25 6.25L10.75 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="logo-text">spend<span class="logo-text-accent">Wise</span></span>
       </a>
-      <nav class="nav">
-        <a href="/" class="<%= activePage === 'home' ? 'active' : '' %>">Home</a>
-        <a href="/budget" class="<%= activePage === 'budget' ? 'active' : '' %>">Budget</a>
+
+      <nav class="sidebar-nav">
+        <a href="/home" class="sidebar-link<%= activePage === 'landing' ? ' sidebar-link--active' : '' %>">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-8.5z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>
+          <span>Home</span>
+        </a>
+        <a href="/dashboard" class="sidebar-link<%= activePage === 'overview' ? ' sidebar-link--active' : '' %>">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/></svg>
+          <span>Overview</span>
+        </a>
+        <a href="/budget" class="sidebar-link<%= activePage === 'budget' ? ' sidebar-link--active' : '' %>">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M7 8h10a3 3 0 010 6H9a3 3 0 000 6h10" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Budget Alerts</span>
+        </a>
+        <a href="/recommendation" class="sidebar-link<%= activePage === 'recommendation' ? ' sidebar-link--active' : '' %>">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Purchase Checker</span>
+        </a>
+        <a href="/chatbot" class="sidebar-link<%= activePage === 'chatbot' ? ' sidebar-link--active' : '' %>">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8h10M7 12h6M5 4h14a2 2 0 012 2v9a2 2 0 01-2 2H9l-4 3v-3H5a2 2 0 01-2-2V6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>
+          <span>FinBot</span>
+        </a>
+        <a href="#" class="sidebar-link sidebar-link--soon">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          <span>Add Expenses</span>
+        </a>
+        <a href="#" class="sidebar-link sidebar-link--soon">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 4h10v16H7zM9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Monthly Report</span>
+        </a>
+        <a href="#" class="sidebar-link sidebar-link--soon">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.75"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          <span>Savings Goal</span>
+        </a>
       </nav>
-    </div>
-  </header>
-  <main class="main">
+    </aside>
+
+    <div class="app-main">
+      <header class="app-topbar">
+        <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="appSidebar">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <h1 class="topbar-title"><%= pageTitle %></h1>
+      </header>
+
+      <main class="app-content<%= typeof activePage !== 'undefined' && activePage === 'landing' ? ' app-content--landing' : '' %>">
