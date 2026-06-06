@@ -40,8 +40,9 @@
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
   --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
   --shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
-  --max-width: 1200px;
-  --sidebar-width: 248px;
+  --max-width: 1480px;
+  --content-padding-x: clamp(1rem, 2.5vw, 2.5rem);
+  --sidebar-width: 240px;
   --topbar-height: 56px;
   --font: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -144,6 +145,7 @@ a:hover { color: var(--blue); }
   flex-direction: column;
   min-height: 100vh;
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 .app-topbar {
@@ -152,7 +154,7 @@ a:hover { color: var(--blue); }
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  padding: 0 1.25rem;
+  padding: 0 var(--content-padding-x);
   background: linear-gradient(180deg, var(--blue) 0%, var(--blue-dark) 100%);
   color: var(--white);
   box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
@@ -193,8 +195,9 @@ a:hover { color: var(--blue); }
 
 .app-content {
   flex: 1;
-  padding: 1.35rem 1.5rem 2rem;
+  padding: 1.35rem var(--content-padding-x) 2rem;
   max-width: 100%;
+  width: 100%;
   background: var(--bg);
 }
 
@@ -205,7 +208,7 @@ a:hover { color: var(--blue); }
 }
 
 .app-footer {
-  padding: 0.85rem 1.5rem;
+  padding: 0.85rem var(--content-padding-x);
   border-top: 1px solid var(--border-soft);
   background: var(--white);
   text-align: center;
@@ -225,9 +228,8 @@ a:hover { color: var(--blue); }
 
 .app-content:not(.app-content--landing) {
   width: 100%;
-  max-width: var(--max-width);
-  margin-left: auto;
-  margin-right: auto;
+  max-width: none;
+  margin: 0;
 }
 
 .sidebar-backdrop {
@@ -548,9 +550,9 @@ a.btn:hover { text-decoration: none; }
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: var(--max-width);
-  margin: 0 auto;
   width: 100%;
+  max-width: none;
+  margin: 0;
   padding-bottom: 5.5rem;
 }
 
@@ -1102,7 +1104,7 @@ a.dash-card--clickable {
 }
 
 .dash-cashflow-card {
-  max-width: 420px;
+  max-width: none;
 }
 
 .dash-cashflow-table {
@@ -1192,9 +1194,10 @@ a.dash-card--clickable {
 }
 
 .home-sections-wrap {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 3rem 1.25rem 2rem;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 3rem var(--content-padding-x) 2rem;
 }
 
 .home-section-block {
@@ -1232,9 +1235,10 @@ a.dash-card--clickable {
 }
 
 .home-live-section {
-  max-width: var(--max-width);
-  margin: 0 auto 3rem;
-  padding: 0 1.25rem;
+  width: 100%;
+  max-width: none;
+  margin: 0 0 3rem;
+  padding: 0 var(--content-padding-x);
 }
 
 .home-live-section .alert-strip {
@@ -1306,9 +1310,9 @@ a.dash-card--clickable {
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 1.25rem;
+  max-width: none;
+  margin: 0;
+  padding: 0 var(--content-padding-x);
 }
 
 .hero-slide-content {
@@ -1477,10 +1481,10 @@ a.dash-card--clickable {
 .feature-slider-section {
   position: relative;
   overflow-x: clip;
-  width: min(90vw, 1300px);
-  max-width: 1300px;
-  margin-left: calc(50% - min(45vw, 650px));
-  margin-right: calc(50% - min(45vw, 650px));
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 var(--content-padding-x);
 }
 
 .feature-slider-wrap,
@@ -1723,14 +1727,16 @@ a.dash-card--clickable {
 /* ----- Layouts ----- */
 .split-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  width: 100%;
 }
 
 .split-layout .card-panel { margin-bottom: 0; }
 
 .split-layout--rec {
-  grid-template-columns: 0.95fr 1.05fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
 }
 
 /* ----- Forms ----- */
@@ -2073,6 +2079,8 @@ a.dash-card--clickable {
   flex-direction: column;
   gap: 1.35rem;
   padding-bottom: 0.5rem;
+  width: 100%;
+  max-width: none;
 }
 
 .spc-header {
@@ -2418,7 +2426,11 @@ a.dash-card--clickable {
 }
 
 /* ----- FinBot chatbot page (Feature 8) ----- */
-.finbot-page { margin-bottom: 0.5rem; }
+.finbot-page {
+  margin-bottom: 0.5rem;
+  width: 100%;
+  max-width: none;
+}
 
 .finbot-header {
   margin-bottom: 1.5rem;
@@ -2440,9 +2452,10 @@ a.dash-card--clickable {
 
 .finbot-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) 1fr;
-  gap: 1.25rem;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 1.5rem;
   align-items: start;
+  width: 100%;
 }
 
 .finbot-sidebar {
@@ -2542,6 +2555,7 @@ a.dash-card--clickable {
   min-height: 520px;
   padding: 0;
   overflow: hidden;
+  width: 100%;
 }
 
 .finbot-chat__header {
@@ -2707,10 +2721,10 @@ a.dash-card--clickable {
   .hero-slider-arrow-next { right: 16px; }
 
   .feature-slider-section {
-    width: min(94vw, 880px);
-    max-width: 880px;
-    margin-left: calc(50% - min(47vw, 440px));
-    margin-right: calc(50% - min(47vw, 440px));
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 var(--content-padding-x);
   }
 
   .feature-slider-wrap,
@@ -2727,6 +2741,10 @@ a.dash-card--clickable {
 }
 
 @media (max-width: 768px) {
+  :root {
+    --content-padding-x: 1.25rem;
+  }
+
   .feature-carousel-track {
     animation-duration: 45s;
   }
@@ -2742,10 +2760,10 @@ a.dash-card--clickable {
   .hero-slider-arrow-next { right: 8px; }
 
   .feature-slider-section {
-    width: min(96vw, 400px);
-    max-width: 400px;
-    margin-left: calc(50% - min(48vw, 200px));
-    margin-right: calc(50% - min(48vw, 200px));
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 1rem;
   }
 
   .feature-slider-wrap,
@@ -2851,9 +2869,9 @@ a.dash-card--clickable {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  max-width: var(--max-width);
-  margin: 0 auto;
   width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .budget-page-header {
@@ -3014,9 +3032,10 @@ a.dash-card--clickable {
 
 .budget-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
+  gap: 1.5rem;
   align-items: start;
+  width: 100%;
 }
 
 .budget-layout__main {
@@ -3074,7 +3093,7 @@ a.dash-card--clickable {
 }
 
 .budget-card--form .budget-setup-form {
-  max-width: 360px;
+  max-width: 100%;
 }
 
 .budget-table-section {
@@ -3676,6 +3695,9 @@ a.dash-card--clickable {
 
   .budget-layout__side {
     position: static;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.25rem;
   }
 }
 
