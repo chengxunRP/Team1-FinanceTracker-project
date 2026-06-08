@@ -63,14 +63,15 @@ pipeline {
 
         stage('Run New Container') {
             steps {
-                script {
-                    if (fileExists('app/.env')) {
-                        echo 'Found app/.env — starting container with --env-file app/.env'
-                        sh 'docker run -d --name spendwise-container -p 3000:3000 --env-file app/.env spendwise-app'
-                    } else {
-                        echo 'WARNING: app/.env not found in workspace — starting container without --env-file'
-                        sh 'docker run -d --name spendwise-container -p 3000:3000 spendwise-app'
-                    }
+                withCredentials([string(credentialsId: 'groq-api-key', variable: 'GROQ_API_KEY')]) {
+                    sh '''
+                        docker run -d \
+                          --name spendwise-container \
+                          -p 3000:3000 \
+                          -e PORT=3000 \
+                          -e GROQ_API_KEY="$GROQ_API_KEY" \
+                          spendwise-app
+                    '''
                 }
             }
         }
@@ -80,8 +81,9 @@ pipeline {
                 sh '''
                     echo "Waiting a few seconds for the app to start..."
                     sleep 5
-                    echo "Checking http://localhost:3000 ..."
-                    curl -f http://localhost:3000
+                    docker ps -a
+                    docker logs spendwise-container || true
+                    docker exec spendwise-container node -e "require('http').get('http://localhost:3000', res => { console.log('STATUS:', res.statusCode); process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', err => { console.error(err); process.exit(1); })"
                 '''
             }
         }
