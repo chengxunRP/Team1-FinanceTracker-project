@@ -38,6 +38,26 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// --- expense-nav script middleware ---
+app.use(function(req, res, next) {
+  var _render = res.render.bind(res);
+  res.render = function(view, locals, cb) {
+    if (typeof locals === 'function') { cb = locals; locals = {}; }
+    locals = locals || {};
+    var _cb = cb || function(err, str) {
+      if (err) return next(err);
+      res.send(str);
+    };
+    _render(view, locals, function(err, str) {
+      if (err) return next(err);
+      str = str.replace('</body>', '<script src="/js/expense-nav.js"></script></body>');
+      _cb(null, str);
+    });
+  };
+  next();
+});
+// --- End expense-nav script middleware ---
+
 function getBudgetPageData() {
   const summary = buildBudgetSummary(monthlyBudget, sampleExpenses);
 
@@ -284,6 +304,21 @@ app.post("/chatbot", async (req, res) => {
 
   renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode);
 });
+
+// --- Expense CRUD routes (integrated) ---
+// Method-override: allows PUT/DELETE from HTML forms via _method field
+app.use((req, res, next) => {
+  if (req.body && req.body._method) {
+    req.method = req.body._method.toUpperCase();
+    delete req.body._method;
+  }
+  next();
+});
+const expenseRoutes  = require('./routes/expenses');
+const categoryRoutes = require('./routes/categories');
+app.use('/expenses',   expenseRoutes);
+app.use('/categories', categoryRoutes);
+// --- End Expense CRUD routes ---
 
 app.listen(PORT, () => {
   console.log(`spendWise running at http://localhost:${PORT}`);

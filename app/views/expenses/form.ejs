@@ -1,0 +1,123 @@
+<%- include('../partials/header') %>
+
+<%
+  var isEdit = typeof isEdit !== 'undefined' ? isEdit : false;
+  var exp = expense || {};
+%>
+
+<div style="display:flex;flex-direction:column;gap:1.25rem;width:100%;max-width:none;">
+
+  <!-- Page header -->
+  <div class="page-header" style="margin-bottom:0;">
+    <a href="/expenses" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem;font-weight:600;color:var(--text-muted);text-decoration:none;margin-bottom:0.5rem;"
+       onmouseover="this.style.color='var(--blue-mid)'" onmouseout="this.style.color='var(--text-muted)'">
+      <svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back to Expenses
+    </a>
+    <span class="eyebrow">Finance Tracker</span>
+    <h1><%= isEdit ? 'Edit Expense' : 'Add Expense' %></h1>
+    <p><%= isEdit ? 'Update the details of this expense record.' : 'Record a new expense to track your spending.' %></p>
+  </div>
+
+  <!-- Error messages -->
+  <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+    <div class="form-errors">
+      <% errors.forEach(function(err) { %><p>⚠ <%= err %></p><% }) %>
+    </div>
+  <% } %>
+
+  <!-- Form card -->
+  <div class="card-panel" style="max-width:600px;">
+    <form method="POST" action="<%= formAction %>" style="display:grid;gap:1.15rem;">
+      <% if (isEdit) { %>
+        <input type="hidden" name="_method" value="PUT">
+      <% } %>
+
+      <!-- Title -->
+      <div class="form-group">
+        <label for="title">Expense Title</label>
+        <input type="text" id="title" name="title" placeholder="e.g. Chicken rice, MRT top-up…"
+          value="<%= exp.title || '' %>" required autofocus
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.95rem;color:var(--text);background:var(--white);width:100%;">
+      </div>
+
+      <!-- Amount + Date row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="form-group">
+          <label for="amount">Amount (SGD)</label>
+          <div style="position:relative;">
+            <span style="position:absolute;left:0.9rem;top:50%;transform:translateY(-50%);font-size:0.88rem;font-weight:600;color:var(--text-muted);pointer-events:none;">$</span>
+            <input type="number" id="amount" name="amount" placeholder="0.00" step="0.01" min="0.01"
+              value="<%= exp.amount || '' %>" required
+              style="padding:0.7rem 0.9rem 0.7rem 1.85rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.95rem;color:var(--text);background:var(--white);width:100%;">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="date">Date</label>
+          <input type="date" id="date" name="date"
+            value="<%= exp.date || new Date().toISOString().split('T')[0] %>" required
+            style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.95rem;color:var(--text);background:var(--white);width:100%;">
+        </div>
+      </div>
+
+      <!-- Category -->
+      <div class="form-group">
+        <label style="font-size:0.875rem;font-weight:600;display:block;margin-bottom:0.5rem;">Category</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+          <% categories.forEach(function(cat) { %>
+            <label style="cursor:pointer;">
+              <input type="radio" name="categoryId" value="<%= cat.id %>"
+                <%= (exp.categoryId === cat.id) ? 'checked' : '' %>
+                style="display:none;" required
+                onchange="this.closest('.cat-radio-group') && this.closest('.cat-radio-group').querySelectorAll('label span').forEach(function(s){s.style.borderColor='var(--border-soft)';s.style.background='var(--white)';s.style.color='var(--text-muted)'})">
+              <span class="cat-radio-pill"
+                style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.4rem 0.85rem;border-radius:999px;font-size:0.82rem;font-weight:600;border:1.5px solid <%= (exp.categoryId === cat.id) ? cat.color : 'var(--border-soft)' %>;background:<%= (exp.categoryId === cat.id) ? cat.color + '18' : 'var(--white)' %>;color:<%= (exp.categoryId === cat.id) ? cat.color : 'var(--text-muted)' %>;transition:all 0.15s;user-select:none;"
+                data-color="<%= cat.color %>">
+                <%= cat.name %>
+              </span>
+            </label>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-group">
+        <label for="notes">Notes <span style="font-weight:400;color:var(--text-muted);font-size:0.82rem;">(optional)</span></label>
+        <textarea id="notes" name="notes" rows="3" placeholder="Any extra details…"
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.95rem;color:var(--text);background:var(--white);width:100%;resize:vertical;font-family:inherit;"><%= exp.notes || '' %></textarea>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;padding-top:0.25rem;">
+        <a href="/expenses" class="btn btn--sm" style="background:var(--white);border:1px solid var(--border-soft);color:var(--text-muted);">Cancel</a>
+        <button type="submit" class="btn btn--primary btn--sm">
+          <%= isEdit ? 'Save Changes' : 'Add Expense' %>
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+<script>
+// Highlight selected category pill on click
+document.querySelectorAll('input[name="categoryId"]').forEach(function(radio) {
+  radio.addEventListener('change', function() {
+    document.querySelectorAll('input[name="categoryId"]').forEach(function(r) {
+      var pill = r.nextElementSibling;
+      var color = pill.dataset.color;
+      pill.style.borderColor = 'var(--border-soft)';
+      pill.style.background = 'var(--white)';
+      pill.style.color = 'var(--text-muted)';
+    });
+    var sel = this.nextElementSibling;
+    var c = sel.dataset.color;
+    sel.style.borderColor = c;
+    sel.style.background = c + '18';
+    sel.style.color = c;
+  });
+});
+</script>
+
+<script src="/js/expense-nav.js"></script>
+<%- include('../partials/footer') %>
