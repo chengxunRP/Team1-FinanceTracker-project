@@ -68,7 +68,7 @@
             <label style="cursor:pointer;">
               <input type="radio" name="categoryId" value="<%= cat.id %>"
                 <%= (exp.categoryId === cat.id) ? 'checked' : '' %>
-                style="display:none;" required
+                style="display:none;"
                 onchange="this.closest('.cat-radio-group') && this.closest('.cat-radio-group').querySelectorAll('label span').forEach(function(s){s.style.borderColor='var(--border-soft)';s.style.background='var(--white)';s.style.color='var(--text-muted)'})">
               <span class="cat-radio-pill"
                 style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.4rem 0.85rem;border-radius:999px;font-size:0.82rem;font-weight:600;border:1.5px solid <%= (exp.categoryId === cat.id) ? cat.color : 'var(--border-soft)' %>;background:<%= (exp.categoryId === cat.id) ? cat.color + '18' : 'var(--white)' %>;color:<%= (exp.categoryId === cat.id) ? cat.color : 'var(--text-muted)' %>;transition:all 0.15s;user-select:none;"

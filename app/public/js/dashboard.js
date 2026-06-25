@@ -29,6 +29,7 @@
 
   var monthlyBudget = 500;
   var allExpenses = [];
+  var categoryBudgets = [];
   var monthSlots = [];
   var hasDates = false;
   var currentMonthIndex = 0;
@@ -43,6 +44,7 @@
       var data = JSON.parse(el.textContent);
       monthlyBudget = Number(data.monthlyBudget) || 0;
       allExpenses = Array.isArray(data.expenses) ? data.expenses : [];
+      categoryBudgets = Array.isArray(data.categoryBudgets) ? data.categoryBudgets : [];
       return true;
     } catch (error) {
       return false;
@@ -253,13 +255,25 @@
   }
 
   function buildBudgetRows(expenses) {
+    var limits = {};
+    var i;
+
+    for (i = 0; i < categoryBudgets.length; i++) {
+      limits[categoryBudgets[i].name] = Number(categoryBudgets[i].budgeted) || 0;
+    }
+
     var rows = getSpendingByCategory(expenses);
 
     return rows.map(function (row) {
+      var limit = limits[row.category];
+      if (!limit || limit <= 0) {
+        limit = monthlyBudget;
+      }
+
       return {
         name: row.category,
         spent: row.amount,
-        limit: monthlyBudget
+        limit: limit
       };
     });
   }
