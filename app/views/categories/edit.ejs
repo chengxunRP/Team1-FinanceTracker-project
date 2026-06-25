@@ -1,0 +1,99 @@
+<%- include('../partials/header') %>
+
+<div style="display:flex;flex-direction:column;gap:1.25rem;width:100%;max-width:none;">
+
+  <div class="page-header" style="margin-bottom:0;">
+    <a href="/categories" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem;font-weight:600;color:var(--text-muted);text-decoration:none;margin-bottom:0.5rem;"
+       onmouseover="this.style.color='var(--blue-mid)'" onmouseout="this.style.color='var(--text-muted)'">
+      <svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back to Categories
+    </a>
+    <span class="eyebrow">Finance Tracker</span>
+    <h1>Edit Category</h1>
+    <p>Update the name, icon, or colour of this category.</p>
+  </div>
+
+  <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+    <div class="form-errors">
+      <% errors.forEach(function(err) { %><p>⚠ <%= err %></p><% }) %>
+    </div>
+  <% } %>
+
+  <div class="card-panel" style="max-width:480px;">
+    <form method="POST" action="/categories/<%= category.id %>" style="display:grid;gap:1.15rem;">
+      <input type="hidden" name="_method" value="PUT">
+
+      <div class="form-group">
+        <label for="name">Category Name</label>
+        <input type="text" id="name" name="name" value="<%= category.name %>" required autofocus
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.95rem;color:var(--text);background:var(--white);width:100%;">
+      </div>
+
+      <!-- Icon picker -->
+      <div class="form-group">
+        <label style="font-size:0.875rem;font-weight:600;display:block;margin-bottom:0.4rem;">Icon</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+          <% icons.forEach(function(icon) { %>
+            <label style="cursor:pointer;">
+              <input type="radio" name="icon" value="<%= icon %>" <%= category.icon === icon ? 'checked' : '' %> style="display:none;">
+              <span class="icon-picker-pill"
+                style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius-sm);border:1.5px solid <%= category.icon === icon ? 'var(--blue-mid)' : 'var(--border-soft)' %>;background:<%= category.icon === icon ? 'var(--blue-light)' : 'var(--white)' %>;font-size:0.75rem;font-weight:700;color:var(--text-muted);cursor:pointer;transition:all 0.15s;text-transform:capitalize;">
+                <%= icon.substring(0,3) %>
+              </span>
+            </label>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- Color picker -->
+      <div class="form-group">
+        <label style="font-size:0.875rem;font-weight:600;display:block;margin-bottom:0.4rem;">Color</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+          <% colors.forEach(function(col) { %>
+            <label style="cursor:pointer;">
+              <input type="radio" name="color" value="<%= col.value %>" <%= category.color === col.value ? 'checked' : '' %> style="display:none;">
+              <span class="color-picker-swatch"
+                style="display:block;width:28px;height:28px;border-radius:50%;background:<%= col.value %>;border:2.5px solid <%= category.color === col.value ? 'var(--text)' : 'transparent' %>;cursor:pointer;transition:all 0.15s;transform:<%= category.color === col.value ? 'scale(1.2)' : 'scale(1)' %>;"
+                title="<%= col.label %>">
+              </span>
+            </label>
+          <% }) %>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;padding-top:0.25rem;">
+        <a href="/categories" class="btn btn--sm" style="background:var(--white);border:1px solid var(--border-soft);color:var(--text-muted);">Cancel</a>
+        <button type="submit" class="btn btn--primary btn--sm">Save Changes</button>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+<script>
+document.querySelectorAll('input[name="icon"]').forEach(function(r) {
+  r.addEventListener('change', function() {
+    document.querySelectorAll('.icon-picker-pill').forEach(function(p) {
+      p.style.borderColor = 'var(--border-soft)';
+      p.style.background = 'var(--white)';
+    });
+    var pill = this.nextElementSibling;
+    pill.style.borderColor = 'var(--blue-mid)';
+    pill.style.background = 'var(--blue-light)';
+  });
+});
+document.querySelectorAll('input[name="color"]').forEach(function(r) {
+  r.addEventListener('change', function() {
+    document.querySelectorAll('.color-picker-swatch').forEach(function(s) {
+      s.style.border = '2.5px solid transparent';
+      s.style.transform = 'scale(1)';
+    });
+    var swatch = this.nextElementSibling;
+    swatch.style.border = '2.5px solid var(--text)';
+    swatch.style.transform = 'scale(1.2)';
+  });
+});
+</script>
+
+<script src="/js/expense-nav.js"></script>
+<%- include('../partials/footer') %>
