@@ -6,13 +6,13 @@ const express = require("express");
 const {
   validateMonthlyBudget,
   buildBudgetSummary,
+  getMonthlyHealthStatus,
 } = require("./budgetHelpers");
 const {
   validateItemInput,
   getSpendingRecommendation,
   getFinanceSnapshot,
 } = require("./recommendationHelpers");
-const sampleExpenses = require("./sampleExpenses");
 const {
   SUGGESTED_QUESTIONS,
   buildFinBotReply,
@@ -25,12 +25,11 @@ const {
   addChatMessage,
   clearChatHistory,
 } = require("./chatHistory");
+const budgetStore = require("./budgetStore");
+const expenseStore = require("./expenseStore");
 
 const app = express();
 const PORT = 3000;
-
-// User sets monthly budget only (stored in memory until database is ready)
-let monthlyBudget = 500;
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -58,106 +57,373 @@ app.use(function(req, res, next) {
 });
 // --- End expense-nav script middleware ---
 
-function getBudgetPageData() {
-  const summary = buildBudgetSummary(monthlyBudget, sampleExpenses);
+async function getBudgetPageData(budgetMonth) {
+  const month = budgetMonth || budgetStore.getCurrentBudgetMonth();
+  let monthlyBudget;
+  let expenses;
+  let categories;
+
+  try {
+    [monthlyBudget, expenses, categories] = await Promise.all([
+      budgetStore.getMonthlyBudget(),
+      expenseStore.getExpensesForAnalytics(),
+      expenseStore.getCategories(),
+    ]);
+  } catch (error) {
+    console.error("Failed to load budget page data from MySQL:", error);
+    throw error;
+  }
+
+  if (!categories.length) {
+    console.warn(
+      "Budget page: no categories returned from MySQL (SELECT id, name, icon, color FROM categories)."
+    );
+  }
+
+  const expensesInMonth = budgetStore.filterExpensesForMonth(expenses, month);
+  const summary = buildBudgetSummary(monthlyBudget, expensesInMonth);
+  const hasCategoryBudgets = await budgetStore.hasCategoryBudgetsForMonth(month);
+  const categoryRows = hasCategoryBudgets
+    ? await budgetStore.getBudgetRows(month, expenses, categories)
+    : [];
+  const categorySpending = budgetStore.getCategorySpendingRows(expenses, month, categories);
+  const categorySetupRows = await budgetStore.getCategorySetupRows(month, categories);
 
   return {
     summary,
-    expenses: sampleExpenses,
+    expenses,
+    monthExpenseCount: expensesInMonth.length,
+    categoryRows,
+    hasCategoryBudgets,
+    categorySpending,
+    categorySetupRows,
+    budgetMonth: month,
+    budgetMonthLabel: budgetStore.formatBudgetMonthLabel(month),
+    healthStatus: getMonthlyHealthStatus(summary.percentageUsed),
   };
 }
 
-function renderOverviewPage(req, res) {
-  const { summary, expenses } = getBudgetPageData();
-  const financeSnapshot = getFinanceSnapshot(summary, expenses);
-
-  res.render("index", {
-    pageTitle: "Overview",
-    activePage: "overview",
-    summary,
-    expenses,
-    financeSnapshot,
+function renderDbError(res, view, locals) {
+  return res.status(500).render(view, {
+    ...locals,
+    errors: ["Unable to load data right now. Please try again."],
   });
+}
+
+async function renderOverviewPage(req, res) {
+  try {
+    const { summary, expenses, categoryRows, budgetMonth } = await getBudgetPageData();
+    const financeSnapshot = getFinanceSnapshot(summary, expenses);
+
+    res.render("index", {
+      pageTitle: "Overview",
+      activePage: "overview",
+      summary,
+      expenses,
+      financeSnapshot,
+      categoryRows,
+      budgetMonth,
+    });
+  } catch (error) {
+    console.error("Database error loading overview/dashboard:", error);
+    renderDbError(res, "index", {
+      pageTitle: "Overview",
+      activePage: "overview",
+      summary: buildBudgetSummary(0, []),
+      expenses: [],
+      financeSnapshot: getFinanceSnapshot(buildBudgetSummary(0, []), []),
+      categoryRows: [],
+      budgetMonth: budgetStore.getCurrentBudgetMonth(),
+    });
+  }
 }
 
 app.get("/", renderOverviewPage);
 app.get("/dashboard", renderOverviewPage);
 
-app.get("/home", (req, res) => {
-  const { summary } = getBudgetPageData();
-
-  res.render("home", {
-    pageTitle: "Home",
-    activePage: "landing",
-    summary,
-  });
+app.get("/home", async (req, res) => {
+  try {
+    const { summary } = await getBudgetPageData();
+    res.render("home", {
+      pageTitle: "Home",
+      activePage: "landing",
+      summary,
+    });
+  } catch (error) {
+    console.error("Database error loading home:", error);
+    res.status(500).render("home", {
+      pageTitle: "Home",
+      activePage: "landing",
+      summary: buildBudgetSummary(0, []),
+    });
+  }
 });
 
-app.get("/budget", (req, res) => {
-  const { summary, expenses } = getBudgetPageData();
-
-  res.render("budget", {
-    pageTitle: "Budget",
-    activePage: "budget",
-    summary,
-    expenses,
-    errors: [],
-  });
-});
-
-app.post("/budget", (req, res) => {
-  const { monthlyBudget: budgetInput } = req.body;
-  const validation = validateMonthlyBudget(budgetInput);
-  const { summary, expenses } = getBudgetPageData();
-
-  if (!validation.valid) {
-    return res.render("budget", {
+app.get("/budget", async (req, res) => {
+  try {
+    const selectedMonth = req.query.month || budgetStore.getCurrentBudgetMonth();
+    const pageData = await getBudgetPageData(selectedMonth);
+    const successMessage =
+      req.query.saved === "1" ? "Budgets saved successfully." : "";
+    res.render("budget", {
       pageTitle: "Budget",
       activePage: "budget",
-      summary,
-      expenses,
-      errors: validation.errors,
+      ...pageData,
+      errors: [],
+      successMessage,
+    });
+  } catch (error) {
+    console.error("Database error loading budget page:", error);
+    renderDbError(res, "budget", {
+      pageTitle: "Budget",
+      activePage: "budget",
+      summary: buildBudgetSummary(0, []),
+      expenses: [],
+      categoryRows: [],
+      hasCategoryBudgets: false,
+      categorySpending: [],
+      categorySetupRows: [],
+      monthExpenseCount: 0,
+      budgetMonth: budgetStore.getCurrentBudgetMonth(),
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
+        budgetStore.getCurrentBudgetMonth()
+      ),
+    });
+  }
+});
+
+app.post("/budget", async (req, res) => {
+  const { monthlyBudget: budgetInput } = req.body;
+  const validation = validateMonthlyBudget(budgetInput);
+  const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
+
+  try {
+    const current = await getBudgetPageData(budgetMonth);
+
+    if (!validation.valid) {
+      return res.render("budget", {
+        pageTitle: "Budget",
+        activePage: "budget",
+        ...current,
+        budgetMonth,
+        errors: validation.errors,
+        formValues: { monthlyBudget: budgetInput },
+      });
+    }
+
+    await budgetStore.setMonthlyBudget(validation.budget);
+    const updated = await getBudgetPageData(budgetMonth);
+
+    res.render("budget", {
+      pageTitle: "Budget",
+      activePage: "budget",
+      ...updated,
+      budgetMonth,
+      errors: [],
+      successMessage: "Monthly budget updated successfully.",
+      formValues: { monthlyBudget: updated.summary.monthlyBudget },
+    });
+  } catch (error) {
+    console.error("Database error updating budget:", error);
+    res.status(500).render("budget", {
+      pageTitle: "Budget",
+      activePage: "budget",
+      summary: buildBudgetSummary(0, []),
+      expenses: [],
+      categoryRows: [],
+      hasCategoryBudgets: false,
+      categorySpending: [],
+      categorySetupRows: [],
+      monthExpenseCount: 0,
+      budgetMonth,
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+      errors: ["Unable to update budget right now. Please try again."],
       formValues: { monthlyBudget: budgetInput },
     });
   }
-
-  monthlyBudget = validation.budget;
-
-  const updated = getBudgetPageData();
-
-  res.render("budget", {
-    pageTitle: "Budget",
-    activePage: "budget",
-    summary: updated.summary,
-    expenses: updated.expenses,
-    errors: [],
-    successMessage: "Monthly budget updated successfully.",
-    formValues: { monthlyBudget: updated.summary.monthlyBudget },
-  });
 });
 
-function getRecommendationCategories() {
-  const categories = [];
+app.post("/budget/categories", async (req, res) => {
+  const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
 
-  for (let i = 0; i < sampleExpenses.length; i++) {
-    const cat = sampleExpenses[i].category;
-    if (!categories.includes(cat)) {
-      categories.push(cat);
+  try {
+    let categories;
+    try {
+      categories = await expenseStore.getCategories();
+    } catch (categoryError) {
+      console.error("Database error loading categories for category budget save:", categoryError);
+      throw categoryError;
     }
-  }
 
-  categories.push("Other");
-  return categories;
+    const budgetsByCategoryId = {};
+
+    categories.forEach((cat) => {
+      const key = `categoryBudget_${cat.id}`;
+      if (req.body[key] !== undefined) {
+        budgetsByCategoryId[cat.id] = req.body[key] === "" ? 0 : req.body[key];
+      }
+    });
+
+    await budgetStore.setCategoryBudgets(budgetMonth, budgetsByCategoryId);
+    const updated = await getBudgetPageData(budgetMonth);
+
+    res.render("budget", {
+      pageTitle: "Budget",
+      activePage: "budget",
+      ...updated,
+      budgetMonth,
+      errors: [],
+      successMessage: "Category budgets updated successfully.",
+      formValues: { monthlyBudget: updated.summary.monthlyBudget },
+    });
+  } catch (error) {
+    console.error("Database error updating category budgets:", error);
+    const current = await getBudgetPageData(budgetMonth).catch(() => ({
+      summary: buildBudgetSummary(0, []),
+      expenses: [],
+      categoryRows: [],
+      hasCategoryBudgets: false,
+      categorySpending: [],
+      categorySetupRows: [],
+      monthExpenseCount: 0,
+      budgetMonth,
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+    }));
+
+    res.status(500).render("budget", {
+      pageTitle: "Budget",
+      activePage: "budget",
+      ...current,
+      budgetMonth,
+      errors: ["Unable to save category budgets. Please check your values and try again."],
+      formValues: { monthlyBudget: current.summary.monthlyBudget },
+    });
+  }
+});
+
+app.get("/budget/setup", async (req, res) => {
+  try {
+    const budgetMonth = req.query.month || budgetStore.getCurrentBudgetMonth();
+    const pageData = await getBudgetPageData(budgetMonth);
+    res.render("budget-setup", {
+      pageTitle: "Budget Setup",
+      activePage: "budget",
+      ...pageData,
+      budgetMonth,
+      errors: [],
+      successMessage: "",
+      formValues: { monthlyBudget: pageData.summary.monthlyBudget },
+    });
+  } catch (error) {
+    console.error("Database error loading budget setup page:", error);
+    const budgetMonth = budgetStore.getCurrentBudgetMonth();
+    res.status(500).render("budget-setup", {
+      pageTitle: "Budget Setup",
+      activePage: "budget",
+      summary: buildBudgetSummary(0, []),
+      expenses: [],
+      categoryRows: [],
+      hasCategoryBudgets: false,
+      categorySpending: [],
+      categorySetupRows: [],
+      monthExpenseCount: 0,
+      budgetMonth,
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+      healthStatus: getMonthlyHealthStatus(0),
+      errors: ["Unable to load budget setup right now. Please try again."],
+      successMessage: "",
+      formValues: {},
+    });
+  }
+});
+
+app.post("/budget/setup", async (req, res) => {
+  const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
+  const { monthlyBudget: budgetInput } = req.body;
+  const validation = validateMonthlyBudget(budgetInput);
+
+  try {
+    const pageData = await getBudgetPageData(budgetMonth);
+
+    if (!validation.valid) {
+      return res.render("budget-setup", {
+        pageTitle: "Budget Setup",
+        activePage: "budget",
+        ...pageData,
+        budgetMonth,
+        errors: validation.errors,
+        successMessage: "",
+        formValues: { monthlyBudget: budgetInput },
+      });
+    }
+
+    await budgetStore.setMonthlyBudget(validation.budget);
+
+    let categories;
+    try {
+      categories = await expenseStore.getCategories();
+    } catch (categoryError) {
+      console.error("Database error loading categories for budget setup save:", categoryError);
+      throw categoryError;
+    }
+
+    const budgetsByCategoryId = {};
+    categories.forEach((cat) => {
+      const key = `categoryBudget_${cat.id}`;
+      if (req.body[key] !== undefined && req.body[key] !== "") {
+        budgetsByCategoryId[cat.id] = req.body[key];
+      }
+    });
+
+    if (Object.keys(budgetsByCategoryId).length > 0) {
+      await budgetStore.setCategoryBudgets(budgetMonth, budgetsByCategoryId);
+    }
+
+    res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}&saved=1`);
+  } catch (error) {
+    console.error("Database error saving budget setup:", error);
+    const pageData = await getBudgetPageData(budgetMonth).catch(() => ({
+      summary: buildBudgetSummary(0, []),
+      expenses: [],
+      categoryRows: [],
+      hasCategoryBudgets: false,
+      categorySpending: [],
+      categorySetupRows: [],
+      monthExpenseCount: 0,
+      budgetMonth,
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+      healthStatus: getMonthlyHealthStatus(0),
+    }));
+
+    res.status(500).render("budget-setup", {
+      pageTitle: "Budget Setup",
+      activePage: "budget",
+      ...pageData,
+      budgetMonth,
+      errors: ["Unable to save budgets right now. Please check your values and try again."],
+      successMessage: "",
+      formValues: { monthlyBudget: budgetInput },
+    });
+  }
+});
+
+async function getRecommendationCategories() {
+  const categories = await expenseStore.getCategories();
+  const names = categories.map((cat) => cat.name);
+  if (!names.includes("Other")) {
+    names.push("Other");
+  }
+  return names;
 }
 
-function ensureFinanceSnapshot(summary) {
-  const snapshot = getFinanceSnapshot(summary, sampleExpenses) || {};
+function ensureFinanceSnapshot(summary, expenses) {
+  const snapshot = getFinanceSnapshot(summary, expenses) || {};
 
   if (!Array.isArray(snapshot.spendingByCategory)) {
     const totals = {};
 
-    for (let i = 0; i < sampleExpenses.length; i++) {
-      const expense = sampleExpenses[i];
+    for (let i = 0; i < expenses.length; i++) {
+      const expense = expenses[i];
       totals[expense.category] = (totals[expense.category] || 0) + expense.amount;
     }
 
@@ -186,56 +452,82 @@ function ensureFinanceSnapshot(summary) {
   return snapshot;
 }
 
-app.get("/recommendation", (req, res) => {
-  const { summary } = getBudgetPageData();
-  const financeSnapshot = ensureFinanceSnapshot(summary);
+app.get("/recommendation", async (req, res) => {
+  try {
+    const { summary, expenses } = await getBudgetPageData();
+    const financeSnapshot = ensureFinanceSnapshot(summary, expenses);
+    const categories = await getRecommendationCategories();
 
-  res.render("recommendation", {
-    pageTitle: "Purchase Checker",
-    activePage: "recommendation",
-    summary,
-    financeSnapshot,
-    categories: getRecommendationCategories(),
-    errors: [],
-  });
-});
-
-app.post("/recommendation", (req, res) => {
-  const { itemName, itemPrice, category } = req.body;
-  const { summary } = getBudgetPageData();
-  const validation = validateItemInput(itemName, itemPrice, category);
-  const categories = getRecommendationCategories();
-
-  if (!validation.valid) {
-    const financeSnapshot = ensureFinanceSnapshot(summary);
-
-    return res.render("recommendation", {
+    res.render("recommendation", {
       pageTitle: "Purchase Checker",
       activePage: "recommendation",
       summary,
       financeSnapshot,
       categories,
-      errors: validation.errors,
+      errors: [],
+    });
+  } catch (error) {
+    console.error("Database error loading purchase checker:", error);
+    renderDbError(res, "recommendation", {
+      pageTitle: "Purchase Checker",
+      activePage: "recommendation",
+      summary: buildBudgetSummary(0, []),
+      financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
+      categories: ["Other"],
+    });
+  }
+});
+
+app.post("/recommendation", async (req, res) => {
+  const { itemName, itemPrice, category } = req.body;
+
+  try {
+    const { summary, expenses } = await getBudgetPageData();
+    const validation = validateItemInput(itemName, itemPrice, category);
+    const categories = await getRecommendationCategories();
+
+    if (!validation.valid) {
+      const financeSnapshot = ensureFinanceSnapshot(summary, expenses);
+
+      return res.render("recommendation", {
+        pageTitle: "Purchase Checker",
+        activePage: "recommendation",
+        summary,
+        financeSnapshot,
+        categories,
+        errors: validation.errors,
+        formValues: { itemName, itemPrice, category },
+      });
+    }
+
+    const recommendation = getSpendingRecommendation(summary, expenses, {
+      itemName: validation.itemName,
+      itemPrice: validation.itemPrice,
+      category: validation.category,
+    });
+
+    res.render("recommendation", {
+      pageTitle: "Purchase Checker",
+      activePage: "recommendation",
+      summary,
+      financeSnapshot: ensureFinanceSnapshot(summary, expenses),
+      categories,
+      errors: [],
+      recommendation,
+      formValues: { itemName, itemPrice, category },
+    });
+  } catch (error) {
+    console.error("Database error processing purchase checker:", error);
+    res.status(500).render("recommendation", {
+      pageTitle: "Purchase Checker",
+      activePage: "recommendation",
+      summary: buildBudgetSummary(0, []),
+      financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
+      categories: ["Other"],
+      errors: ["Unable to process recommendation right now. Please try again."],
       formValues: { itemName, itemPrice, category },
     });
   }
-
-  const recommendation = getSpendingRecommendation(summary, sampleExpenses, {
-    itemName: validation.itemName,
-    itemPrice: validation.itemPrice,
-    category: validation.category,
-  });
-
-  res.render("recommendation", {
-    pageTitle: "Purchase Checker",
-    activePage: "recommendation",
-    summary,
-    financeSnapshot: ensureFinanceSnapshot(summary),
-    categories,
-    errors: [],
-    recommendation,
-    formValues: { itemName, itemPrice, category },
-  });
 });
 
 function renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode, inputText) {
@@ -251,58 +543,91 @@ function renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode, 
   });
 }
 
-app.get("/chatbot", (req, res) => {
-  const { summary } = getBudgetPageData();
-  const financeSnapshot = ensureFinanceSnapshot(summary);
-  const sessionId = getSessionId(req, res);
-  const welcomeText = getWelcomeMessage();
-  const messages = getChatHistory(sessionId, welcomeText);
+app.get("/chatbot", async (req, res) => {
+  try {
+    const { summary, expenses } = await getBudgetPageData();
+    const financeSnapshot = ensureFinanceSnapshot(summary, expenses);
+    const sessionId = getSessionId(req, res);
+    const welcomeText = getWelcomeMessage();
+    const messages = await getChatHistory(sessionId, welcomeText);
 
-  renderChatbotPage(res, summary, financeSnapshot, messages, false);
+    renderChatbotPage(res, summary, financeSnapshot, messages, false);
+  } catch (error) {
+    console.error("Database error loading chatbot:", error);
+    res.status(500).render("chatbot", {
+      pageTitle: "FinBot",
+      activePage: "chatbot",
+      summary: buildBudgetSummary(0, []),
+      financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
+      messages: [{ sender: "bot", text: getWelcomeMessage() }],
+      suggestedQuestions: SUGGESTED_QUESTIONS,
+      inputText: "",
+      groqAiMode: false,
+    });
+  }
 });
 
-app.post("/chatbot/clear", (req, res) => {
-  const sessionId = getSessionId(req, res);
-  clearChatHistory(sessionId, getWelcomeMessage());
-  res.redirect("/chatbot");
+app.post("/chatbot/clear", async (req, res) => {
+  try {
+    const sessionId = getSessionId(req, res);
+    await clearChatHistory(sessionId, getWelcomeMessage());
+    res.redirect("/chatbot");
+  } catch (error) {
+    console.error("Database error clearing chat history:", error);
+    res.status(500).redirect("/chatbot");
+  }
 });
 
 app.post("/chatbot", async (req, res) => {
-  const { summary, expenses } = getBudgetPageData();
-  const financeSnapshot = ensureFinanceSnapshot(summary);
   const rawMessage = (req.body.message || req.body.question || "").trim();
-  const sessionId = getSessionId(req, res);
-  const welcomeText = getWelcomeMessage();
 
-  let groqAiMode = false;
+  try {
+    const { summary, expenses } = await getBudgetPageData();
+    const financeSnapshot = ensureFinanceSnapshot(summary, expenses);
+    const sessionId = getSessionId(req, res);
+    const welcomeText = getWelcomeMessage();
 
-  if (rawMessage.length > 0) {
-    addChatMessage(sessionId, "user", rawMessage, welcomeText);
+    let groqAiMode = false;
 
-    try {
-      const reply = await getFinBotReply(
-        rawMessage,
-        summary,
-        financeSnapshot,
-        expenses
-      );
-      addChatMessage(sessionId, "bot", reply.text, welcomeText);
-      groqAiMode = reply.usedGroq;
-    } catch (error) {
-      console.log("Groq API failed, using fallback");
-      addChatMessage(
-        sessionId,
-        "bot",
-        buildFinBotReply(rawMessage, summary, financeSnapshot),
-        welcomeText
-      );
-      groqAiMode = false;
+    if (rawMessage.length > 0) {
+      await addChatMessage(sessionId, "user", rawMessage, welcomeText);
+
+      try {
+        const reply = await getFinBotReply(
+          rawMessage,
+          summary,
+          financeSnapshot,
+          expenses
+        );
+        await addChatMessage(sessionId, "bot", reply.text, welcomeText);
+        groqAiMode = reply.usedGroq;
+      } catch (error) {
+        console.log("Groq API failed, using fallback");
+        await addChatMessage(
+          sessionId,
+          "bot",
+          buildFinBotReply(rawMessage, summary, financeSnapshot),
+          welcomeText
+        );
+        groqAiMode = false;
+      }
     }
+
+    const messages = await getChatHistory(sessionId, welcomeText);
+    renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode);
+  } catch (error) {
+    console.error("Database error processing chatbot message:", error);
+    res.status(500).render("chatbot", {
+      pageTitle: "FinBot",
+      activePage: "chatbot",
+      summary: buildBudgetSummary(0, []),
+      financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
+      messages: [{ sender: "bot", text: "Sorry, something went wrong. Please try again." }],
+      suggestedQuestions: SUGGESTED_QUESTIONS,
+      inputText: rawMessage,
+      groqAiMode: false,
+    });
   }
-
-  const messages = getChatHistory(sessionId, welcomeText);
-
-  renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode);
 });
 
 // --- Expense CRUD routes (integrated) ---

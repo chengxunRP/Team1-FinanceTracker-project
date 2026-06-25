@@ -68,8 +68,10 @@ web_modules/
 # dotenv environment variable files
 .env
 app/.env
+*.env
 .env.*
 !.env.example
+!app/.env.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -144,5 +146,18 @@ vite.config.ts.timestamp-*
 .vite/
 
 # Uploaded expense images (keep folder)
+app/public/uploads/*
+!app/public/uploads/.gitkeep
 app/public/uploads/expenses/*
 !app/public/uploads/expenses/.gitkeep
+public/uploads/*
+!public/uploads/.gitkeep
+public/uploads/expenses/*
+!public/uploads/expenses/.gitkeep
+
+# Windows / macOS OS files
+.DS_Store
+Thumbs.db
+
+# App-level dependencies
+app/node_modules/

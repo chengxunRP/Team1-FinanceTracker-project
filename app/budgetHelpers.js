@@ -67,6 +67,60 @@ function getStatus(percentageUsed) {
   };
 }
 
+function getCategoryBudgetStatus(usedPct) {
+  const pct = Number(usedPct) || 0;
+
+  if (pct >= 100) {
+    return {
+      label: "Overspent",
+      key: "overspent",
+      barClass: "budget-progress--overspent",
+      badgeClass: "budget-badge--overspent",
+      cardClass: "budget-cat-card--overspent",
+    };
+  }
+
+  if (pct >= 90) {
+    return {
+      label: "Near Limit",
+      key: "near-limit",
+      barClass: "budget-progress--near-limit",
+      badgeClass: "budget-badge--near-limit",
+      cardClass: "budget-cat-card--near-limit",
+    };
+  }
+
+  if (pct >= 70) {
+    return {
+      label: "Watch",
+      key: "watch",
+      barClass: "budget-progress--watch",
+      badgeClass: "budget-badge--watch",
+      cardClass: "budget-cat-card--watch",
+    };
+  }
+
+  return {
+    label: "Safe",
+    key: "safe",
+    barClass: "budget-progress--safe",
+    badgeClass: "budget-badge--safe",
+    cardClass: "budget-cat-card--safe",
+  };
+}
+
+function getMonthlyHealthStatus(percentageUsed) {
+  const pct = Number(percentageUsed) || 0;
+
+  if (pct >= 100) {
+    return { label: "Over budget", key: "danger", helper: "Spending has exceeded your limit" };
+  }
+  if (pct >= 80) {
+    return { label: "Watch spending", key: "warning", helper: "Approaching your monthly limit" };
+  }
+  return { label: "On track", key: "safe", helper: "Spending is within your budget" };
+}
+
 function buildBudgetSummary(monthlyBudget, expenses) {
   const totalSpent = calculateTotalSpent(expenses);
   const percentageUsed = calculatePercentageUsed(totalSpent, monthlyBudget);
@@ -99,5 +153,7 @@ module.exports = {
   calculatePercentageUsed,
   calculateRemainingBudget,
   getStatus,
+  getCategoryBudgetStatus,
+  getMonthlyHealthStatus,
   buildBudgetSummary,
 };

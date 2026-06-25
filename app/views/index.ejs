@@ -223,7 +223,7 @@
   </div>
 </div>
 
-<script id="dashData" type="application/json"><%- JSON.stringify({ monthlyBudget: summary.monthlyBudget, expenses: expenses }) %></script>
+<script id="dashData" type="application/json"><%- JSON.stringify({ monthlyBudget: summary.monthlyBudget, expenses: expenses, categoryBudgets: typeof categoryRows !== 'undefined' ? categoryRows : [] }) %></script>
 <script src="/js/dashboard.js"></script>
 
 <%- include('partials/footer') %>

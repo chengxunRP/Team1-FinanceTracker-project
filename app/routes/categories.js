@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const store = require('../expenseStore');
+const db = require('../config/db');
 
 const AVAILABLE_ICONS = [
   'food', 'transport', 'school', 'shopping',
@@ -19,74 +20,117 @@ const AVAILABLE_COLORS = [
   { label: 'Slate',  value: '#64748b' },
 ];
 
-function categoriesWithStats() {
-  return store.categories.map(cat => ({
-    ...cat,
-    count: store.expenses.filter(e => e.categoryId === cat.id).length,
-    total: store.expenses.filter(e => e.categoryId === cat.id).reduce((s, e) => s + e.amount, 0),
+async function categoriesWithStats() {
+  const [rows] = await db.query(
+    `SELECT
+      c.id,
+      c.name,
+      c.icon,
+      c.color,
+      COUNT(e.id) AS count,
+      COALESCE(SUM(e.amount), 0) AS total
+    FROM categories c
+    LEFT JOIN expenses e ON e.category_id = c.id
+    GROUP BY c.id, c.name, c.icon, c.color
+    ORDER BY c.name ASC`
+  );
+
+  return rows.map((row) => ({
+    id: String(row.id),
+    name: row.name,
+    icon: row.icon,
+    color: row.color,
+    count: Number(row.count),
+    total: Number(row.total),
   }));
 }
 
 // GET /categories
-router.get('/', (req, res) => {
-  res.render('categories/index', {
-    pageTitle: 'Categories',
-    activePage: 'categories',
-    categories: categoriesWithStats(),
-    icons: AVAILABLE_ICONS,
-    colors: AVAILABLE_COLORS,
-    errors: [],
-    formValues: {},
-  });
+router.get('/', async (req, res) => {
+  try {
+    res.render('categories/index', {
+      pageTitle: 'Categories',
+      activePage: 'categories',
+      categories: await categoriesWithStats(),
+      icons: AVAILABLE_ICONS,
+      colors: AVAILABLE_COLORS,
+      errors: [],
+      formValues: {},
+    });
+  } catch (error) {
+    console.error('Database error loading categories:', error);
+    res.status(500).render('categories/index', {
+      pageTitle: 'Categories',
+      activePage: 'categories',
+      categories: [],
+      icons: AVAILABLE_ICONS,
+      colors: AVAILABLE_COLORS,
+      errors: ['Unable to load categories right now. Please try again.'],
+      formValues: {},
+    });
+  }
 });
 
 // POST /categories
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { name, icon, color } = req.body;
   const errors = [];
 
   if (!name || !name.trim()) errors.push('Category name is required.');
-  if (store.categories.find(c => c.name.toLowerCase() === (name || '').trim().toLowerCase())) {
-    errors.push('A category with that name already exists.');
-  }
+  try {
+    const categories = await store.getCategories();
+    if (categories.find(c => c.name.toLowerCase() === (name || '').trim().toLowerCase())) {
+      errors.push('A category with that name already exists.');
+    }
 
-  if (errors.length) {
-    return res.render('categories/index', {
+    if (errors.length) {
+      return res.render('categories/index', {
+        pageTitle: 'Categories', activePage: 'categories',
+        categories: await categoriesWithStats(),
+        icons: AVAILABLE_ICONS, colors: AVAILABLE_COLORS,
+        errors, formValues: { name, icon, color },
+      });
+    }
+
+    await db.query(
+      'INSERT INTO categories (name, icon, color) VALUES (?, ?, ?)',
+      [name.trim(), icon || 'others', color || '#64748b']
+    );
+
+    res.redirect('/categories');
+  } catch (error) {
+    console.error('Database error creating category:', error);
+    res.status(500).render('categories/index', {
       pageTitle: 'Categories', activePage: 'categories',
-      categories: categoriesWithStats(),
+      categories: await categoriesWithStats().catch(() => []),
       icons: AVAILABLE_ICONS, colors: AVAILABLE_COLORS,
-      errors, formValues: { name, icon, color },
+      errors: ['Unable to save category right now. Please try again.'],
+      formValues: { name, icon, color },
     });
   }
-
-  store.categories.push({
-    id: 'cat-' + store.newId(),
-    name: name.trim(),
-    icon: icon || 'others',
-    color: color || '#64748b',
-  });
-
-  res.redirect('/categories');
 });
 
 // GET /categories/:id/edit
-router.get('/:id/edit', (req, res) => {
-  const cat = store.categories.find(c => c.id === req.params.id);
-  if (!cat) return res.redirect('/categories');
+router.get('/:id/edit', async (req, res) => {
+  try {
+    const categories = await store.getCategories();
+    const cat = categories.find(c => c.id === req.params.id);
+    if (!cat) return res.redirect('/categories');
 
-  res.render('categories/edit', {
-    pageTitle: 'Edit Category', activePage: 'categories',
-    category: cat,
-    icons: AVAILABLE_ICONS, colors: AVAILABLE_COLORS,
-    errors: [],
-  });
+    res.render('categories/edit', {
+      pageTitle: 'Edit Category', activePage: 'categories',
+      category: cat,
+      icons: AVAILABLE_ICONS, colors: AVAILABLE_COLORS,
+      errors: [],
+    });
+  } catch (error) {
+    console.error('Database error loading category edit page:', error);
+    res.status(500).redirect('/categories');
+  }
 });
 
 // POST /categories/:id  (_method=PUT)
-router.put('/:id', (req, res) => {
-  const idx = store.categories.findIndex(c => c.id === req.params.id);
-  if (idx === -1) return res.redirect('/categories');
-
+router.put('/:id', async (req, res) => {
   const { name, icon, color } = req.body;
   const errors = [];
 
@@ -101,24 +145,41 @@ router.put('/:id', (req, res) => {
     });
   }
 
-  store.categories[idx] = {
-    ...store.categories[idx],
-    name: name.trim(),
-    icon: icon || 'others',
-    color: color || '#64748b',
-  };
-
-  res.redirect('/categories');
+  try {
+    await db.query(
+      `UPDATE categories
+      SET name = ?, icon = ?, color = ?
+      WHERE id = ?`,
+      [name.trim(), icon || 'others', color || '#64748b', Number(req.params.id)]
+    );
+    res.redirect('/categories');
+  } catch (error) {
+    console.error('Database error updating category:', error);
+    res.status(500).render('categories/edit', {
+      pageTitle: 'Edit Category', activePage: 'categories',
+      category: { ...req.body, id: req.params.id },
+      icons: AVAILABLE_ICONS, colors: AVAILABLE_COLORS,
+      errors: ['Unable to update category right now. Please try again.'],
+    });
+  }
 });
 
 // POST /categories/:id  (_method=DELETE)
-router.delete('/:id', (req, res) => {
-  const inUse = store.expenses.some(e => e.categoryId === req.params.id);
-  if (!inUse) {
-    const idx = store.categories.findIndex(c => c.id === req.params.id);
-    if (idx !== -1) store.categories.splice(idx, 1);
+router.delete('/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT COUNT(*) AS count FROM expenses WHERE category_id = ?',
+      [Number(req.params.id)]
+    );
+    const inUse = Number(rows[0].count) > 0;
+    if (!inUse) {
+      await db.query('DELETE FROM categories WHERE id = ?', [Number(req.params.id)]);
+    }
+    res.redirect('/categories');
+  } catch (error) {
+    console.error('Database error deleting category:', error);
+    res.status(500).redirect('/categories');
   }
-  res.redirect('/categories');
 });
 
 module.exports = router;
