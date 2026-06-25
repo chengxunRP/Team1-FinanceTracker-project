@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const store = require('../expenseStore');
+const uploadExpenseImage = require('../middleware/expenseUpload');
 
 function formatSGD(amount) {
   return '$' + Number(amount).toFixed(2);
@@ -64,10 +65,11 @@ router.get('/new', (req, res) => {
 });
 
 // POST /expenses
-router.post('/', (req, res) => {
+router.post('/', uploadExpenseImage, (req, res) => {
   const { title, amount, categoryId, date, notes } = req.body;
   const errors = [];
 
+  if (req.uploadError) errors.push(req.uploadError);
   if (!title || !title.trim())                          errors.push('Title is required.');
   if (!amount || isNaN(amount) || +amount <= 0)         errors.push('Amount must be a positive number.');
   if (!categoryId)                                      errors.push('Please select a category.');
@@ -81,6 +83,8 @@ router.post('/', (req, res) => {
     });
   }
 
+  const expenseImagePath = req.file ? '/uploads/expenses/' + req.file.filename : '';
+
   store.expenses.unshift({
     id: store.newId(),
     title: title.trim(),
@@ -88,6 +92,7 @@ router.post('/', (req, res) => {
     categoryId,
     date,
     notes: (notes || '').trim(),
+    imagePath: expenseImagePath,
   });
 
   res.redirect('/expenses');
@@ -117,13 +122,14 @@ router.get('/:id/edit', (req, res) => {
 });
 
 // POST /expenses/:id  (_method=PUT)
-router.put('/:id', (req, res) => {
+router.put('/:id', uploadExpenseImage, (req, res) => {
   const idx = store.expenses.findIndex(e => e.id === req.params.id);
   if (idx === -1) return res.redirect('/expenses');
 
   const { title, amount, categoryId, date, notes } = req.body;
   const errors = [];
 
+  if (req.uploadError) errors.push(req.uploadError);
   if (!title || !title.trim())                  errors.push('Title is required.');
   if (!amount || isNaN(amount) || +amount <= 0) errors.push('Amount must be a positive number.');
   if (!categoryId)                              errors.push('Please select a category.');
@@ -132,10 +138,14 @@ router.put('/:id', (req, res) => {
   if (errors.length) {
     return res.render('expenses/form', {
       pageTitle: 'Edit Expense', activePage: 'expenses',
-      expense: { ...req.body, id: req.params.id }, categories: store.categories,
+      expense: { ...req.body, id: req.params.id, imagePath: store.expenses[idx].imagePath }, categories: store.categories,
       errors, formAction: `/expenses/${req.params.id}`, isEdit: true,
     });
   }
+
+  const expenseImagePath = req.file
+    ? '/uploads/expenses/' + req.file.filename
+    : (store.expenses[idx].imagePath || '');
 
   store.expenses[idx] = {
     ...store.expenses[idx],
@@ -144,6 +154,7 @@ router.put('/:id', (req, res) => {
     categoryId,
     date,
     notes: (notes || '').trim(),
+    imagePath: expenseImagePath,
   };
 
   res.redirect('/expenses');

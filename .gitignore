@@ -142,3 +142,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Uploaded expense images (keep folder)
+app/public/uploads/expenses/*
+!app/public/uploads/expenses/.gitkeep

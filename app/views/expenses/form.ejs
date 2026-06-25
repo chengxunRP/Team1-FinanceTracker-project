@@ -28,7 +28,7 @@
 
   <!-- Form card -->
   <div class="card-panel" style="max-width:600px;">
-    <form method="POST" action="<%= formAction %>" style="display:grid;gap:1.15rem;">
+    <form method="POST" action="<%= formAction %>" enctype="multipart/form-data" style="display:grid;gap:1.15rem;">
       <% if (isEdit) { %>
         <input type="hidden" name="_method" value="PUT">
       <% } %>
@@ -87,6 +87,29 @@
           style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.95rem;color:var(--text);background:var(--white);width:100%;resize:vertical;font-family:inherit;"><%= exp.notes || '' %></textarea>
       </div>
 
+      <!-- Expense image upload -->
+      <div class="form-group">
+        <label class="expense-upload-label-heading">Expense Image <span class="expense-upload-optional">(optional)</span></label>
+        <div class="expense-upload-box" id="expenseUploadBox">
+          <input type="file" name="expenseImage" id="expenseImage" accept="image/*" class="expense-upload-input">
+          <div class="expense-upload-content">
+            <svg class="expense-upload-icon" viewBox="0 0 24 24" fill="none" width="40" height="40" aria-hidden="true">
+              <path d="M4 7h16l-2 12H6L4 7z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+              <path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              <circle cx="12" cy="13" r="3" stroke="currentColor" stroke-width="1.75"/>
+              <path d="M9 4.5h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+            <p class="expense-upload-hint">Click to choose an image or drag and drop it here.</p>
+          </div>
+          <img id="expenseImagePreview" class="expense-image-preview<%= (isEdit && exp.imagePath) ? ' expense-image-preview--visible' : '' %>"
+            alt="Expense image preview"
+            <% if (isEdit && exp.imagePath) { %>src="<%= exp.imagePath %>" data-existing="<%= exp.imagePath %>"<% } %>>
+        </div>
+        <% if (isEdit && exp.imagePath) { %>
+          <p class="expense-upload-edit-note">Current image is shown above. Upload a new file to replace it.</p>
+        <% } %>
+      </div>
+
       <!-- Actions -->
       <div style="display:flex;gap:0.75rem;justify-content:flex-end;padding-top:0.25rem;">
         <a href="/expenses" class="btn btn--sm" style="background:var(--white);border:1px solid var(--border-soft);color:var(--text-muted);">Cancel</a>
@@ -119,5 +142,6 @@ document.querySelectorAll('input[name="categoryId"]').forEach(function(radio) {
 });
 </script>
 
+<script src="/js/expense-upload.js"></script>
 <script src="/js/expense-nav.js"></script>
 <%- include('../partials/footer') %>
