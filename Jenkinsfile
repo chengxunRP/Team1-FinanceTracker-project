@@ -67,9 +67,15 @@ pipeline {
                     sh '''
                         docker run -d \
                           --name spendwise-container \
+                          --add-host=host.docker.internal:host-gateway \
                           -p 3000:3000 \
                           -e PORT=3000 \
                           -e GROQ_API_KEY="$GROQ_API_KEY" \
+                          -e DB_HOST=host.docker.internal \
+                          -e DB_USER=finance_user \
+                          -e DB_PASSWORD=password123 \
+                          -e DB_NAME=finance_tracker \
+                          -e DB_PORT=3306 \
                           spendwise-app
                     '''
                 }
