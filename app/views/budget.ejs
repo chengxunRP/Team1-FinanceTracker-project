@@ -10,21 +10,6 @@
   if (typeof healthStatus === 'undefined') healthStatus = { label: 'On track', key: 'safe', helper: 'Spending is within your budget' };
   if (typeof successMessage === 'undefined') successMessage = '';
 
-  function budgetIconSvg(type) {
-    var icons = {
-      budget: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
-      spend: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.75"/><path d="M7 15h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
-      food: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21c4-4 6-7.5 6-11a6 6 0 10-12 0c0 3.5 2 7 6 11z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M12 13a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" stroke-width="1.75"/></svg>',
-      transport: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 17h14M5 17a2 2 0 100-4 2 2 0 000 4zM19 17a2 2 0 100-4 2 2 0 000 4zM5 17V8l2-3h10l2 3v9" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M7 8h10" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
-      school: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3L2 8l10 5 10-5-10-5z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M6 10.5V17c2 2 8 2 12 0v-6.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
-      shopping: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 9V7a5 5 0 0110 0v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M6 9h12l-1 12H7L6 9z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
-      bills: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4h8l2 4v12H6V4h2z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
-      entertainment: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M10 9.5l5 3-5 3v-6z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
-      others: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M8.5 12h7M12 8.5v7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>'
-    };
-    return icons[type] || icons.spend;
-  }
-
   function formatMoney(value) {
     var num = Number(value);
     if (Number.isNaN(num)) return '$0';
@@ -41,20 +26,6 @@
       return includeOverspentLabel !== false ? overspentText + ' overspent' : overspentText;
     }
     return formatMoney(num);
-  }
-
-  function getExpenseIcon(category) {
-    var icons = {
-      Food: { icon: 'food' },
-      Transport: { icon: 'transport' },
-      School: { icon: 'school' },
-      Shopping: { icon: 'shopping' },
-      Utilities: { icon: 'bills' },
-      Bills: { icon: 'bills' },
-      Entertainment: { icon: 'entertainment' },
-      Others: { icon: 'others' }
-    };
-    return icons[category] || { icon: 'spend' };
   }
 
   function getBudgetCategoryLabel(category) {
@@ -169,7 +140,7 @@
           <% categorySpending.forEach(function(row) { %>
           <div class="budget-hbar-row">
             <div class="budget-hbar-row__label">
-              <span class="budget-cat-icon budget-cat-icon--sm budget-cat-icon--<%= row.icon %>" aria-hidden="true"><%- budgetIconSvg(row.icon) %></span>
+              <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'sm' }) %>
               <span class="budget-hbar-row__name"><%= row.name %></span>
             </div>
             <div class="budget-hbar-row__track-wrap">
@@ -206,7 +177,7 @@
           <% categoryRows.forEach(function(row) { %>
           <div class="budget-hbar-row budget-hbar-row--usage">
             <div class="budget-hbar-row__label">
-              <span class="budget-cat-icon budget-cat-icon--sm budget-cat-icon--<%= row.icon %>" aria-hidden="true"><%- budgetIconSvg(row.icon) %></span>
+              <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'sm' }) %>
               <span class="budget-hbar-row__name"><%= row.name %></span>
               <span class="budget-badge budget-badge--sm <%= row.statusBadgeClass %>"><%= row.statusLabel %></span>
             </div>
@@ -253,7 +224,7 @@
       <% categoryRows.forEach(function(row) { %>
       <article class="budget-cat-card <%= row.statusCardClass %>">
         <div class="budget-cat-card__top">
-          <span class="budget-cat-icon budget-cat-icon--<%= row.icon %>" aria-hidden="true"><%- budgetIconSvg(row.icon) %></span>
+          <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'md' }) %>
           <div class="budget-cat-card__heading">
             <h3 class="budget-cat-card__name"><%= row.name %></h3>
             <span class="budget-badge <%= row.statusBadgeClass %>"><%= row.statusLabel %></span>
@@ -298,14 +269,13 @@
 
     <ul class="budget-expense-list budget-expense-list--compact">
       <% expenses.forEach(function(expense) {
-        var expenseIcon = getExpenseIcon(expense.category);
         var budgetCategory = getBudgetCategoryLabel(expense.category);
       %>
       <li class="budget-expense-item">
-        <span class="budget-cat-icon budget-cat-icon--sm budget-cat-icon--<%= expenseIcon.icon %>" aria-hidden="true"><%- budgetIconSvg(expenseIcon.icon) %></span>
+        <%- include('partials/category-icon', { catName: budgetCategory, catIcon: '', catSize: 'sm' }) %>
         <div class="budget-expense-item__main">
           <span class="budget-expense-item__title"><%= expense.description %></span>
-          <span class="budget-expense-item__meta"><span class="budget-tag budget-tag--<%= expenseIcon.icon %>"><%= budgetCategory %></span></span>
+          <span class="budget-expense-item__meta"><span class="budget-tag budget-tag--<%= budgetCategory.toLowerCase() %>"><%= budgetCategory %></span></span>
         </div>
         <span class="budget-expense-item__amount"><%= formatMoney(expense.amount) %></span>
       </li>

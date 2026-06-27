@@ -24,9 +24,10 @@ router.get('/', async (req, res) => {
   const { category = '', sort = 'date-desc', search = '' } = req.query;
 
   try {
-    const [list, categories] = await Promise.all([
+    const [list, categories, totalInDb] = await Promise.all([
       store.getAllExpenses({ category, sort, search }),
       store.getCategories(),
+      store.getExpenseCount(),
     ]);
 
     const total = list.reduce((s, e) => s + Number(e.amount), 0);
@@ -49,6 +50,8 @@ router.get('/', async (req, res) => {
       activeCategory: category,
       sort,
       search,
+      hasAnyExpenses: totalInDb > 0,
+      isFiltered: !!(category || search),
     });
   } catch (error) {
     console.error('Database error loading expenses:', error);
@@ -63,6 +66,8 @@ router.get('/', async (req, res) => {
       activeCategory: category,
       sort,
       search,
+      hasAnyExpenses: false,
+      isFiltered: !!(category || search),
       errors: ['Unable to load expenses right now. Please try again.'],
     });
   }
