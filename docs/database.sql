@@ -133,23 +133,12 @@ ON DUPLICATE KEY UPDATE
   color = VALUES(color);
 
 -- =============================================================================
--- Seed data — expenses (from app/expenseStore.js sample records)
--- Original in-memory IDs were generated strings; DB uses INT AUTO_INCREMENT.
--- No image_path in seed data because the original samples had no uploads.
+-- Seed data — expenses
+-- No default expense rows are inserted. Add expenses through the app UI or
+-- your own INSERT statements after setup.
 -- =============================================================================
-INSERT INTO expenses (id, title, amount, category_id, expense_date, notes, image_path) VALUES
-  (1, 'Chicken rice at hawker centre',  4.50,  1, '2025-05-28', 'Lunch at Toa Payoh',     NULL),
-  (2, 'MRT top-up',                    20.00, 2, '2025-05-27', '',                       NULL),
-  (3, 'Textbooks',                     65.00, 3, '2025-05-25', 'Semester 2 materials',   NULL),
-  (4, 'Netflix subscription',          15.98, 6, '2025-05-20', 'Monthly plan',           NULL),
-  (5, 'Electricity bill',              87.30, 5, '2025-05-15', 'May bill',               NULL)
-ON DUPLICATE KEY UPDATE
-  title = VALUES(title),
-  amount = VALUES(amount),
-  category_id = VALUES(category_id),
-  expense_date = VALUES(expense_date),
-  notes = VALUES(notes),
-  image_path = VALUES(image_path);
+-- To remove legacy demo rows from an existing database, run:
+--   docs/remove-sample-expense-seeds.sql
 
 -- =============================================================================
 -- Seed data — default monthly budget (from app/app.js default: 500)
