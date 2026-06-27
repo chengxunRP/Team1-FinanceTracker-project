@@ -92,7 +92,10 @@
         <div class="spc-item-summary">
           <h3 class="spc-item-name"><%= recommendation.itemName %></h3>
           <p class="spc-item-price">$<%= recommendation.itemPrice %></p>
-          <span class="tag tag--blue"><%= recommendation.category %></span>
+          <span class="tag tag--blue spc-category-tag">
+            <%- include('partials/category-icon', { catName: recommendation.category, catIcon: '', catSize: 'sm' }) %>
+            <%= recommendation.category %>
+          </span>
         </div>
 
         <div class="spc-metrics result-metrics">

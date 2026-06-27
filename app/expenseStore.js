@@ -24,6 +24,11 @@ async function getCategories() {
   }
 }
 
+async function getExpenseCount() {
+  const [rows] = await db.query("SELECT COUNT(*) AS count FROM expenses");
+  return Number(rows[0].count) || 0;
+}
+
 async function getAllExpenses(filters = {}) {
   const sortMap = {
     "date-desc": "e.expense_date DESC",
@@ -196,6 +201,7 @@ async function getExpensesForAnalytics() {
 
 module.exports = {
   getCategories,
+  getExpenseCount,
   getAllExpenses,
   getExpenseById,
   addExpense,

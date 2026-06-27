@@ -17,6 +17,17 @@
     Entertainment: "pink"
   };
 
+  var CATEGORY_IMAGE_URLS = {
+    Food: "/categoryimages/food.png",
+    Dining: "/categoryimages/food.png",
+    Transport: "/categoryimages/transport.png",
+    Shopping: "/categoryimages/shopping.png",
+    Utilities: "/categoryimages/bills.png",
+    Bills: "/categoryimages/bills.png",
+    Entertainment: "/categoryimages/entertainment.png",
+    School: "/categoryimages/schools.png"
+  };
+
   var CATEGORY_INITIALS = {
     Food: "F",
     Dining: "D",
@@ -238,6 +249,18 @@
 
   function getCategoryColor(category) {
     return CATEGORY_COLORS[category] || "blue";
+  }
+
+  function renderCategoryIcon(category, sizeClass) {
+    var url = CATEGORY_IMAGE_URLS[category];
+    sizeClass = sizeClass || "sm";
+
+    if (url) {
+      return '<span class="sw-category-icon sw-category-icon--' + sizeClass + '"><img src="' + url + '" alt="" class="sw-category-icon__img"></span>';
+    }
+
+    var initial = CATEGORY_INITIALS[category] || category.charAt(0).toUpperCase() || "?";
+    return '<span class="dash-txn-icon dash-txn-icon--' + getCategoryColor(category) + '" aria-hidden="true">' + initial + "</span>";
   }
 
   function formatExpenseDate(expense) {
@@ -527,7 +550,7 @@
       var barPct = Math.min(100, pct);
       var pctClass = pct >= 100 ? "danger" : pct >= 80 ? "warning" : "safe";
       html += '<div class="dash-budget-row">';
-      html += '<div class="dash-budget-meta"><span class="dash-budget-name"><span class="dash-budget-cat-dot dash-budget-cat-dot--' + getCategoryColor(row.name) + '" aria-hidden="true"></span>' + row.name + "</span>";
+      html += '<div class="dash-budget-meta"><span class="dash-budget-name">' + renderCategoryIcon(row.name, "sm") + row.name + "</span>";
       html += '<span class="dash-budget-amt">' + money(row.spent) + " / " + money(row.limit) + "</span></div>";
       html += '<div class="dash-budget-track"><div class="dash-budget-fill ' + budgetBarClass(pct) + '" style="width:' + barPct + '%;"></div></div>';
       html += '<span class="dash-budget-pct dash-budget-pct--' + pctClass + '">' + pct + "%</span>";
@@ -552,9 +575,8 @@
 
     for (var i = 0; i < transactions.length; i++) {
       var row = transactions[i];
-      var initial = CATEGORY_INITIALS[row.category] || row.category.charAt(0).toUpperCase() || "?";
       html += '<li class="dash-txn-item">';
-      html += '<span class="dash-txn-icon dash-txn-icon--' + row.color + '" aria-hidden="true">' + initial + "</span>";
+      html += renderCategoryIcon(row.category, "sm");
       html += '<div class="dash-txn-main">';
       html += '<span class="dash-txn-cat">' + row.description + "</span>";
       html += '<span class="dash-txn-meta">' + row.category + " · " + row.date + "</span>";

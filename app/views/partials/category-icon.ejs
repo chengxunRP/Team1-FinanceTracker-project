@@ -1,0 +1,21 @@
+<%
+  var _name = typeof catName !== 'undefined' ? catName : (typeof name !== 'undefined' ? name : '');
+  var _icon = typeof catIcon !== 'undefined' ? catIcon : (typeof icon !== 'undefined' ? icon : '');
+  var _size = typeof catSize !== 'undefined' ? catSize : 'md';
+  var _imgUrl = '';
+  if (typeof getCategoryImageUrl === 'function') {
+    _imgUrl = getCategoryImageUrl(_name, _icon);
+  }
+%>
+<span class="sw-category-icon sw-category-icon--<%= _size %>"<% if (_name) { %> title="<%= _name %>"<% } %>>
+  <% if (_imgUrl) { %>
+    <img src="<%= _imgUrl %>" alt="" class="sw-category-icon__img" loading="lazy">
+  <% } else { %>
+    <span class="sw-category-icon__fallback" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/>
+        <path d="M8.5 12h7M12 8.5v7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </svg>
+    </span>
+  <% } %>
+</span>

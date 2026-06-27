@@ -27,6 +27,7 @@ const {
 } = require("./chatHistory");
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
+const { getCategoryImageUrl } = require("./categoryImageHelpers");
 
 const app = express();
 const PORT = 3000;
@@ -43,6 +44,7 @@ app.use(function(req, res, next) {
   res.render = function(view, locals, cb) {
     if (typeof locals === 'function') { cb = locals; locals = {}; }
     locals = locals || {};
+    locals.getCategoryImageUrl = getCategoryImageUrl;
     var _cb = cb || function(err, str) {
       if (err) return next(err);
       res.send(str);

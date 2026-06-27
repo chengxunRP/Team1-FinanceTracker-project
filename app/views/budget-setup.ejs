@@ -88,7 +88,7 @@
         <% categorySetupRows.forEach(function(row) { %>
         <div class="budget-cat-setup-field">
           <div class="budget-cat-setup-field__info">
-            <span class="budget-cat-icon budget-cat-icon--sm budget-cat-icon--<%= row.icon %>" aria-hidden="true"><%- budgetIconSvg(row.icon) %></span>
+            <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'md' }) %>
             <div>
               <label class="budget-cat-setup-field__label" for="categoryBudget_<%= row.categoryId %>"><%= row.name %></label>
               <span class="budget-cat-setup-field__hint">Monthly limit</span>

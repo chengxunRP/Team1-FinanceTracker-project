@@ -1,21 +1,8 @@
 <%- include('../partials/header') %>
 
 <%
-  function catIconSvg(icon) {
-    var map = {
-      food:          '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M12 21c4-4 6-7.5 6-11a6 6 0 10-12 0c0 3.5 2 7 6 11z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="11" r="2" stroke="currentColor" stroke-width="1.75"/></svg>',
-      transport:     '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M5 17h14M5 17a2 2 0 100-4 2 2 0 000 4zM19 17a2 2 0 100-4 2 2 0 000 4zM5 17V8l2-3h10l2 3v9" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
-      school:        '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M12 3L2 8l10 5 10-5-10-5z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M6 10.5V17c2 2 8 2 12 0v-6.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
-      shopping:      '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M7 9V7a5 5 0 0110 0v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M6 9h12l-1 12H7L6 9z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
-      bills:         '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M8 4h8l2 4v12H6V4h2z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
-      entertainment: '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M10 9.5l5 3-5 3v-6z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
-      health:        '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M4.5 12.5h3l2-7 3 14 2-9 1.5 2H20" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      travel:        '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M22 16.5H2M5 16.5V7a1 1 0 011-1h12a1 1 0 011 1v9.5M9 6V4h6v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      others:        '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M8.5 12h7M12 8.5v7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>'
-    };
-    return map[icon] || map.others;
-  }
-
+  if (typeof hasAnyExpenses === 'undefined') hasAnyExpenses = false;
+  if (typeof isFiltered === 'undefined') isFiltered = false;
   var topCat = byCategory.filter(function(c){ return c.count > 0; }).sort(function(a,b){ return b.total - a.total; })[0];
 %>
 
@@ -56,7 +43,7 @@
     </div>
     <div class="stat-card">
       <span class="stat-card__label">Top Category</span>
-      <span class="stat-card__value stat-card__value--sm"><%= topCat ? topCat.name : '—' %></span>
+      <span class="stat-card__value stat-card__value--sm"><%= topCat ? topCat.name : 'None' %></span>
     </div>
   </div>
 
@@ -67,10 +54,11 @@
     <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
       <% byCategory.filter(function(c){ return c.count > 0; }).forEach(function(cat) { %>
         <a href="/expenses?category=<%= cat.id %>&sort=<%= sort %>"
-           style="display:inline-flex;align-items:center;gap:0.45rem;padding:0.35rem 0.85rem;border-radius:999px;font-size:0.8rem;font-weight:600;text-decoration:none;border:1.5px solid <%= activeCategory === cat.id ? cat.color : 'var(--border-soft)' %>;background:<%= activeCategory === cat.id ? cat.color + '18' : 'var(--white)' %>;color:<%= activeCategory === cat.id ? cat.color : 'var(--text-muted)' %>;transition:all 0.15s;">
-          <span style="color:<%= cat.color %>;"><%- catIconSvg(cat.icon) %></span>
+           class="expense-cat-pill<%= activeCategory === cat.id ? ' expense-cat-pill--active' : '' %>"
+           style="--cat-color:<%= cat.color %>;">
+          <%- include('../partials/category-icon', { catName: cat.name, catIcon: cat.icon, catSize: 'sm' }) %>
           <%= cat.name %>
-          <span style="background:<%= cat.color %>18;color:<%= cat.color %>;padding:0.1rem 0.45rem;border-radius:999px;font-size:0.7rem;font-weight:700;"><%= formatSGD(cat.total) %></span>
+          <span class="expense-cat-pill__amount"><%= formatSGD(cat.total) %></span>
         </a>
       <% }) %>
       <% if (activeCategory) { %>
@@ -122,75 +110,80 @@
 
   <!-- Expense table or empty state -->
   <% if (expenses.length === 0) { %>
-    <div class="card-panel" style="text-align:center;padding:3.5rem 2rem;">
-      <svg viewBox="0 0 24 24" fill="none" width="42" height="42" style="margin:0 auto 1rem;color:var(--grey-300);display:block;" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M9 12h6M9 9h6M9 15h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <p style="font-weight:700;color:var(--text);margin:0 0 0.35rem;font-size:1rem;">No expenses found</p>
-      <p style="color:var(--text-muted);margin:0;font-size:0.9rem;">Try adjusting your filters or <a href="/expenses/new">add a new expense</a>.</p>
+    <div class="expense-empty-state card-panel">
+      <% if (!hasAnyExpenses && !isFiltered) { %>
+      <div class="expense-empty-state__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" width="48" height="48">
+          <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2 class="expense-empty-state__title">No expenses added yet.</h2>
+      <p class="expense-empty-state__text">Add your first expense to start tracking your spending.</p>
+      <a href="/expenses/new" class="btn btn--primary btn--sm">Add your first expense</a>
+      <% } else { %>
+      <div class="expense-empty-state__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" width="48" height="48">
+          <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M9 12h6M9 9h6M9 15h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2 class="expense-empty-state__title">No expenses found</h2>
+      <p class="expense-empty-state__text">Try adjusting your filters or <a href="/expenses/new">add a new expense</a>.</p>
+      <% } %>
     </div>
   <% } else { %>
-    <div style="background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;">
-      <div class="table-wrap" style="border:none;border-radius:0;">
-        <table class="data-table">
+    <div class="expense-table-card">
+      <div class="table-wrap expense-table-wrap">
+        <table class="data-table data-table--expenses">
           <thead>
             <tr>
-              <th>Image</th>
-              <th>Expense</th>
-              <th>Category</th>
-              <th>Date</th>
-              <th class="data-table__right">Amount</th>
-              <th class="data-table__right">Actions</th>
+              <th class="data-table__image-col">Image</th>
+              <th class="data-table__expense-col">Expense</th>
+              <th class="data-table__category-col">Category</th>
+              <th class="data-table__date-col">Date</th>
+              <th class="data-table__right data-table__amount-col">Amount</th>
+              <th class="data-table__right data-table__actions-col">Actions</th>
             </tr>
           </thead>
           <tbody>
             <% expenses.forEach(function(expense) { %>
-              <tr>
-                <td>
-                  <% if (expense.imagePath) { %>
-                    <a href="/expenses/<%= expense.id %>" class="expense-thumb-link">
-                      <img src="<%= expense.imagePath %>" alt="<%= expense.title %> receipt" class="expense-thumb">
-                    </a>
-                  <% } else { %>
-                    <div class="expense-no-image" title="No image">
-                      <svg viewBox="0 0 24 24" fill="none" width="22" height="22" aria-hidden="true">
-                        <path d="M4 7h16l-2 12H6L4 7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                        <path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                        <circle cx="12" cy="13" r="2.5" stroke="currentColor" stroke-width="1.5"/>
-                      </svg>
-                      <span>No image</span>
-                    </div>
-                  <% } %>
+              <tr class="expense-table-row">
+                <td class="data-table__image-col">
+                  <%- include('../partials/expense-thumb', {
+                    expenseTitle: expense.title,
+                    imagePath: expense.imagePath,
+                    thumbLink: '/expenses/' + expense.id,
+                    thumbSize: 'md'
+                  }) %>
                 </td>
-                <td>
-                  <a href="/expenses/<%= expense.id %>" style="font-weight:600;color:var(--text);text-decoration:none;font-size:0.9rem;display:block;" onmouseover="this.style.color='var(--blue-mid)'" onmouseout="this.style.color='var(--text)'"><%= expense.title %></a>
-                  <% if (expense.notes) { %>
-                    <span style="font-size:0.75rem;color:var(--text-muted);display:block;margin-top:0.15rem;"><%= expense.notes %></span>
-                  <% } %>
+                <td class="data-table__expense-col">
+                  <div class="expense-row-details">
+                    <a href="/expenses/<%= expense.id %>" class="expense-row-details__title"><%= expense.title %></a>
+                    <% if (expense.notes) { %>
+                      <span class="expense-row-details__notes"><%= expense.notes %></span>
+                    <% } %>
+                  </div>
                 </td>
-                <td>
-                  <span style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.2rem 0.65rem;border-radius:999px;font-size:0.75rem;font-weight:600;background:<%= expense.category.color %>15;color:<%= expense.category.color %>;">
-                    <%- catIconSvg(expense.category.icon) %>
+                <td class="data-table__category-col">
+                  <span class="expense-cat-pill expense-cat-pill--table" style="--cat-color:<%= expense.category.color %>;">
+                    <%- include('../partials/category-icon', { catName: expense.category.name, catIcon: expense.category.icon, catSize: 'sm' }) %>
                     <%= expense.category.name %>
                   </span>
                 </td>
-                <td style="color:var(--text-muted);font-size:0.875rem;">
+                <td class="data-table__date-col">
                   <%= new Date(expense.date + 'T00:00:00').toLocaleDateString('en-SG', { day:'numeric', month:'short', year:'numeric' }) %>
                 </td>
                 <td class="data-table__right data-table__amount"><%= formatSGD(expense.amount) %></td>
-                <td class="data-table__right">
-                  <div style="display:inline-flex;gap:0.35rem;align-items:center;">
-                    <a href="/expenses/<%= expense.id %>/edit"
-                       style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.3rem 0.65rem;border-radius:var(--radius-sm);font-size:0.78rem;font-weight:600;text-decoration:none;background:var(--blue-light);color:var(--blue);border:1px solid transparent;transition:all 0.15s;"
-                       onmouseover="this.style.background='var(--blue)';this.style.color='var(--white)'"
-                       onmouseout="this.style.background='var(--blue-light)';this.style.color='var(--blue)'">
+                <td class="data-table__right data-table__actions-col">
+                  <div class="expense-row-actions">
+                    <a href="/expenses/<%= expense.id %>/edit" class="expense-action-btn expense-action-btn--edit">
                       <svg viewBox="0 0 24 24" fill="none" width="12" height="12" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       Edit
                     </a>
-                    <form method="POST" action="/expenses/<%= expense.id %>" style="display:inline;" onsubmit="return confirm('Delete this expense?')">
+                    <form method="POST" action="/expenses/<%= expense.id %>" class="expense-action-form" onsubmit="return confirm('Delete this expense?')">
                       <input type="hidden" name="_method" value="DELETE">
-                      <button type="submit"
-                        style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.3rem 0.65rem;border-radius:var(--radius-sm);font-size:0.78rem;font-weight:600;background:var(--danger-light);color:var(--danger);border:1px solid transparent;cursor:pointer;transition:all 0.15s;font-family:inherit;"
-                        onmouseover="this.style.background='var(--danger)';this.style.color='var(--white)'"
-                        onmouseout="this.style.background='var(--danger-light)';this.style.color='var(--danger)'">
+                      <button type="submit" class="expense-action-btn expense-action-btn--delete">
                         <svg viewBox="0 0 24 24" fill="none" width="12" height="12" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         Delete
                       </button>
