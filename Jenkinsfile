@@ -44,21 +44,32 @@ pipeline {
         stage('DevSecOps Security Scan') {
             steps {
                 sh '''
-                    echo "Running DevSecOps dependency security scan..."
-                    cd app
+                    echo "Running DevSecOps dependency security scan inside Node.js container..."
 
-                    if [ ! -f package.json ]; then
-                        echo "ERROR: package.json is missing. Cannot run npm audit."
-                        exit 1
-                    fi
+                    docker run --rm \
+                      -v "$PWD/app:/app" \
+                      -w /app \
+                      node:20-alpine \
+                      sh -c '
+                        echo "Node version:"
+                        node -v
 
-                    if [ ! -f package-lock.json ]; then
-                        echo "package-lock.json is missing. Generating lock file for audit..."
-                        npm install --package-lock-only --ignore-scripts
-                    fi
+                        echo "NPM version:"
+                        npm -v
 
-                    npm audit --audit-level=high
-                    echo "DevSecOps security scan completed successfully."
+                        if [ ! -f package.json ]; then
+                            echo "ERROR: package.json is missing. Cannot run npm audit."
+                            exit 1
+                        fi
+
+                        if [ ! -f package-lock.json ]; then
+                            echo "package-lock.json is missing. Generating lock file for audit..."
+                            npm install --package-lock-only --ignore-scripts
+                        fi
+
+                        npm audit --audit-level=high
+                        echo "DevSecOps security scan completed successfully."
+                      '
                 '''
             }
         }
