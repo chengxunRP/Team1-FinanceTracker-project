@@ -6,7 +6,7 @@
     links.forEach(function (link) {
       var span = link.querySelector('span');
       if (span && span.textContent.trim() === 'Add Expenses') {
-        link.href = '/expenses';
+        link.href = '/expenses/new';
         link.classList.remove('sidebar-link--soon');
       }
     });

@@ -19,10 +19,11 @@ const SUGGESTED_QUESTIONS = [
   "How can I reduce my spending?",
 ];
 
-function buildFinBotReply(message, summary, financeSnapshot) {
+function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel) {
   const text = (message || "").trim().toLowerCase();
   const highestCategory = financeSnapshot.highestCategory;
   const highestCategoryAmount = financeSnapshot.highestCategoryAmount;
+  const monthNote = budgetMonthLabel ? ` (${budgetMonthLabel})` : " this month";
 
   const itemPrice = extractItemPrice(message);
   if (itemPrice != null && isPurchaseQuestion(message)) {
@@ -39,7 +40,7 @@ function buildFinBotReply(message, summary, financeSnapshot) {
 
   if (text.includes("spent")) {
     return [
-      "Summary:",
+      `Summary for${monthNote}:`,
       `- You have spent $${summary.totalSpent} out of $${summary.monthlyBudget}.`,
       `- You have $${summary.remainingBudget} remaining.`,
       `- You have used ${summary.percentageUsed}% of your budget.`,
@@ -48,10 +49,10 @@ function buildFinBotReply(message, summary, financeSnapshot) {
 
   if (text.includes("budget")) {
     return [
-      "Summary:",
+      `Budget summary for${monthNote}:`,
       `- Monthly budget: $${summary.monthlyBudget}`,
-      `- Current spent: $${summary.totalSpent}`,
-      `- Current remaining: $${summary.remainingBudget}`,
+      `- Spent this month: $${summary.totalSpent}`,
+      `- Remaining this month: $${summary.remainingBudget}`,
       `- Budget used: ${summary.percentageUsed}%`,
     ].join("\n");
   }
@@ -63,7 +64,7 @@ function buildFinBotReply(message, summary, financeSnapshot) {
     text.includes("category did i spend")
   ) {
     return [
-      "Main insight:",
+      `Main insight for${monthNote}:`,
       `${highestCategory} is your highest spending category at $${highestCategoryAmount}.`,
       "",
       "Advice:",
@@ -89,15 +90,26 @@ function getWelcomeMessage() {
   return "Hey! I am FinBot, your finance assistant. Ask about spending, your budget, or whether a purchase fits your plan.";
 }
 
-async function getFinBotReply(message, summary, financeSnapshot, expenses) {
-  const fallbackReply = buildFinBotReply(message, summary, financeSnapshot);
+async function getFinBotReply(message, summary, financeSnapshot, expenses, budgetMonthLabel) {
+  const fallbackReply = buildFinBotReply(
+    message,
+    summary,
+    financeSnapshot,
+    budgetMonthLabel
+  );
 
   if (!process.env.GROQ_API_KEY || !hasGroqApiKey()) {
     return { text: fallbackReply, usedGroq: false };
   }
 
   try {
-    const aiReply = await getGroqReply(message, summary, financeSnapshot, expenses);
+    const aiReply = await getGroqReply(
+      message,
+      summary,
+      financeSnapshot,
+      expenses,
+      budgetMonthLabel
+    );
 
     if (aiReply) {
       return { text: aiReply, usedGroq: true };

@@ -5,6 +5,7 @@ const path = require("path");
 const express = require("express");
 const {
   validateMonthlyBudget,
+  validateCategoryBudgetAmount,
   buildBudgetSummary,
   getMonthlyHealthStatus,
 } = require("./budgetHelpers");
@@ -27,6 +28,8 @@ const {
 } = require("./chatHistory");
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
+const { getCategoryDisplayNames } = require("./categoryHelpers");
+const financeHelpers = require("./financeHelpers");
 const { getCategoryImageUrl } = require("./categoryImageHelpers");
 
 const app = express();
@@ -60,16 +63,31 @@ app.use(function(req, res, next) {
 // --- End expense-nav script middleware ---
 
 async function getBudgetPageData(budgetMonth) {
-  const month = budgetMonth || budgetStore.getCurrentBudgetMonth();
+  const month = budgetStore.normalizeBudgetMonth(
+    budgetMonth || budgetStore.getCurrentBudgetMonth()
+  );
   let monthlyBudget;
   let expenses;
   let categories;
+  let spendingByCategoryId;
+  let monthTotalSpent;
+  let monthExpenseCount;
 
   try {
-    [monthlyBudget, expenses, categories] = await Promise.all([
+    [
+      monthlyBudget,
+      expenses,
+      categories,
+      spendingByCategoryId,
+      monthTotalSpent,
+      monthExpenseCount,
+    ] = await Promise.all([
       budgetStore.getMonthlyBudget(),
       expenseStore.getExpensesForAnalytics(),
       expenseStore.getCategories(),
+      budgetStore.getSpendingTotalsByCategoryId(month),
+      financeHelpers.getMonthlyExpenseTotal(month),
+      financeHelpers.getExpenseCountForMonth(month),
     ]);
   } catch (error) {
     console.error("Failed to load budget page data from MySQL:", error);
@@ -82,19 +100,41 @@ async function getBudgetPageData(budgetMonth) {
     );
   }
 
-  const expensesInMonth = budgetStore.filterExpensesForMonth(expenses, month);
-  const summary = buildBudgetSummary(monthlyBudget, expensesInMonth);
+  // Month-scoped list for detail views; summary totals use SQL aggregates as source of truth.
+  const expensesInMonth = await expenseStore.getExpensesInMonth(month);
+  const summary = buildBudgetSummary(monthlyBudget, expensesInMonth, monthTotalSpent);
+  const financeSnapshot = financeHelpers.buildFinanceSnapshot(
+    summary,
+    spendingByCategoryId,
+    categories,
+    "month"
+  );
   const hasCategoryBudgets = await budgetStore.hasCategoryBudgetsForMonth(month);
   const categoryRows = hasCategoryBudgets
-    ? await budgetStore.getBudgetRows(month, expenses, categories)
+    ? await budgetStore.getBudgetRows(month, categories, spendingByCategoryId)
     : [];
-  const categorySpending = budgetStore.getCategorySpendingRows(expenses, month, categories);
+  const categorySpending = budgetStore.getCategorySpendingRows(spendingByCategoryId, categories);
   const categorySetupRows = await budgetStore.getCategorySetupRows(month, categories);
+  const monthBudgets = await budgetStore.getCategoryBudgets(month);
+  const budgetedCategoryIds = monthBudgets.map((b) => b.categoryId);
+  const everythingElse = budgetStore.getEverythingElseData(
+    categories,
+    budgetedCategoryIds,
+    spendingByCategoryId
+  );
+  const budgetTotals = budgetStore.getBudgetTotals(categoryRows);
+  const availableCategories = await budgetStore.getAvailableCategoriesForBudget(
+    month,
+    categories,
+    spendingByCategoryId
+  );
 
   return {
     summary,
+    financeSnapshot,
     expenses,
-    monthExpenseCount: expensesInMonth.length,
+    expensesInMonth,
+    monthExpenseCount,
     categoryRows,
     hasCategoryBudgets,
     categorySpending,
@@ -102,6 +142,11 @@ async function getBudgetPageData(budgetMonth) {
     budgetMonth: month,
     budgetMonthLabel: budgetStore.formatBudgetMonthLabel(month),
     healthStatus: getMonthlyHealthStatus(summary.percentageUsed),
+    everythingElse,
+    budgetTotals,
+    availableCategories,
+    categories,
+    spendingByCategoryId,
   };
 }
 
@@ -114,8 +159,17 @@ function renderDbError(res, view, locals) {
 
 async function renderOverviewPage(req, res) {
   try {
-    const { summary, expenses, categoryRows, budgetMonth } = await getBudgetPageData();
-    const financeSnapshot = getFinanceSnapshot(summary, expenses);
+    const budgetMonth = budgetStore.normalizeBudgetMonth(req.query.month || undefined);
+    const pageData = await getBudgetPageData(budgetMonth);
+    const {
+      summary,
+      expenses,
+      financeSnapshot,
+      categoryRows,
+      budgetMonth: month,
+      monthExpenseCount,
+      budgetMonthLabel,
+    } = pageData;
 
     res.render("index", {
       pageTitle: "Overview",
@@ -124,7 +178,9 @@ async function renderOverviewPage(req, res) {
       expenses,
       financeSnapshot,
       categoryRows,
-      budgetMonth,
+      budgetMonth: month,
+      budgetMonthLabel,
+      monthExpenseCount,
     });
   } catch (error) {
     console.error("Database error loading overview/dashboard:", error);
@@ -136,6 +192,10 @@ async function renderOverviewPage(req, res) {
       financeSnapshot: getFinanceSnapshot(buildBudgetSummary(0, []), []),
       categoryRows: [],
       budgetMonth: budgetStore.getCurrentBudgetMonth(),
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
+        budgetStore.getCurrentBudgetMonth()
+      ),
+      monthExpenseCount: 0,
     });
   }
 }
@@ -163,12 +223,14 @@ app.get("/home", async (req, res) => {
 
 app.get("/budget", async (req, res) => {
   try {
-    const selectedMonth = req.query.month || budgetStore.getCurrentBudgetMonth();
+    const selectedMonth = budgetStore.normalizeBudgetMonth(
+      req.query.month || budgetStore.getCurrentBudgetMonth()
+    );
     const pageData = await getBudgetPageData(selectedMonth);
     const successMessage =
       req.query.saved === "1" ? "Budgets saved successfully." : "";
     res.render("budget", {
-      pageTitle: "Budget",
+      pageTitle: "Spending & Budgets",
       activePage: "budget",
       ...pageData,
       errors: [],
@@ -177,7 +239,7 @@ app.get("/budget", async (req, res) => {
   } catch (error) {
     console.error("Database error loading budget page:", error);
     renderDbError(res, "budget", {
-      pageTitle: "Budget",
+      pageTitle: "Spending & Budgets",
       activePage: "budget",
       summary: buildBudgetSummary(0, []),
       expenses: [],
@@ -409,16 +471,153 @@ app.post("/budget/setup", async (req, res) => {
   }
 });
 
+app.post("/budget/add", async (req, res) => {
+  const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
+  const { categoryId, amount } = req.body;
+  const validation = validateCategoryBudgetAmount(amount);
+
+  if (!categoryId) {
+    return res.status(400).json({ errors: ["Please select a category."] });
+  }
+
+  if (!validation.valid) {
+    return res.status(400).json({ errors: validation.errors });
+  }
+
+  try {
+    await budgetStore.setCategoryBudget(categoryId, budgetMonth, validation.budget);
+    res.json({ success: true, redirect: `/budget?month=${encodeURIComponent(budgetMonth)}&saved=1` });
+  } catch (error) {
+    console.error("Database error adding category budget:", error);
+    res.status(500).json({ errors: ["Unable to save budget. Please try again."] });
+  }
+});
+
+app.delete("/budget/categories/:id", async (req, res) => {
+  const budgetMonth = req.query.month || budgetStore.getCurrentBudgetMonth();
+  const categoryId = req.params.id;
+
+  try {
+    await budgetStore.deleteCategoryBudget(categoryId, budgetMonth);
+    res.json({ success: true, redirect: `/budget?month=${encodeURIComponent(budgetMonth)}&saved=1` });
+  } catch (error) {
+    console.error("Database error deleting category budget:", error);
+    res.status(500).json({ errors: ["Unable to delete budget. Please try again."] });
+  }
+});
+
+app.get("/budget/everything-else", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+
+  try {
+    const categories = await expenseStore.getCategories();
+
+    const detail = await budgetStore.getEverythingElseDetailData(
+      budgetMonth,
+      categories
+    );
+
+    res.render("budget-everything-else", {
+      pageTitle: "Everything else",
+      activePage: "budget",
+      budgetMonth,
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+      detail,
+    });
+  } catch (error) {
+    console.error("Database error loading everything else detail:", error);
+    res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+  }
+});
+
+app.get("/budget/categories/:id", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+  const categoryId = req.params.id;
+
+  try {
+    const [categories, spendingByCategoryId] = await Promise.all([
+      expenseStore.getCategories(),
+      budgetStore.getSpendingTotalsByCategoryId(budgetMonth),
+    ]);
+
+    const detail = await budgetStore.getCategoryDetailData(
+      categoryId,
+      budgetMonth,
+      spendingByCategoryId,
+      categories
+    );
+
+    if (!detail) {
+      return res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+    }
+
+    res.render("budget-category", {
+      pageTitle: detail.category.displayName,
+      activePage: "budget",
+      budgetMonth,
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+      detail,
+      successMessage: req.query.saved === "1" ? "Budget updated successfully." : "",
+    });
+  } catch (error) {
+    console.error("Database error loading category budget detail:", error);
+    res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+  }
+});
+
+app.post("/budget/categories/:id", async (req, res) => {
+  const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
+  const categoryId = req.params.id;
+  const { amount } = req.body;
+  const validation = validateCategoryBudgetAmount(amount);
+
+  if (!validation.valid) {
+    return res.status(400).json({ errors: validation.errors });
+  }
+
+  try {
+    await budgetStore.setCategoryBudget(categoryId, budgetMonth, validation.budget);
+    res.json({
+      success: true,
+      redirect: `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}&saved=1`,
+    });
+  } catch (error) {
+    console.error("Database error updating category budget:", error);
+    res.status(500).json({ errors: ["Unable to update budget. Please try again."] });
+  }
+});
+
 async function getRecommendationCategories() {
   const categories = await expenseStore.getCategories();
-  const names = categories.map((cat) => cat.name);
-  if (!names.includes("Other")) {
-    names.push("Other");
-  }
-  return names;
+  return getCategoryDisplayNames(categories);
 }
 
-function ensureFinanceSnapshot(summary, expenses) {
+function ensureFinanceSnapshot(summary, financeSnapshotOrExpenses, categories, spendingByCategoryId) {
+  if (
+    financeSnapshotOrExpenses &&
+    typeof financeSnapshotOrExpenses === "object" &&
+    Array.isArray(financeSnapshotOrExpenses.spendingByCategory)
+  ) {
+    return financeSnapshotOrExpenses;
+  }
+
+  const expenses = Array.isArray(financeSnapshotOrExpenses)
+    ? financeSnapshotOrExpenses
+    : [];
+
+  if (categories && spendingByCategoryId) {
+    return financeHelpers.buildFinanceSnapshot(
+      summary,
+      spendingByCategoryId,
+      categories,
+      "month"
+    );
+  }
+
   const snapshot = getFinanceSnapshot(summary, expenses) || {};
 
   if (!Array.isArray(snapshot.spendingByCategory)) {
@@ -456,8 +655,7 @@ function ensureFinanceSnapshot(summary, expenses) {
 
 app.get("/recommendation", async (req, res) => {
   try {
-    const { summary, expenses } = await getBudgetPageData();
-    const financeSnapshot = ensureFinanceSnapshot(summary, expenses);
+    const { summary, financeSnapshot, budgetMonthLabel } = await getBudgetPageData();
     const categories = await getRecommendationCategories();
 
     res.render("recommendation", {
@@ -465,6 +663,7 @@ app.get("/recommendation", async (req, res) => {
       activePage: "recommendation",
       summary,
       financeSnapshot,
+      budgetMonthLabel,
       categories,
       errors: [],
     });
@@ -475,7 +674,7 @@ app.get("/recommendation", async (req, res) => {
       activePage: "recommendation",
       summary: buildBudgetSummary(0, []),
       financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
-      categories: ["Other"],
+      categories: [],
     });
   }
 });
@@ -484,25 +683,25 @@ app.post("/recommendation", async (req, res) => {
   const { itemName, itemPrice, category } = req.body;
 
   try {
-    const { summary, expenses } = await getBudgetPageData();
+    const pageData = await getBudgetPageData();
+    const { summary, expensesInMonth, financeSnapshot, budgetMonthLabel } = pageData;
     const validation = validateItemInput(itemName, itemPrice, category);
     const categories = await getRecommendationCategories();
 
     if (!validation.valid) {
-      const financeSnapshot = ensureFinanceSnapshot(summary, expenses);
-
       return res.render("recommendation", {
         pageTitle: "Purchase Checker",
         activePage: "recommendation",
         summary,
         financeSnapshot,
+        budgetMonthLabel,
         categories,
         errors: validation.errors,
         formValues: { itemName, itemPrice, category },
       });
     }
 
-    const recommendation = getSpendingRecommendation(summary, expenses, {
+    const recommendation = getSpendingRecommendation(summary, expensesInMonth, {
       itemName: validation.itemName,
       itemPrice: validation.itemPrice,
       category: validation.category,
@@ -512,7 +711,8 @@ app.post("/recommendation", async (req, res) => {
       pageTitle: "Purchase Checker",
       activePage: "recommendation",
       summary,
-      financeSnapshot: ensureFinanceSnapshot(summary, expenses),
+      financeSnapshot,
+      budgetMonthLabel,
       categories,
       errors: [],
       recommendation,
@@ -525,19 +725,30 @@ app.post("/recommendation", async (req, res) => {
       activePage: "recommendation",
       summary: buildBudgetSummary(0, []),
       financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
-      categories: ["Other"],
+      categories: [],
       errors: ["Unable to process recommendation right now. Please try again."],
       formValues: { itemName, itemPrice, category },
     });
   }
 });
 
-function renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode, inputText) {
+function renderChatbotPage(
+  res,
+  summary,
+  financeSnapshot,
+  messages,
+  groqAiMode,
+  inputText,
+  budgetMonthLabel,
+  monthExpenseCount
+) {
   res.render("chatbot", {
     pageTitle: "FinBot",
     activePage: "chatbot",
     summary,
     financeSnapshot,
+    budgetMonthLabel: budgetMonthLabel || "",
+    monthExpenseCount: monthExpenseCount || 0,
     messages,
     suggestedQuestions: SUGGESTED_QUESTIONS,
     inputText: inputText || "",
@@ -547,20 +758,34 @@ function renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode, 
 
 app.get("/chatbot", async (req, res) => {
   try {
-    const { summary, expenses } = await getBudgetPageData();
-    const financeSnapshot = ensureFinanceSnapshot(summary, expenses);
+    const pageData = await getBudgetPageData();
+    const { summary, financeSnapshot, budgetMonthLabel, monthExpenseCount } = pageData;
     const sessionId = getSessionId(req, res);
     const welcomeText = getWelcomeMessage();
     const messages = await getChatHistory(sessionId, welcomeText);
 
-    renderChatbotPage(res, summary, financeSnapshot, messages, false);
+    renderChatbotPage(
+      res,
+      summary,
+      financeSnapshot,
+      messages,
+      false,
+      "",
+      budgetMonthLabel,
+      monthExpenseCount
+    );
   } catch (error) {
     console.error("Database error loading chatbot:", error);
+    const emptySummary = buildBudgetSummary(0, []);
     res.status(500).render("chatbot", {
       pageTitle: "FinBot",
       activePage: "chatbot",
-      summary: buildBudgetSummary(0, []),
-      financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
+      summary: emptySummary,
+      financeSnapshot: financeHelpers.buildFinanceSnapshot(emptySummary, {}, [], "month"),
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
+        budgetStore.getCurrentBudgetMonth()
+      ),
+      monthExpenseCount: 0,
       messages: [{ sender: "bot", text: getWelcomeMessage() }],
       suggestedQuestions: SUGGESTED_QUESTIONS,
       inputText: "",
@@ -584,8 +809,14 @@ app.post("/chatbot", async (req, res) => {
   const rawMessage = (req.body.message || req.body.question || "").trim();
 
   try {
-    const { summary, expenses } = await getBudgetPageData();
-    const financeSnapshot = ensureFinanceSnapshot(summary, expenses);
+    const pageData = await getBudgetPageData();
+    const {
+      summary,
+      financeSnapshot,
+      expensesInMonth,
+      budgetMonthLabel,
+      monthExpenseCount,
+    } = pageData;
     const sessionId = getSessionId(req, res);
     const welcomeText = getWelcomeMessage();
 
@@ -599,7 +830,8 @@ app.post("/chatbot", async (req, res) => {
           rawMessage,
           summary,
           financeSnapshot,
-          expenses
+          expensesInMonth,
+          budgetMonthLabel
         );
         await addChatMessage(sessionId, "bot", reply.text, welcomeText);
         groqAiMode = reply.usedGroq;
@@ -608,7 +840,7 @@ app.post("/chatbot", async (req, res) => {
         await addChatMessage(
           sessionId,
           "bot",
-          buildFinBotReply(rawMessage, summary, financeSnapshot),
+          buildFinBotReply(rawMessage, summary, financeSnapshot, budgetMonthLabel),
           welcomeText
         );
         groqAiMode = false;
@@ -616,14 +848,28 @@ app.post("/chatbot", async (req, res) => {
     }
 
     const messages = await getChatHistory(sessionId, welcomeText);
-    renderChatbotPage(res, summary, financeSnapshot, messages, groqAiMode);
+    renderChatbotPage(
+      res,
+      summary,
+      financeSnapshot,
+      messages,
+      groqAiMode,
+      rawMessage,
+      budgetMonthLabel,
+      monthExpenseCount
+    );
   } catch (error) {
     console.error("Database error processing chatbot message:", error);
+    const emptySummary = buildBudgetSummary(0, []);
     res.status(500).render("chatbot", {
       pageTitle: "FinBot",
       activePage: "chatbot",
-      summary: buildBudgetSummary(0, []),
-      financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
+      summary: emptySummary,
+      financeSnapshot: financeHelpers.buildFinanceSnapshot(emptySummary, {}, [], "month"),
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
+        budgetStore.getCurrentBudgetMonth()
+      ),
+      monthExpenseCount: 0,
       messages: [{ sender: "bot", text: "Sorry, something went wrong. Please try again." }],
       suggestedQuestions: SUGGESTED_QUESTIONS,
       inputText: rawMessage,

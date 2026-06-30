@@ -3,6 +3,8 @@
 <%
   var isEdit = typeof isEdit !== 'undefined' ? isEdit : false;
   var exp = expense || {};
+  var maxDate = typeof maxDate !== 'undefined' ? maxDate : new Date().toISOString().slice(0, 10);
+  var defaultDate = exp.date || maxDate;
 %>
 
 <div style="display:flex;flex-direction:column;gap:1.25rem;width:100%;max-width:none;">
@@ -55,8 +57,10 @@
         <div class="form-group">
           <label for="date">Date</label>
           <input type="date" id="date" name="date"
-            value="<%= exp.date || new Date().toISOString().split('T')[0] %>" required
+            value="<%= defaultDate %>" max="<%= maxDate %>" required
+            class="expense-date-input"
             style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.95rem;color:var(--text);background:var(--white);width:100%;">
+          <p id="dateError" class="expense-date-error" role="alert" hidden>The date cannot be later than today.</p>
         </div>
       </div>
 
@@ -73,7 +77,7 @@
               <span class="cat-radio-pill"
                 style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.4rem 0.85rem;border-radius:999px;font-size:0.82rem;font-weight:600;border:1.5px solid <%= (exp.categoryId === cat.id) ? cat.color : 'var(--border-soft)' %>;background:<%= (exp.categoryId === cat.id) ? cat.color + '18' : 'var(--white)' %>;color:<%= (exp.categoryId === cat.id) ? cat.color : 'var(--text-muted)' %>;transition:all 0.15s;user-select:none;"
                 data-color="<%= cat.color %>">
-                <%= cat.name %>
+                <%= cat.displayName || cat.name %>
               </span>
             </label>
           <% }) %>
@@ -142,6 +146,7 @@ document.querySelectorAll('input[name="categoryId"]').forEach(function(radio) {
 });
 </script>
 
+<script src="/js/expense-date.js"></script>
 <script src="/js/expense-upload.js"></script>
 <script src="/js/expense-nav.js"></script>
 <%- include('../partials/footer') %>

@@ -1,332 +1,205 @@
-﻿<%- include('partials/header') %>
+<%- include('partials/header') %>
 
 <%
   if (typeof categoryRows === 'undefined') categoryRows = [];
-  if (typeof categorySpending === 'undefined') categorySpending = [];
   if (typeof hasCategoryBudgets === 'undefined') hasCategoryBudgets = false;
   if (typeof budgetMonth === 'undefined') budgetMonth = '';
-  if (typeof monthExpenseCount === 'undefined') monthExpenseCount = 0;
   if (typeof budgetMonthLabel === 'undefined') budgetMonthLabel = budgetMonth;
-  if (typeof healthStatus === 'undefined') healthStatus = { label: 'On track', key: 'safe', helper: 'Spending is within your budget' };
   if (typeof successMessage === 'undefined') successMessage = '';
+  if (typeof everythingElse === 'undefined') everythingElse = { amount: 0, categoryCount: 0, label: 'Other categories' };
+  if (typeof budgetTotals === 'undefined') budgetTotals = { totalSpent: 0, totalBudgeted: 0 };
+  if (typeof availableCategories === 'undefined') availableCategories = [];
 
   function formatMoney(value) {
     var num = Number(value);
     if (Number.isNaN(num)) return '$0';
-    var text = num.toFixed(2);
-    if (text.slice(-3) === '.00') return '$' + text.slice(0, -3);
-    return '$' + text;
+    if (num % 1 === 0) return '$' + num.toLocaleString();
+    return '$' + num.toFixed(2);
   }
 
-  function formatRemaining(value, includeOverspentLabel) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return '$0';
-    if (num < 0) {
-      var overspentText = formatMoney(Math.abs(num)).replace('$', '-$');
-      return includeOverspentLabel !== false ? overspentText + ' overspent' : overspentText;
-    }
-    return formatMoney(num);
-  }
-
-  function getBudgetCategoryLabel(category) {
-    if (category === 'Utilities') return 'Bills';
-    return category;
-  }
-
-  var monthTitle = budgetMonthLabel + ' Budget';
-  var remainingKey = summary.remainingBudget < 0 ? 'danger' : (summary.percentageUsed >= 80 ? 'warning' : 'safe');
-  var setupUrl = '/budget/setup' + (budgetMonth ? '?month=' + budgetMonth : '');
+  var currentMonthName = budgetMonthLabel.split(' ')[0] || 'this month';
 %>
 
-<div class="budget-page budget-page--tracker budget-page--full">
-  <header class="budget-page-header">
-    <div class="budget-page-header__text">
-      <span class="budget-page-eyebrow">Budget &amp; alerts</span>
-      <h1 class="budget-page-title">Budget Alerts</h1>
-      <p class="budget-page-subtitle">Monitor your monthly limit, track category spending, and catch overspending before it happens.</p>
-    </div>
-    <div class="budget-page-header__actions">
-      <div class="budget-month-nav" aria-label="Budget month">
-        <button type="button" class="budget-month-nav__arrow" id="budgetMonthPrev" aria-label="Previous month">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <span class="budget-month-nav__label" id="budgetMonthLabel"><%= monthTitle %></span>
-        <button type="button" class="budget-month-nav__arrow" id="budgetMonthNext" aria-label="Next month">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-      <a href="<%= setupUrl %>" class="btn btn--primary budget-setup-link">Set or update budgets</a>
-    </div>
+<div class="spb-page">
+  <header class="spb-topbar">
+    <h1 class="spb-topbar__title">Spending &amp; Budgets</h1>
+    <button type="button" class="spb-topbar__add" id="openAddBudget" aria-label="Add a budget">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+    </button>
   </header>
 
-  <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
-  <div class="budget-flash budget-flash--error">
-    <% errors.forEach(function(error) { %>
-      <p><%= error %></p>
-    <% }); %>
-  </div>
-  <% } %>
+  <div class="spb-page__body">
 
-  <% if (successMessage) { %>
-  <div class="budget-flash budget-flash--success"><%= successMessage %></div>
-  <% } %>
-
-  <section class="budget-health" aria-labelledby="budgetHealthTitle">
-    <div class="budget-health__head">
-      <div>
-        <h2 class="budget-health__title" id="budgetHealthTitle">Budget Health</h2>
-        <p class="budget-health__subtitle"><%= healthStatus.helper %> &middot; <%= budgetMonthLabel %></p>
-      </div>
-      <span class="budget-health__pill budget-health__pill--<%= healthStatus.key %>"><%= healthStatus.label %></span>
-    </div>
-
-    <div class="budget-health__grid">
-      <article class="budget-stat-card budget-stat-card--budget">
-        <div class="budget-stat-card__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-        </div>
-        <div class="budget-stat-card__body">
-          <span class="budget-stat-card__label">Monthly Budget</span>
-          <span class="budget-stat-card__value"><%= formatMoney(summary.monthlyBudget) %></span>
-          <span class="budget-stat-card__hint">Your spending limit for <%= budgetMonthLabel %></span>
-        </div>
-      </article>
-
-      <article class="budget-stat-card budget-stat-card--spent">
-        <div class="budget-stat-card__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.75"/></svg>
-        </div>
-        <div class="budget-stat-card__body">
-          <span class="budget-stat-card__label">Total Spent</span>
-          <span class="budget-stat-card__value"><%= formatMoney(summary.totalSpent) %></span>
-          <span class="budget-stat-card__hint"><%= monthExpenseCount %> expense<%= monthExpenseCount === 1 ? '' : 's' %> this month</span>
-        </div>
-      </article>
-
-      <article class="budget-stat-card budget-stat-card--<%= remainingKey %>">
-        <div class="budget-stat-card__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M7 8l5-5 5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-        <div class="budget-stat-card__body">
-          <span class="budget-stat-card__label">Remaining</span>
-          <span class="budget-stat-card__value"><%= formatRemaining(summary.remainingBudget, false) %></span>
-          <span class="budget-stat-card__hint"><%= summary.remainingBudget < 0 ? 'Over your monthly limit' : 'Available to spend' %></span>
-        </div>
-      </article>
-
-      <article class="budget-stat-card budget-stat-card--<%= summary.percentageUsed >= 100 ? 'danger' : (summary.percentageUsed >= 80 ? 'warning' : 'safe') %>">
-        <div class="budget-stat-card__icon budget-stat-card__icon--ring" aria-hidden="true">
-          <span class="budget-stat-card__ring"><%= summary.percentageUsed %>%</span>
-        </div>
-        <div class="budget-stat-card__body">
-          <span class="budget-stat-card__label">Budget Used</span>
-          <span class="budget-stat-card__value"><%= summary.percentageUsed %>%</span>
-          <span class="budget-stat-card__hint">Of your monthly budget</span>
-        </div>
-      </article>
-    </div>
+  <section class="spb-summary">
+    <h2 class="spb-summary__title">Budgets &bull; <strong><%= formatMoney(budgetTotals.totalSpent) %></strong></h2>
+    <p class="spb-summary__sub">of <%= formatMoney(budgetTotals.totalBudgeted) %> budgeted</p>
   </section>
 
-  <section class="budget-visuals" aria-label="Budget charts">
-    <div class="budget-visuals__grid">
-      <article class="budget-chart-panel">
-        <div class="budget-chart-panel__head">
-          <h2 class="budget-chart-panel__title">Category Spending</h2>
-          <p class="budget-chart-panel__intro">Actual spending in <%= budgetMonthLabel %> from MySQL expenses.</p>
-        </div>
-
-        <% if (categorySpending.length > 0) { %>
-        <div class="budget-hbar-chart" role="img" aria-label="Category spending chart">
-          <% categorySpending.forEach(function(row) { %>
-          <div class="budget-hbar-row">
-            <div class="budget-hbar-row__label">
-              <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'sm' }) %>
-              <span class="budget-hbar-row__name"><%= row.name %></span>
-            </div>
-            <div class="budget-hbar-row__track-wrap">
-              <div class="budget-hbar-row__track">
-                <div class="budget-hbar-row__fill budget-hbar-row__fill--spend" style="width: <%= row.relativePct %>%;"></div>
-              </div>
-              <span class="budget-hbar-row__meta"><%= formatMoney(row.actual) %> &middot; <%= row.expenseCount %> expense<%= row.expenseCount === 1 ? '' : 's' %></span>
-            </div>
-          </div>
-          <% }); %>
-        </div>
-        <% } else { %>
-        <div class="budget-chart-empty">
-          <p>No spending recorded for <%= budgetMonthLabel %> yet.</p>
-          <p class="budget-chart-empty__hint">Expense records below may be from other months.</p>
-        </div>
-        <% } %>
-      </article>
-
-      <article class="budget-chart-panel">
-        <div class="budget-chart-panel__head">
-          <h2 class="budget-chart-panel__title">Budget Usage by Category</h2>
-          <p class="budget-chart-panel__intro">
-            <% if (hasCategoryBudgets) { %>
-            How much of each category limit you have used in <%= budgetMonthLabel %>.
-            <% } else { %>
-            Set category limits to see progress bars and overspending alerts.
-            <% } %>
-          </p>
-        </div>
-
-        <% if (hasCategoryBudgets) { %>
-        <div class="budget-hbar-chart" role="img" aria-label="Budget usage chart">
-          <% categoryRows.forEach(function(row) { %>
-          <div class="budget-hbar-row budget-hbar-row--usage">
-            <div class="budget-hbar-row__label">
-              <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'sm' }) %>
-              <span class="budget-hbar-row__name"><%= row.name %></span>
-              <span class="budget-badge budget-badge--sm <%= row.statusBadgeClass %>"><%= row.statusLabel %></span>
-            </div>
-            <div class="budget-hbar-row__track-wrap">
-              <div class="budget-hbar-row__track">
-                <div class="budget-hbar-row__fill <%= row.statusBarClass %>" style="width: <%= Math.min(row.usedPct, 100) %>%;"></div>
-              </div>
-              <span class="budget-hbar-row__meta">
-                <%= formatMoney(row.actual) %> / <%= formatMoney(row.budgeted) %>
-                &middot; <%= row.usedPct %>% used
-                &middot; <%= formatRemaining(row.remaining, false) %> left
-              </span>
-            </div>
-          </div>
-          <% }); %>
-        </div>
-        <% } else { %>
-        <div class="budget-chart-empty budget-chart-empty--cta">
-          <div class="budget-chart-empty__icon" aria-hidden="true">
-            <svg viewBox="0 0 64 64" fill="none" width="56" height="56">
-              <rect x="8" y="14" width="48" height="36" rx="6" stroke="currentColor" stroke-width="2"/>
-              <path d="M8 24h48" stroke="currentColor" stroke-width="2"/>
-              <circle cx="22" cy="36" r="4" stroke="currentColor" stroke-width="2"/>
-              <path d="M34 34h16M34 40h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <h3 class="budget-chart-empty__title">Start tracking category budgets</h3>
-          <p class="budget-chart-empty__text">Set limits for categories to see progress bars and overspending alerts.</p>
-          <a href="<%= setupUrl %>" class="btn btn--primary">Set or update budgets</a>
-        </div>
-        <% } %>
-      </article>
-    </div>
+  <% if (!hasCategoryBudgets) { %>
+  <section class="spb-empty">
+    <p class="spb-empty__text">Allocate a portion of money out of your income in order to budget for spending categories like Groceries, Auto &amp; Transport, Entertainment, or Eating out.</p>
+    <button type="button" class="spb-btn spb-btn--primary" id="openAddBudgetEmpty">Add a budget</button>
+    <aside class="spb-protip">
+      <span class="spb-protip__label">PRO TIP:</span>
+      <span class="spb-protip__text">do not track your recurring expenses (bills) and variable expenses (budgets) under the same category to avoid double-counting of your monthly plan (Leftover).</span>
+    </aside>
   </section>
-
-  <% if (hasCategoryBudgets) { %>
-  <section class="budget-panel budget-panel--cards">
-    <div class="budget-panel__head">
-      <h2 class="budget-panel__title">Category Budget Details</h2>
-      <p class="budget-panel__intro">Limits saved for <%= budgetMonth %> &middot; spending from expenses in <%= budgetMonthLabel %></p>
-    </div>
-
-    <div class="budget-cat-grid">
-      <% categoryRows.forEach(function(row) { %>
-      <article class="budget-cat-card <%= row.statusCardClass %>">
-        <div class="budget-cat-card__top">
-          <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'md' }) %>
-          <div class="budget-cat-card__heading">
-            <h3 class="budget-cat-card__name"><%= row.name %></h3>
-            <span class="budget-badge <%= row.statusBadgeClass %>"><%= row.statusLabel %></span>
-          </div>
-        </div>
-
-        <div class="budget-cat-card__metrics">
-          <div class="budget-cat-card__metric">
-            <span class="budget-cat-card__metric-label">Budget</span>
-            <span class="budget-cat-card__metric-value"><%= formatMoney(row.budgeted) %></span>
-          </div>
-          <div class="budget-cat-card__metric">
-            <span class="budget-cat-card__metric-label">Spent</span>
-            <span class="budget-cat-card__metric-value"><%= formatMoney(row.actual) %></span>
-          </div>
-          <div class="budget-cat-card__metric">
-            <span class="budget-cat-card__metric-label">Remaining</span>
-            <span class="budget-cat-card__metric-value budget-cat-card__metric-value--<%= row.remaining < 0 ? 'danger' : 'default' %>"><%= formatRemaining(row.remaining, false) %></span>
-          </div>
-        </div>
-
-        <div class="budget-progress" role="progressbar" aria-valuenow="<%= Math.min(row.usedPct, 100) %>" aria-valuemin="0" aria-valuemax="100" aria-label="<%= row.name %> budget used">
-          <div class="budget-progress__track">
-            <div class="budget-progress__fill <%= row.statusBarClass %>" style="width: <%= Math.min(row.usedPct, 100) %>%;"></div>
-          </div>
-          <span class="budget-progress__label"><%= row.usedPct %>% used</span>
-        </div>
-      </article>
-      <% }); %>
-    </div>
-  </section>
-  <% } %>
-
-  <section class="budget-card budget-card--expenses budget-card--expense-records">
-    <div class="budget-expense-head">
-      <div>
-        <h2 class="budget-expense-records__title">Expense Records</h2>
-        <p class="budget-expense-records__intro">Category totals use <%= monthExpenseCount %> expense<%= monthExpenseCount === 1 ? '' : 's' %> dated in <%= budgetMonthLabel %>. This list shows all <%= expenses.length %> record<%= expenses.length === 1 ? '' : 's' %> in the database.</p>
-      </div>
-      <span class="budget-expense-count"><%= expenses.length %> record<%= expenses.length === 1 ? '' : 's' %></span>
-    </div>
-
-    <ul class="budget-expense-list budget-expense-list--compact">
-      <% expenses.forEach(function(expense) {
-        var budgetCategory = getBudgetCategoryLabel(expense.category);
+  <% } else { %>
+  <section class="spb-cards" aria-label="Category budgets">
+    <div class="spb-cards__grid">
+      <% categoryRows.forEach(function(row) {
+        var cardClass = row.overspent ? 'spb-card--overspent' : (row.showWarning && row.statusKey === 'warning' ? 'spb-card--warning' : '');
+        var ringR = 29;
+        var ringC = 2 * Math.PI * ringR;
+        var ringPct = Math.min(Math.max(row.usedPct || 0, 0), 100);
+        var ringOffset = ringC * (1 - ringPct / 100);
+        var ringFillClass = row.overspent ? 'spb-ring__fill--danger' : (row.showWarning && row.statusKey === 'warning' ? 'spb-ring__fill--warning' : 'spb-ring__fill--default');
+        var ringWrapClass = row.overspent ? ' spb-card__ring-wrap--alert' : (row.showWarning && row.statusKey === 'warning' ? ' spb-card__ring-wrap--warning' : '');
       %>
-      <li class="budget-expense-item">
-        <%- include('partials/category-icon', { catName: budgetCategory, catIcon: '', catSize: 'sm' }) %>
-        <div class="budget-expense-item__main">
-          <span class="budget-expense-item__title"><%= expense.description %></span>
-          <span class="budget-expense-item__meta"><span class="budget-tag budget-tag--<%= budgetCategory.toLowerCase() %>"><%= budgetCategory %></span></span>
+      <a href="/budget/categories/<%= row.categoryId %>?month=<%= budgetMonth %>" class="spb-card <%= cardClass %>">
+        <div class="spb-card__ring-wrap<%= ringWrapClass %>">
+          <svg class="spb-ring" viewBox="0 0 74 74" aria-hidden="true">
+            <circle class="spb-ring__track" cx="37" cy="37" r="29" fill="none" stroke-width="4"/>
+            <circle class="spb-ring__fill <%= ringFillClass %>" cx="37" cy="37" r="29" fill="none" stroke-width="4" stroke-dasharray="<%= ringC %>" stroke-dashoffset="<%= ringOffset %>" transform="rotate(-90 37 37)"/>
+          </svg>
+          <div class="spb-card__ring-icon">
+            <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'md' }) %>
+          </div>
         </div>
-        <span class="budget-expense-item__amount"><%= formatMoney(expense.amount) %></span>
-      </li>
+        <div class="spb-card__body">
+          <span class="spb-card__name"><%= row.displayName %></span>
+          <span class="spb-card__status"><%= row.statusMessage %></span>
+          <% if (row.warningMessage) { %>
+          <span class="spb-card__warning"><%= row.warningMessage %></span>
+          <% } %>
+        </div>
+        <div class="spb-card__amounts">
+          <span class="spb-card__spent"><%= formatMoney(row.actual) %></span>
+          <span class="spb-card__limit">of <%= formatMoney(row.budgeted) %></span>
+        </div>
+      </a>
       <% }); %>
-    </ul>
-
-    <div class="budget-expense-total budget-expense-total--compact">
-      <span class="budget-expense-total__label">Total spent in <%= budgetMonthLabel %></span>
-      <span class="budget-expense-total__value"><%= formatMoney(summary.totalSpent) %></span>
     </div>
   </section>
+  <% } %>
+
+  <section class="spb-elsewhere">
+    <h2 class="spb-elsewhere__title">Everything else &bull; <%= formatMoney(everythingElse.amount) %></h2>
+    <a href="/budget/everything-else?month=<%= encodeURIComponent(budgetMonth) %>" class="spb-elsewhere__card everything-card" aria-label="View unbudgeted spending">
+      <div class="spb-elsewhere__row">
+        <span class="spb-elsewhere__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
+        </span>
+        <span class="spb-elsewhere__label"><%= everythingElse.categoryCount > 0 ? everythingElse.label : 'Other categories' %></span>
+        <span class="spb-elsewhere__amount"><%= formatMoney(everythingElse.amount) %></span>
+        <svg class="spb-elsewhere__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <p class="spb-elsewhere__hint">Spending in unbudgeted categories falls here.</p>
+    </a>
+  </section>
+  </div>
 </div>
 
-<script>
-(function () {
-  "use strict";
-  var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  var monthIndex = new Date().getMonth();
-  var year = new Date().getFullYear();
-  var label = document.getElementById("budgetMonthLabel");
-  var prevBtn = document.getElementById("budgetMonthPrev");
-  var nextBtn = document.getElementById("budgetMonthNext");
+<!-- Add budget modal -->
+<div class="spb-modal-overlay" id="addBudgetOverlay" hidden>
+  <div class="spb-modal" role="dialog" aria-labelledby="addBudgetTitle" aria-modal="true">
+    <header class="spb-modal__header" id="addBudgetHeader">
+      <h2 class="spb-modal__title" id="addBudgetTitle">Add a budget</h2>
+      <button type="button" class="spb-modal__close" id="closeAddBudget" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
 
-  function updateLabel() {
-    if (label) {
-      label.textContent = months[monthIndex] + " " + year + " Budget";
-    }
-  }
+    <div class="spb-modal__search" id="addBudgetSearch">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      <input type="search" id="categorySearch" placeholder="Search category" autocomplete="off">
+    </div>
 
-  if (prevBtn) {
-    prevBtn.addEventListener("click", function () {
-      monthIndex -= 1;
-      if (monthIndex < 0) {
-        monthIndex = 11;
-        year -= 1;
-      }
-      updateLabel();
-    });
-  }
+    <div class="spb-modal__body" id="categoryPickerStep">
+      <h3 class="spb-modal__section-title">Your categories</h3>
+      <a href="/categories" class="spb-modal__create">
+        <span class="spb-modal__create-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        </span>
+        <span>Create a category</span>
+        <svg class="spb-modal__chevron" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
 
-  if (nextBtn) {
-    nextBtn.addEventListener("click", function () {
-      monthIndex += 1;
-      if (monthIndex > 11) {
-        monthIndex = 0;
-        year += 1;
-      }
-      updateLabel();
-    });
-  }
-})();
-</script>
+      <h3 class="spb-modal__section-title">General categories</h3>
+      <ul class="spb-category-list" id="categoryList">
+        <% availableCategories.forEach(function(cat) { %>
+        <li>
+          <button type="button" class="spb-category-item<%= cat.hasBudget ? ' spb-category-item--budgeted' : '' %>" data-category-id="<%= cat.id %>" data-category-name="<%= cat.displayName %>" data-is-bills="<%= cat.displayName === 'Bills & Utilities' ? '1' : '0' %>" data-spent="<%= cat.spentThisMonth || 0 %>" data-has-budget="<%= cat.hasBudget ? '1' : '0' %>"<%= cat.hasBudget ? ' aria-disabled="true"' : '' %>>
+            <%- include('partials/category-icon', { catName: cat.displayName || cat.name, catIcon: cat.icon, catSize: 'sm' }) %>
+            <span class="spb-category-item__name"><%= cat.displayName %></span>
+            <span class="spb-category-item__radio" aria-hidden="true"></span>
+          </button>
+        </li>
+        <% }); %>
+      </ul>
+      <% if (availableCategories.length === 0) { %>
+      <p class="spb-modal__empty">No categories found. Create a category first.</p>
+      <% } %>
+    </div>
+
+    <!-- Set amount step (hidden initially) -->
+    <div class="spb-modal__body spb-modal__body--amount" id="amountStep" hidden>
+      <header class="spb-modal__header spb-modal__header--step">
+        <button type="button" class="spb-modal__back" id="backToCategories" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <h2 class="spb-modal__title">Add a budget</h2>
+        <button type="button" class="spb-modal__close" id="closeAddBudgetAmount" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <p class="spb-amount-prompt">How much would you like to budget for <strong id="selectedCategoryName">Category</strong>?</p>
+
+      <div class="spb-amount-input-wrap">
+        <input type="text" inputmode="decimal" id="budgetAmountInput" class="spb-amount-input" placeholder="Enter amount" autocomplete="off">
+      </div>
+
+      <aside class="spb-note">
+        <span class="spb-note__label">NOTE:</span>
+        <span class="spb-note__text" id="budgetSpentNote">You've spent $0.00 so far in <%= currentMonthName %>. Your budget will start over at the beginning of every month.</span>
+      </aside>
+
+      <div class="spb-rollover">
+        <span class="spb-rollover__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0113.66-5.66M20 12a8 8 0 01-13.66 5.66" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M16 6h4V2M8 18H4v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <div class="spb-rollover__text">
+          <strong>Make this budget a monthly rollover</strong>
+          <p>Every month the left to spend balance will rollover to the next month. <a href="#" class="spb-rollover__link">Learn more</a></p>
+        </div>
+        <label class="spb-toggle">
+          <input type="checkbox" id="rolloverToggle">
+          <span class="spb-toggle__track"></span>
+        </label>
+      </div>
+
+      <p class="spb-form-error" id="budgetFormError" hidden></p>
+
+      <button type="button" class="spb-btn spb-btn--save" id="saveBudgetBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bills warning dialog -->
+<div class="spb-modal-overlay spb-modal-overlay--alert" id="billsWarningOverlay" hidden>
+  <div class="spb-alert" role="alertdialog" aria-labelledby="billsAlertTitle" aria-modal="true">
+    <h2 class="spb-alert__title" id="billsAlertTitle">Attention!</h2>
+    <p class="spb-alert__text">Please note that spendWise tracks your bills automatically and the relevant amount was already subtracted from the Leftover.</p>
+    <p class="spb-alert__text">Create 'Bills &amp; Utilities' category for manual tracking purposes only.</p>
+    <div class="spb-alert__actions">
+      <button type="button" class="spb-alert__cancel" id="billsWarningCancel">Cancel</button>
+      <button type="button" class="spb-alert__proceed" id="billsWarningProceed">Proceed</button>
+    </div>
+  </div>
+</div>
+
+<script id="budgetPageData" type="application/json"><%- JSON.stringify({ budgetMonth: budgetMonth, availableCategories: availableCategories, currentMonthName: currentMonthName }) %></script>
+<script src="/js/budget.js"></script>
 
 <%- include('partials/footer') %>

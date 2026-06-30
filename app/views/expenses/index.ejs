@@ -3,7 +3,12 @@
 <%
   if (typeof hasAnyExpenses === 'undefined') hasAnyExpenses = false;
   if (typeof isFiltered === 'undefined') isFiltered = false;
-  var topCat = byCategory.filter(function(c){ return c.count > 0; }).sort(function(a,b){ return b.total - a.total; })[0];
+  if (typeof allTimeFinance === 'undefined') allTimeFinance = { totalSpent: total, expenseCount: expenses.length, highestCategory: 'None', highestCategoryAmount: 0 };
+  if (typeof monthFinance === 'undefined') monthFinance = { summary: { totalSpent: 0 }, monthExpenseCount: 0, budgetMonthLabel: '' };
+  if (typeof budgetMonthLabel === 'undefined') budgetMonthLabel = monthFinance.budgetMonthLabel || '';
+  var topCat = isFiltered
+    ? byCategory.filter(function(c){ return c.count > 0; }).sort(function(a,b){ return b.total - a.total; })[0]
+    : { name: allTimeFinance.highestCategory, total: allTimeFinance.highestCategoryAmount };
 %>
 
 <div style="display:flex;flex-direction:column;gap:1.25rem;width:100%;max-width:none;">
@@ -27,23 +32,24 @@
     </div>
   </div>
 
-  <!-- Stat cards -->
+  <!-- Stat cards — all-time totals from MySQL unless filters are active -->
   <div class="stat-grid">
     <div class="stat-card">
-      <span class="stat-card__label">Total Spent</span>
+      <span class="stat-card__label"><%= isFiltered ? 'Total Spent (filtered)' : 'Total Spent (all time)' %></span>
       <span class="stat-card__value stat-card__value--blue"><%= formatSGD(total) %></span>
     </div>
     <div class="stat-card">
-      <span class="stat-card__label">Records</span>
-      <span class="stat-card__value"><%= expenses.length %></span>
+      <span class="stat-card__label">Spent this month</span>
+      <span class="stat-card__sub" style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem;"><%= budgetMonthLabel %></span>
+      <span class="stat-card__value stat-card__value--blue"><%= formatSGD(monthFinance.summary.totalSpent) %></span>
     </div>
     <div class="stat-card">
-      <span class="stat-card__label">Categories Used</span>
-      <span class="stat-card__value"><%= byCategory.filter(function(c){ return c.count > 0; }).length %></span>
+      <span class="stat-card__label"><%= isFiltered ? 'Records (filtered)' : 'Records (all time)' %></span>
+      <span class="stat-card__value"><%= isFiltered ? expenses.length : allTimeFinance.expenseCount %></span>
     </div>
     <div class="stat-card">
-      <span class="stat-card__label">Top Category</span>
-      <span class="stat-card__value stat-card__value--sm"><%= topCat ? topCat.name : 'None' %></span>
+      <span class="stat-card__label">Top Category<%= isFiltered ? ' (filtered)' : ' (all time)' %></span>
+      <span class="stat-card__value stat-card__value--sm"><%= topCat && topCat.name !== '—' ? topCat.name : 'None' %></span>
     </div>
   </div>
 
@@ -56,8 +62,8 @@
         <a href="/expenses?category=<%= cat.id %>&sort=<%= sort %>"
            class="expense-cat-pill<%= activeCategory === cat.id ? ' expense-cat-pill--active' : '' %>"
            style="--cat-color:<%= cat.color %>;">
-          <%- include('../partials/category-icon', { catName: cat.name, catIcon: cat.icon, catSize: 'sm' }) %>
-          <%= cat.name %>
+          <%- include('../partials/category-icon', { catName: cat.displayName || cat.name, catIcon: cat.icon, catSize: 'sm' }) %>
+          <%= cat.displayName || cat.name %>
           <span class="expense-cat-pill__amount"><%= formatSGD(cat.total) %></span>
         </a>
       <% }) %>
@@ -86,7 +92,7 @@
         <select id="category" name="category" style="padding:0.6rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
           <option value="">All Categories</option>
           <% categories.forEach(function(cat) { %>
-            <option value="<%= cat.id %>" <%= activeCategory === cat.id ? 'selected' : '' %>><%= cat.name %></option>
+            <option value="<%= cat.id %>" <%= activeCategory === cat.id ? 'selected' : '' %>><%= cat.displayName || cat.name %></option>
           <% }) %>
         </select>
       </div>
@@ -167,8 +173,8 @@
                 </td>
                 <td class="data-table__category-col">
                   <span class="expense-cat-pill expense-cat-pill--table" style="--cat-color:<%= expense.category.color %>;">
-                    <%- include('../partials/category-icon', { catName: expense.category.name, catIcon: expense.category.icon, catSize: 'sm' }) %>
-                    <%= expense.category.name %>
+                    <%- include('../partials/category-icon', { catName: expense.category.displayName || expense.category.name, catIcon: expense.category.icon, catSize: 'sm' }) %>
+                    <%= expense.category.displayName || expense.category.name %>
                   </span>
                 </td>
                 <td class="data-table__date-col">

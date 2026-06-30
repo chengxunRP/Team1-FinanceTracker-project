@@ -1,0 +1,227 @@
+<%- include('partials/header') %>
+
+<%
+  if (typeof detail === 'undefined') detail = {};
+  if (typeof budgetMonth === 'undefined') budgetMonth = '';
+  if (typeof budgetMonthLabel === 'undefined') budgetMonthLabel = budgetMonth;
+  if (typeof successMessage === 'undefined') successMessage = '';
+
+  var cat = detail.category || {};
+  var monthShort = budgetMonthLabel.split(' ')[0].slice(0, 3) + " '" + (budgetMonthLabel.split(' ')[1] || '').slice(-2);
+
+  function formatMoney(value) {
+    var num = Number(value);
+    if (Number.isNaN(num)) return '$0';
+    if (num % 1 === 0) return '$' + num.toLocaleString();
+    return '$' + num.toFixed(2);
+  }
+
+  function formatMoneySigned(value) {
+    var num = Number(value);
+    if (Number.isNaN(num)) return '-$0.00';
+    return '-$' + Math.abs(num).toFixed(2);
+  }
+
+  function formatDateShort(dateStr) {
+    if (!dateStr) return '';
+    var parts = dateStr.split('-');
+    if (parts.length < 3) return dateStr;
+    var months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    return months[Number(parts[1]) - 1] + ' ' + Number(parts[2]);
+  }
+%>
+
+<div class="spb-page spb-page--detail">
+  <header class="spb-topbar spb-topbar--detail">
+    <div class="spb-detail-header__group">
+      <a href="/budget?month=<%= budgetMonth %>" class="spb-topbar__back" aria-label="Back to budgets">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <div class="spb-topbar__category">
+        <%- include('partials/category-icon', { catName: cat.displayName || cat.name, catIcon: cat.icon, catSize: 'md' }) %>
+        <h1 class="spb-topbar__title"><%= cat.displayName %></h1>
+      </div>
+    </div>
+    <button type="button" class="spb-topbar__settings" id="openEditBudget" aria-label="Budget settings">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      Settings
+    </button>
+  </header>
+
+  <section class="spb-chart-section" aria-label="Monthly spending chart">
+    <div class="category-graph-scroll spb-bar-chart-scroll" id="categoryGraphScroll">
+      <div class="spb-bar-chart-scroll__inner category-chart-inner">
+        <div class="spb-bar-chart" role="img" aria-label="Monthly spending chart">
+          <% (detail.chartData || []).forEach(function(bar) { %>
+          <div class="spb-bar-chart__col spb-bar-chart__col--clickable category-chart-month"
+               data-budget-month="<%= bar.budgetMonth %>"
+               data-month-label="<%= bar.monthLabel || bar.label %>"
+               role="button"
+               tabindex="0"
+               aria-pressed="false"
+               aria-label="<%= bar.monthLabel || bar.label %> spending">
+            <div class="spb-bar-chart__plot">
+              <% if (bar.amount > 0) { %>
+              <span class="spb-bar-chart__value"><%= bar.formattedAmount %></span>
+              <% } else { %>
+              <span class="spb-bar-chart__value spb-bar-chart__value--zero">$0</span>
+              <% } %>
+              <div class="spb-bar-chart__bar-wrap">
+                <% if (bar.amount > 0) { %>
+                <div class="spb-bar-chart__bar spb-bar-chart__bar--active" style="height: <%= bar.relativePct %>%;"></div>
+                <% } else { %>
+                <div class="spb-bar-chart__bar spb-bar-chart__bar--zero"></div>
+                <% } %>
+              </div>
+            </div>
+            <span class="spb-bar-chart__label"><%= bar.label %></span>
+          </div>
+          <% }); %>
+        </div>
+        <% if (detail.chartYearSpans && detail.chartYearSpans.length) { %>
+        <div class="spb-bar-chart__years" aria-hidden="true">
+          <% detail.chartYearSpans.forEach(function(span) { %>
+          <span class="spb-bar-chart__year-group" data-year-span="<%= span.span %>" style="flex: <%= span.span %>"><%= span.year %></span>
+          <% }); %>
+        </div>
+        <% } %>
+      </div>
+    </div>
+  </section>
+
+  <div class="spb-detail-grid">
+    <section class="spb-summary-card">
+      <header class="spb-summary-card__head">
+        <h2>Summary</h2>
+        <span><%= monthShort %></span>
+      </header>
+
+      <div class="spb-summary-card__status<%= detail.overspent ? ' spb-summary-card__status--overspent' : (detail.showWarning ? ' spb-summary-card__status--warning' : '') %>">
+        <div class="spb-summary-card__status-head">
+          <span><%= detail.overspent ? 'Overspent' : (detail.showWarning ? 'Warning' : 'Left to spend') %></span>
+          <svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M12 10v5M12 7h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <p class="spb-summary-card__status-amount"><%= detail.overspent ? formatMoney(detail.overspentAmount) : formatMoney(detail.remaining) %></p>
+        <div class="spb-summary-card__progress">
+          <div class="spb-summary-card__progress-fill<%= detail.overspent ? ' spb-summary-card__progress-fill--danger' : (detail.showWarning ? ' spb-summary-card__progress-fill--warning' : '') %>" style="width: <%= Math.min(detail.usedPct, 100) %>%;"></div>
+        </div>
+        <p class="spb-summary-card__budget-label"><%= formatMoney(detail.budgeted) %> budget</p>
+      </div>
+
+      <div class="spb-summary-card__stats">
+        <div class="spb-summary-card__stat">
+          <span class="spb-summary-card__stat-label">Spent</span>
+          <span class="spb-summary-card__stat-value spb-summary-card__stat-value--purple"><%= formatMoney(detail.actual) %></span>
+        </div>
+        <div class="spb-summary-card__stat">
+          <span class="spb-summary-card__stat-label">Earned</span>
+          <span class="spb-summary-card__stat-value spb-summary-card__stat-value--green">$0</span>
+        </div>
+      </div>
+
+      <div class="spb-summary-card__plan">
+        <span>Subtracted from your Plan</span>
+        <svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M12 10v5M12 7h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <strong><%= formatMoney(detail.actual) %></strong>
+      </div>
+
+      <div class="spb-summary-card__actions">
+        <button type="button" class="spb-btn spb-btn--outline" id="editBudgetBtn">Edit budget</button>
+        <button type="button" class="spb-btn spb-btn--danger" id="deleteBudgetBtn">
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Delete budget
+        </button>
+      </div>
+    </section>
+
+    <section class="spb-history-card">
+      <header class="spb-history-card__head">
+        <h2 id="historyTitle">History</h2>
+        <p id="historySubtitle">You've spent <%= formatMoney(detail.totalAmount) %> in <%= detail.transactionCount %> transaction<%= detail.transactionCount === 1 ? '' : 's' %>.</p>
+      </header>
+
+      <div class="spb-history-card__search">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        <input type="search" id="transactionSearch" placeholder="Search transactions by amount, merchant, and note" autocomplete="off">
+      </div>
+
+      <div class="spb-history-card__metrics">
+        <div class="spb-history-metric">
+          <span>Total Transactions</span>
+          <strong id="historyMetricCount"><%= detail.transactionCount %></strong>
+        </div>
+        <div class="spb-history-metric">
+          <span>Average Transaction</span>
+          <strong id="historyMetricAvg"><%= formatMoneySigned(detail.avgTransaction) %></strong>
+        </div>
+        <div class="spb-history-metric">
+          <span>Largest Transaction</span>
+          <strong id="historyMetricLargest"><%= formatMoneySigned(detail.largestTransaction) %></strong>
+        </div>
+        <div class="spb-history-metric">
+          <span>Total Amount</span>
+          <strong id="historyMetricTotal"><%= formatMoneySigned(detail.totalAmount) %></strong>
+        </div>
+      </div>
+
+      <ul class="spb-transaction-list" id="transactionList">
+        <% (detail.transactions || []).forEach(function(tx) { %>
+        <li class="spb-transaction-item"
+            data-budget-month="<%= tx.date.slice(0, 7) %>"
+            data-search="<%= (tx.description + ' ' + tx.amount + ' ' + (tx.notes || '')).toLowerCase() %>">
+          <a href="/expenses/<%= tx.id %>" class="spb-transaction-item__link">
+            <span class="spb-transaction-item__date"><%= formatDateShort(tx.date) %></span>
+            <span class="spb-transaction-item__merchant"><%= tx.description %></span>
+            <span class="spb-transaction-item__tag">CASH</span>
+            <span class="spb-transaction-item__amount"><%= formatMoneySigned(tx.amount) %></span>
+            <svg class="spb-transaction-item__chevron" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </li>
+        <% }); %>
+        <li class="spb-transaction-empty" id="transactionEmpty"<%= (detail.transactions && detail.transactions.length) ? ' hidden' : '' %>>No transactions for this category.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<!-- Edit budget modal -->
+<div class="spb-modal-overlay" id="editBudgetOverlay" hidden>
+  <div class="spb-modal spb-modal--sm" role="dialog" aria-labelledby="editBudgetTitle" aria-modal="true">
+    <header class="spb-modal__header">
+      <h2 class="spb-modal__title" id="editBudgetTitle">Edit budget</h2>
+      <button type="button" class="spb-modal__close" id="closeEditBudget" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="spb-modal__body">
+      <p class="spb-amount-prompt">Budget amount for <strong><%= cat.displayName %></strong></p>
+      <div class="spb-amount-input-wrap">
+        <input type="text" inputmode="decimal" id="editBudgetAmount" class="spb-amount-input" value="<%= detail.budgeted %>" autocomplete="off">
+      </div>
+      <p class="spb-form-error" id="editBudgetError" hidden></p>
+      <button type="button" class="spb-btn spb-btn--save" id="saveEditBudget">Save</button>
+    </div>
+  </div>
+</div>
+
+<script id="budgetCategoryData" type="application/json"><%- JSON.stringify({
+  categoryId: cat.id,
+  budgetMonth: budgetMonth,
+  budgeted: detail.budgeted,
+  historyAll: {
+    transactionCount: detail.transactionCount,
+    totalAmount: detail.totalAmount,
+    avgTransaction: detail.avgTransaction,
+    largestTransaction: detail.largestTransaction
+  },
+  transactions: (detail.transactions || []).map(function(tx) {
+    return { budgetMonth: tx.date.slice(0, 7), amount: tx.amount };
+  }),
+  monthLabels: (detail.chartData || []).reduce(function(acc, bar) {
+    acc[bar.budgetMonth] = bar.monthLabel || bar.label;
+    return acc;
+  }, {})
+}) %></script>
+<script src="/js/budget-category.js?v=6"></script>
+
+<%- include('partials/footer') %>

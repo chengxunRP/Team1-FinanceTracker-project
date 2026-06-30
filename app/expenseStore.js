@@ -1,4 +1,10 @@
 const db = require("./config/db");
+const {
+  enrichCategory,
+  enrichCategories,
+  compareCategoriesForSort,
+  getDisplayCategoryName,
+} = require("./categoryHelpers");
 
 async function getCategories() {
   try {
@@ -12,12 +18,14 @@ async function getCategories() {
       ORDER BY name ASC`
     );
 
-    return rows.map((row) => ({
-      id: String(row.id),
-      name: row.name,
-      icon: row.icon,
-      color: row.color,
-    }));
+    return enrichCategories(
+      rows.map((row) => ({
+        id: String(row.id),
+        name: row.name,
+        icon: row.icon,
+        color: row.color,
+      }))
+    ).sort(compareCategoriesForSort);
   } catch (error) {
     console.error("Database error loading categories from MySQL:", error);
     throw error;
@@ -82,12 +90,12 @@ async function getAllExpenses(filters = {}) {
     date: row.date,
     notes: row.notes || "",
     imagePath: row.imagePath || "",
-    category: {
+    category: enrichCategory({
       id: String(row.category_id),
       name: row.category_name,
       icon: row.category_icon,
       color: row.category_color,
-    },
+    }),
   }));
 }
 
@@ -123,12 +131,12 @@ async function getExpenseById(id) {
     date: row.date,
     notes: row.notes || "",
     imagePath: row.imagePath || "",
-    category: {
+    category: enrichCategory({
       id: String(row.category_id),
       name: row.category_name,
       icon: row.category_icon,
       color: row.category_color,
-    },
+    }),
   };
 }
 
@@ -186,9 +194,16 @@ async function deleteExpense(id) {
 }
 
 function toLegacyExpense(expense) {
+  const displayName = expense.category
+    ? expense.category.displayName || getDisplayCategoryName(expense.category.name)
+    : "Other categories";
+
   return {
+    id: expense.id,
+    categoryId: expense.categoryId,
     description: expense.title,
-    category: expense.category ? expense.category.name : "Others",
+    notes: expense.notes || "",
+    category: displayName,
     amount: expense.amount,
     date: expense.date,
   };
@@ -197,6 +212,39 @@ function toLegacyExpense(expense) {
 async function getExpensesForAnalytics() {
   const expenses = await getAllExpenses();
   return expenses.map(toLegacyExpense);
+}
+
+/** Expenses for one budget month — SQL date range (expense_date >= start AND < next month start). */
+async function getExpensesInMonth(budgetMonth) {
+  const budgetStore = require("./budgetStore");
+  const month = budgetStore.normalizeBudgetMonth(budgetMonth);
+  const { startDate, endExclusive } = budgetStore.getBudgetMonthDateRange(month);
+
+  const [rows] = await db.query(
+    `SELECT
+      e.id,
+      e.title,
+      CAST(e.amount AS DECIMAL(10,2)) AS amount,
+      e.category_id AS categoryId,
+      DATE_FORMAT(e.expense_date, '%Y-%m-%d') AS date,
+      COALESCE(e.notes, '') AS notes,
+      c.name AS category_name
+    FROM expenses e
+    INNER JOIN categories c ON c.id = e.category_id
+    WHERE e.expense_date >= ? AND e.expense_date < ?
+    ORDER BY e.expense_date DESC, e.id DESC`,
+    [startDate, endExclusive]
+  );
+
+  return rows.map((row) => ({
+    id: String(row.id),
+    categoryId: String(row.categoryId),
+    description: row.title,
+    notes: row.notes || "",
+    category: getDisplayCategoryName(row.category_name),
+    amount: Number(row.amount),
+    date: row.date,
+  }));
 }
 
 module.exports = {
@@ -208,4 +256,5 @@ module.exports = {
   updateExpense,
   deleteExpense,
   getExpensesForAnalytics,
+  getExpensesInMonth,
 };

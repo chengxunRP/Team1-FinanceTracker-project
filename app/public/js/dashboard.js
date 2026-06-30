@@ -8,39 +8,63 @@
   ];
   var MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var CATEGORY_COLORS = {
+    Groceries: "green",
     Food: "green",
     Dining: "green",
+    "Auto & Transport": "orange",
     Transport: "orange",
     Shopping: "purple",
+    "Bills & Utilities": "blue",
     Utilities: "blue",
     Bills: "blue",
-    Entertainment: "pink"
+    Entertainment: "pink",
+    Education: "purple",
+    School: "purple",
+    "Other categories": "blue",
+    Others: "blue",
+    Other: "blue"
   };
 
   var CATEGORY_IMAGE_URLS = {
+    Groceries: "/categoryimages/food.png",
     Food: "/categoryimages/food.png",
     Dining: "/categoryimages/food.png",
+    "Auto & Transport": "/categoryimages/transport.png",
     Transport: "/categoryimages/transport.png",
     Shopping: "/categoryimages/shopping.png",
+    "Bills & Utilities": "/categoryimages/bills.png",
     Utilities: "/categoryimages/bills.png",
     Bills: "/categoryimages/bills.png",
     Entertainment: "/categoryimages/entertainment.png",
-    School: "/categoryimages/schools.png"
+    Education: "/categoryimages/schools.png",
+    School: "/categoryimages/schools.png",
+    "Other categories": "",
+    Others: "",
+    Other: ""
   };
 
   var CATEGORY_INITIALS = {
-    Food: "F",
+    Groceries: "G",
+    Food: "G",
     Dining: "D",
+    "Auto & Transport": "T",
     Transport: "T",
     Shopping: "S",
+    "Bills & Utilities": "B",
     Utilities: "U",
     Bills: "B",
-    Entertainment: "E"
+    Entertainment: "E",
+    Education: "E",
+    School: "E",
+    "Other categories": "O",
+    Others: "O",
+    Other: "O"
   };
 
   var monthlyBudget = 500;
   var allExpenses = [];
   var categoryBudgets = [];
+  var serverBudgetMonth = "";
   var monthSlots = [];
   var hasDates = false;
   var currentMonthIndex = 0;
@@ -56,6 +80,7 @@
       monthlyBudget = Number(data.monthlyBudget) || 0;
       allExpenses = Array.isArray(data.expenses) ? data.expenses : [];
       categoryBudgets = Array.isArray(data.categoryBudgets) ? data.categoryBudgets : [];
+      serverBudgetMonth = data.budgetMonth || "";
       return true;
     } catch (error) {
       return false;
@@ -282,7 +307,8 @@
     var i;
 
     for (i = 0; i < categoryBudgets.length; i++) {
-      limits[categoryBudgets[i].name] = Number(categoryBudgets[i].budgeted) || 0;
+      var budgetName = categoryBudgets[i].displayName || categoryBudgets[i].name;
+      limits[budgetName] = Number(categoryBudgets[i].budgeted) || 0;
     }
 
     var rows = getSpendingByCategory(expenses);
@@ -325,6 +351,7 @@
 
     return sorted.map(function (expense) {
       return {
+        id: expense.id || null,
         category: expense.category || "Other",
         description: expense.description || expense.name || expense.category || "Expense",
         source: getExpenseSource(expense),
@@ -583,7 +610,11 @@
       html += "</div>";
       html += '<div class="dash-txn-side">';
       html += '<span class="dash-txn-amt dash-val-red">-' + money(row.amount) + "</span>";
-      html += '<button type="button" class="dash-txn-detail-btn">View details</button>';
+      if (row.id) {
+        html += '<button type="button" class="dash-txn-detail-btn" data-expense-id="' + row.id + '">View details</button>';
+      } else {
+        html += '<button type="button" class="dash-txn-detail-btn">View details</button>';
+      }
       html += "</div>";
       html += "</li>";
     }
@@ -708,9 +739,38 @@
       var btn = event.target.closest(".dash-txn-detail-btn");
       if (btn) {
         event.preventDefault();
-        window.alert("Expense details will be available after Expense CRUD is connected.");
+        var expenseId = btn.getAttribute("data-expense-id");
+        if (expenseId) {
+          window.location.href = "/expenses/" + expenseId + "/edit";
+        }
       }
     });
+  }
+
+  function findMonthIndexForBudgetMonth(budgetMonth) {
+    if (!budgetMonth || monthSlots.length === 0) {
+      return -1;
+    }
+
+    var parts = String(budgetMonth).split("-");
+    if (parts.length !== 2) {
+      return -1;
+    }
+
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10) - 1;
+
+    if (Number.isNaN(year) || Number.isNaN(month)) {
+      return -1;
+    }
+
+    for (var i = 0; i < monthSlots.length; i++) {
+      if (monthSlots[i].year === year && monthSlots[i].month === month) {
+        return i;
+      }
+    }
+
+    return -1;
   }
 
   function initCardMenus() {
@@ -725,19 +785,11 @@
   }
 
   function initFabButtons() {
-    var addBtn = document.getElementById("dashFabAdd");
     var removeBtn = document.getElementById("dashFabRemove");
-
-    if (addBtn) {
-      addBtn.addEventListener("click", function (event) {
-        event.preventDefault();
-        window.alert("Add Expenses feature coming soon.");
-      });
-    }
 
     if (removeBtn) {
       removeBtn.addEventListener("click", function () {
-        window.alert("Delete feature coming soon.");
+        window.location.href = "/expenses";
       });
     }
   }
@@ -751,6 +803,11 @@
     hasDates = detectHasDates(allExpenses);
     monthSlots = buildMonthSlots(allExpenses, hasDates);
     currentMonthIndex = monthSlots.length - 1;
+
+    var serverMonthIndex = findMonthIndexForBudgetMonth(serverBudgetMonth);
+    if (serverMonthIndex >= 0) {
+      currentMonthIndex = serverMonthIndex;
+    }
 
     renderDashboard(currentMonthIndex);
     initMonthNav();

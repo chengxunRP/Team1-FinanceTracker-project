@@ -8,17 +8,18 @@
   </header>
 
   <section class="spc-snapshot" aria-label="Finance snapshot">
+    <p class="spc-scope-note">Budget month: <strong><%= typeof budgetMonthLabel !== 'undefined' ? budgetMonthLabel : 'Current month' %></strong> — totals below are for this month only.</p>
     <div class="stat-grid stat-grid--spc">
       <article class="stat-card">
         <span class="stat-card__label">Monthly Budget</span>
         <span class="stat-card__value stat-card__value--blue">$<%= financeSnapshot.monthlyBudget %></span>
       </article>
       <article class="stat-card">
-        <span class="stat-card__label">Total Spent</span>
+        <span class="stat-card__label">Spent This Month</span>
         <span class="stat-card__value stat-card__value--blue">$<%= financeSnapshot.totalSpent %></span>
       </article>
       <article class="stat-card">
-        <span class="stat-card__label">Remaining Budget</span>
+        <span class="stat-card__label">Remaining This Month</span>
         <span class="stat-card__value stat-card__value--green">$<%= financeSnapshot.remainingBudget %></span>
       </article>
       <article class="stat-card">
@@ -26,7 +27,7 @@
         <span class="stat-card__value"><%= financeSnapshot.percentageUsed %>%</span>
       </article>
       <article class="stat-card stat-card--wide spc-stat-highlight">
-        <span class="stat-card__label">Highest Spending Category</span>
+        <span class="stat-card__label">Highest Category This Month</span>
         <span class="stat-card__value stat-card__value--sm"><%= financeSnapshot.highestCategory %></span>
         <span class="spc-stat-sub">$<%= financeSnapshot.highestCategoryAmount %> spent so far</span>
       </article>
