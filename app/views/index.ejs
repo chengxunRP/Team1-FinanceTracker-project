@@ -8,7 +8,7 @@
     <span class="dash-month-icon" aria-hidden="true">
       <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M3 8h14M7 3v2M13 3v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
     </span>
-    <h2 class="dash-month-label" id="dashMonthLabel">June 2026</h2>
+    <h2 class="dash-month-label" id="dashMonthLabel"><%= typeof budgetMonthLabel !== 'undefined' ? budgetMonthLabel : 'This month' %></h2>
     <button type="button" class="dash-month-arrow" id="dashMonthNext" aria-label="Next month">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
@@ -31,10 +31,10 @@
         <span class="dash-stat-badge dash-stat-badge--red" aria-hidden="true">
           <svg viewBox="0 0 20 20" fill="none"><path d="M7 9V7a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 9h12l-1 9H5L4 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
         </span>
-        <span class="dash-stat-label">Total Spent</span>
+        <span class="dash-stat-label">Spent This Month</span>
       </div>
       <span class="dash-stat-value dash-stat-value--red" id="dashStatSpent">$<%= summary.totalSpent %></span>
-      <span class="dash-stat-sub" id="dashStatExpenseCount"><%= expenses.length %> expense<%= expenses.length === 1 ? '' : 's' %></span>
+      <span class="dash-stat-sub" id="dashStatExpenseCount"><%= typeof monthExpenseCount !== 'undefined' ? monthExpenseCount : 0 %> expense<%= (typeof monthExpenseCount !== 'undefined' ? monthExpenseCount : 0) === 1 ? '' : 's' %> · <%= typeof budgetMonthLabel !== 'undefined' ? budgetMonthLabel : 'This month' %></span>
     </article>
 
     <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Remaining budget - open Budget Alerts">
@@ -64,7 +64,7 @@
         <span class="dash-stat-badge dash-stat-badge--purple" aria-hidden="true">
           <svg viewBox="0 0 20 20" fill="none"><path d="M10 2l1.8 5.4H17l-4.6 3.3 1.8 5.4L10 13l-4.2 3.1 1.8-5.4L3 7.4h5.2L10 2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
         </span>
-        <span class="dash-stat-label">Top Category</span>
+        <span class="dash-stat-label">Top Category This Month</span>
       </div>
       <span class="dash-stat-value dash-stat-value--sm" id="dashStatTopCategory"><%= financeSnapshot.highestCategory %></span>
       <span class="dash-stat-sub" id="dashStatTopAmount">$<%= financeSnapshot.highestCategoryAmount %> spent</span>
@@ -81,16 +81,16 @@
         <button type="button" class="dash-card-menu" aria-label="This month options">&#8943;</button>
       </div>
       <div class="dash-period-body">
-        <div class="dash-donut" id="dashDonutThis" style="--used: 64;" aria-hidden="true">
+        <div class="dash-donut" id="dashDonutThis" style="--used: <%= summary.percentageUsed %>;" aria-hidden="true">
           <div class="dash-donut__hole">
-            <span class="dash-donut__pct" id="dashThisUsedPct">64%</span>
+            <span class="dash-donut__pct" id="dashThisUsedPct"><%= summary.percentageUsed %>%</span>
             <span class="dash-donut__lbl">used</span>
           </div>
         </div>
         <ul class="dash-period-stats">
-          <li><span>Spent</span><strong class="dash-val-red" id="dashThisSpent">$320</strong></li>
-          <li><span>Remaining</span><strong class="dash-val-green" id="dashThisRemaining">$180</strong></li>
-          <li><span>Budget</span><strong id="dashThisBudget">$500</strong></li>
+          <li><span>Spent</span><strong class="dash-val-red" id="dashThisSpent">$<%= summary.totalSpent %></strong></li>
+          <li><span>Remaining</span><strong class="dash-val-green" id="dashThisRemaining">$<%= summary.remainingBudget %></strong></li>
+          <li><span>Budget</span><strong id="dashThisBudget">$<%= summary.monthlyBudget %></strong></li>
         </ul>
       </div>
     </article>
@@ -197,33 +197,33 @@
             <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v14M5 8l5-5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="dash-cashflow-metric__label">Income (Budget)</span>
-          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashIncome">$500</span>
+          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashIncome">$<%= summary.monthlyBudget %></span>
         </div>
         <div class="dash-cashflow-metric">
           <span class="dash-cashflow-metric__icon dash-cashflow-metric__icon--red" aria-hidden="true">
             <svg viewBox="0 0 20 20" fill="none"><path d="M10 17V3M5 12l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="dash-cashflow-metric__label">Total Expenses</span>
-          <span class="dash-cashflow-metric__value dash-val-red" id="dashCashExpenses">$320</span>
+          <span class="dash-cashflow-metric__value dash-val-red" id="dashCashExpenses">$<%= summary.totalSpent %></span>
         </div>
         <div class="dash-cashflow-metric dash-cashflow-metric--total">
           <span class="dash-cashflow-metric__icon dash-cashflow-metric__icon--blue" aria-hidden="true">
             <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M7.5 10.5l1.5 1.5 3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="dash-cashflow-metric__label">Net Remaining</span>
-          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashRemaining">$180</span>
+          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashRemaining">$<%= summary.remainingBudget %></span>
         </div>
       </div>
     </article>
   </section>
 
   <div class="dash-fab-group" aria-label="Quick actions">
-    <a href="#" class="dash-fab dash-fab--add" id="dashFabAdd" aria-label="Add expense">+</a>
+    <a href="/expenses/new" class="dash-fab dash-fab--add" id="dashFabAdd" aria-label="Add expense">+</a>
     <button type="button" class="dash-fab dash-fab--remove" id="dashFabRemove" aria-label="Remove expense">&minus;</button>
   </div>
 </div>
 
-<script id="dashData" type="application/json"><%- JSON.stringify({ monthlyBudget: summary.monthlyBudget, expenses: expenses, categoryBudgets: typeof categoryRows !== 'undefined' ? categoryRows : [] }) %></script>
+<script id="dashData" type="application/json"><%- JSON.stringify({ monthlyBudget: summary.monthlyBudget, expenses: expenses, categoryBudgets: typeof categoryRows !== 'undefined' ? categoryRows : [], budgetMonth: typeof budgetMonth !== 'undefined' ? budgetMonth : '' }) %></script>
 <script src="/js/dashboard.js"></script>
 
 <%- include('partials/footer') %>

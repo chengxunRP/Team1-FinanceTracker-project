@@ -120,13 +120,13 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 -- Seed data — categories (from app/expenseStore.js)
 -- =============================================================================
 INSERT INTO categories (id, name, icon, color) VALUES
-  (1, 'Food',          'food',          '#e07b39'),
-  (2, 'Transport',     'transport',     '#1976d2'),
-  (3, 'School',        'school',        '#7c4dff'),
-  (4, 'Shopping',      'shopping',      '#e91e8c'),
-  (5, 'Bills',         'bills',         '#fb8c00'),
-  (6, 'Entertainment', 'entertainment', '#43a047'),
-  (7, 'Others',        'others',        '#64748b')
+  (1, 'Groceries',          'food',          '#e07b39'),
+  (2, 'Auto & Transport',   'transport',     '#1976d2'),
+  (3, 'Education',          'school',        '#7c4dff'),
+  (4, 'Shopping',           'shopping',      '#e91e8c'),
+  (5, 'Bills & Utilities',  'bills',         '#fb8c00'),
+  (6, 'Entertainment',      'entertainment', '#43a047'),
+  (7, 'Other categories',   'others',        '#64748b')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   icon = VALUES(icon),

@@ -1,0 +1,83 @@
+<%- include('partials/header') %>
+
+<%
+  if (typeof detail === 'undefined') detail = {};
+  if (typeof budgetMonth === 'undefined') budgetMonth = '';
+  if (typeof budgetMonthLabel === 'undefined') budgetMonthLabel = budgetMonth;
+
+  function formatMoney(value) {
+    var num = Number(value);
+    if (Number.isNaN(num)) return '$0';
+    if (num % 1 === 0) return '$' + num.toLocaleString();
+    return '$' + num.toFixed(2);
+  }
+
+  function formatMoneySigned(value) {
+    var num = Number(value);
+    if (Number.isNaN(num)) return '-$0.00';
+    return '-$' + Math.abs(num).toFixed(2);
+  }
+%>
+
+<div class="everything-detail-page spb-page--everything-else">
+  <div class="everything-detail-inner">
+    <div class="everything-content-column">
+      <header class="everything-header">
+        <a href="/budget?month=<%= encodeURIComponent(budgetMonth) %>" class="everything-back" aria-label="Back to budgets">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <div class="everything-header__text">
+          <h1 class="everything-title">Everything else</h1>
+          <p class="everything-total">Total: <%= formatMoneySigned(detail.totalAmount || 0) %></p>
+        </div>
+      </header>
+
+      <div class="everything-search-wrap">
+        <span class="everything-search-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        </span>
+        <input type="search" id="everythingElseSearch" class="everything-search" placeholder="Search transactions by amount, merchant, category or note" autocomplete="off">
+      </div>
+
+      <section class="everything-transactions-card" aria-label="Unbudgeted transactions">
+        <% if (!(detail.dateGroups || []).length) { %>
+        <p class="everything-empty" id="everythingElseEmpty">No unbudgeted transactions found.</p>
+        <% } else { %>
+        <div id="everythingElseGroups">
+          <% (detail.dateGroups || []).forEach(function(group) { %>
+          <div class="everything-date-group" data-date-group="<%= group.date %>">
+            <header class="everything-date-header">
+              <span class="everything-date-label"><%= group.dateLabel %></span>
+              <span class="everything-date-total"><%= formatMoneySigned(group.dayTotal) %></span>
+            </header>
+            <% group.transactions.forEach(function(tx) { %>
+            <a href="/expenses/<%= tx.id %>"
+               class="everything-transaction-row"
+               data-search="<%= (tx.description + ' ' + tx.categoryDisplayName + ' ' + tx.amount + ' ' + (tx.notes || '') + ' ' + tx.accountLabel).toLowerCase() %>">
+              <span class="everything-transaction-icon">
+                <%- include('partials/category-icon', { catName: tx.categoryDisplayName, catIcon: tx.categoryIcon, catSize: 'sm' }) %>
+              </span>
+              <span class="everything-transaction-body">
+                <span class="everything-transaction-title"><%= tx.description %></span>
+                <span class="everything-transaction-meta">
+                  <span class="everything-cash-badge"><%= tx.accountLabel %></span>
+                  <span class="everything-transaction-dot" aria-hidden="true">&bull;</span>
+                  <span class="everything-transaction-category"><%= tx.categoryDisplayName %></span>
+                </span>
+              </span>
+              <span class="everything-transaction-amount"><%= formatMoneySigned(tx.amount) %></span>
+            </a>
+            <% }); %>
+          </div>
+          <% }); %>
+        </div>
+        <p class="everything-empty everything-empty--filter" id="everythingElseFilterEmpty" hidden>No transactions match your search.</p>
+        <% } %>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="/js/budget-everything-else.js?v=2"></script>
+
+<%- include('partials/footer') %>

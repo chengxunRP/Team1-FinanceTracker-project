@@ -1,9 +1,18 @@
 // Smart Spending Recommendation helpers (Feature 7)
 
+const { getStandardCategoryName } = require("./categoryHelpers");
+
 const WARNING_PERCENT = 80;
 const HIGH_CATEGORY_PERCENT = 20;
 const LARGE_SHARE_OF_REMAINING = 0.5;
 const LITTLE_LEFT_PERCENT = 15;
+
+function categoryNamesMatch(expenseCategory, selectedCategory) {
+  return (
+    getStandardCategoryName(expenseCategory) ===
+    getStandardCategoryName(selectedCategory)
+  );
+}
 
 function validateItemInput(itemName, itemPrice, category) {
   const errors = [];
@@ -36,7 +45,7 @@ function getCategoryTotal(expenses, category) {
   let total = 0;
 
   for (let i = 0; i < expenses.length; i++) {
-    if (expenses[i].category.toLowerCase() === category.toLowerCase()) {
+    if (categoryNamesMatch(expenses[i].category, category)) {
       total += expenses[i].amount;
     }
   }
@@ -165,7 +174,7 @@ function buildReasons(result, analysis, financeSnapshot, item) {
 function buildSpendingInsight(itemCategory, financeSnapshot) {
   const itemCategoryData = financeSnapshot.spendingByCategory.find(
     function (row) {
-      return row.category.toLowerCase() === itemCategory.toLowerCase();
+      return categoryNamesMatch(row.category, itemCategory);
     }
   );
 
@@ -174,9 +183,10 @@ function buildSpendingInsight(itemCategory, financeSnapshot) {
     (itemCategoryAmount / financeSnapshot.monthlyBudget) * 100
   );
 
-  const isHighestCategory =
-    itemCategory.toLowerCase() ===
-    financeSnapshot.highestCategory.toLowerCase();
+  const isHighestCategory = categoryNamesMatch(
+    itemCategory,
+    financeSnapshot.highestCategory
+  );
 
   const isHighSpendCategory = itemCategoryPercent >= HIGH_CATEGORY_PERCENT;
 
@@ -231,8 +241,7 @@ function getSpendingRecommendation(summary, expenses, item) {
       : 100;
   const isHighSpendCategory =
     categoryPercent >= HIGH_CATEGORY_PERCENT ||
-    item.category.toLowerCase() ===
-      financeSnapshot.highestCategory.toLowerCase();
+    categoryNamesMatch(item.category, financeSnapshot.highestCategory);
   const leavesLittleRemaining =
     newRemainingBudget >= 0 &&
     (newRemainingBudget / summary.monthlyBudget) * 100 < LITTLE_LEFT_PERCENT;

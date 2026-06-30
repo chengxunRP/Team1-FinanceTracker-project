@@ -77,16 +77,20 @@ function getCategoryBudgetStatus(usedPct) {
       barClass: "budget-progress--overspent",
       badgeClass: "budget-badge--overspent",
       cardClass: "budget-cat-card--overspent",
+      warningMessage: null,
+      showWarning: true,
     };
   }
 
-  if (pct >= 90) {
+  if (pct >= 80) {
     return {
-      label: "Near Limit",
-      key: "near-limit",
+      label: "Warning",
+      key: "warning",
       barClass: "budget-progress--near-limit",
       badgeClass: "budget-badge--near-limit",
       cardClass: "budget-cat-card--near-limit",
+      warningMessage: "You've used " + pct + "% of this category budget.",
+      showWarning: true,
     };
   }
 
@@ -97,6 +101,8 @@ function getCategoryBudgetStatus(usedPct) {
       barClass: "budget-progress--watch",
       badgeClass: "budget-badge--watch",
       cardClass: "budget-cat-card--watch",
+      warningMessage: null,
+      showWarning: false,
     };
   }
 
@@ -106,6 +112,8 @@ function getCategoryBudgetStatus(usedPct) {
     barClass: "budget-progress--safe",
     badgeClass: "budget-badge--safe",
     cardClass: "budget-cat-card--safe",
+    warningMessage: null,
+    showWarning: false,
   };
 }
 
@@ -121,8 +129,11 @@ function getMonthlyHealthStatus(percentageUsed) {
   return { label: "On track", key: "safe", helper: "Spending is within your budget" };
 }
 
-function buildBudgetSummary(monthlyBudget, expenses) {
-  const totalSpent = calculateTotalSpent(expenses);
+function buildBudgetSummary(monthlyBudget, expenses, totalSpentOverride) {
+  const totalSpent =
+    totalSpentOverride !== undefined && totalSpentOverride !== null
+      ? Number(totalSpentOverride) || 0
+      : calculateTotalSpent(expenses);
   const percentageUsed = calculatePercentageUsed(totalSpent, monthlyBudget);
   const remainingBudget = calculateRemainingBudget(monthlyBudget, totalSpent);
   const status = getStatus(percentageUsed);
@@ -147,13 +158,52 @@ function buildBudgetSummary(monthlyBudget, expenses) {
   };
 }
 
+function validateCategoryBudgetAmount(amount) {
+  const errors = [];
+  const budget = Number(amount);
+
+  if (amount === "" || Number.isNaN(budget)) {
+    errors.push("Budget amount must be a valid number.");
+  } else if (budget <= 0) {
+    errors.push("Budget amount must be greater than zero.");
+  }
+
+  return {
+    errors,
+    budget,
+    valid: errors.length === 0,
+  };
+}
+
+function getCategoryStatusMessage(remaining) {
+  const num = Number(remaining) || 0;
+
+  if (num < 0) {
+    const overspent = Math.abs(num);
+    const text = overspent % 1 === 0 ? "$" + overspent.toLocaleString() : "$" + overspent.toFixed(2);
+    return text + " overspent";
+  }
+
+  const leftText = num % 1 === 0 ? "$" + num.toLocaleString() : "$" + num.toFixed(2);
+  return leftText + " left to spend";
+}
+
+const {
+  getDisplayCategoryName,
+  isBillsCategory,
+} = require("./categoryHelpers");
+
 module.exports = {
   calculateTotalSpent,
   validateMonthlyBudget,
+  validateCategoryBudgetAmount,
   calculatePercentageUsed,
   calculateRemainingBudget,
   getStatus,
   getCategoryBudgetStatus,
   getMonthlyHealthStatus,
+  getCategoryStatusMessage,
+  getDisplayCategoryName,
+  isBillsCategory,
   buildBudgetSummary,
 };

@@ -33,8 +33,8 @@
 
     <!-- Category badge -->
     <div class="expense-cat-pill expense-cat-pill--detail" style="--cat-color:<%= expense.category.color %>;margin-bottom:1rem;">
-      <%- include('../partials/category-icon', { catName: expense.category.name, catIcon: expense.category.icon, catSize: 'md' }) %>
-      <%= expense.category.name %>
+      <%- include('../partials/category-icon', { catName: expense.category.displayName || expense.category.name, catIcon: expense.category.icon, catSize: 'md' }) %>
+      <%= expense.category.displayName || expense.category.name %>
     </div>
 
     <!-- Title -->

@@ -9,7 +9,7 @@ const GROQ_API_HOST = "api.groq.com";
 const GROQ_API_PATH = "/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.1-8b-instant";
 
-function buildFinanceContext(summary, financeSnapshot, expenses) {
+function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabel) {
   const expenseLines = expenses
     .map((e) => `- ${e.description} (${e.category}): $${e.amount}`)
     .join("\n");
@@ -18,31 +18,36 @@ function buildFinanceContext(summary, financeSnapshot, expenses) {
     .map((row) => `- ${row.category}: $${row.amount}`)
     .join("\n");
 
+  const monthLabel = budgetMonthLabel || "current month";
+
   return [
-    "User finance data (use only this data in your answer):",
+    `User finance data for ${monthLabel} (use only this data in your answer):`,
     `- Monthly budget: $${summary.monthlyBudget}`,
     `- Total spent this month: $${summary.totalSpent}`,
-    `- Remaining budget: $${summary.remainingBudget}`,
+    `- Remaining budget this month: $${summary.remainingBudget}`,
     `- Budget used: ${summary.percentageUsed}%`,
-    `- Highest spending category: ${financeSnapshot.highestCategory} ($${financeSnapshot.highestCategoryAmount})`,
+    `- Highest spending category this month: ${financeSnapshot.highestCategory} ($${financeSnapshot.highestCategoryAmount})`,
     "",
-    "Spending by category:",
+    "Spending by category this month:",
     categoryLines || "- No category data",
     "",
-    "Sample expenses:",
+    "Expenses this month:",
     expenseLines || "- No expenses",
+    "",
+    "Note: These totals are for the selected month only, not all-time spending.",
   ].join("\n");
 }
 
-function buildSystemPrompt(summary, financeSnapshot, expenses) {
+function buildSystemPrompt(summary, financeSnapshot, expenses, budgetMonthLabel) {
   return [
     "You are FinBot, a friendly personal finance assistant.",
     "Use only the finance data below. Do not invent income, savings, or expenses.",
+    "When answering about spending, always clarify it is for the current budget month unless asked about all-time totals.",
     "Always use real dollar amounts and category names from the data.",
     "",
     buildFormatRulesForPrompt(),
     "",
-    buildFinanceContext(summary, financeSnapshot, expenses),
+    buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabel),
   ].join("\n");
 }
 
@@ -95,7 +100,7 @@ function postGroqChat(body, apiKey) {
   });
 }
 
-async function getGroqReply(userMessage, summary, financeSnapshot, expenses) {
+async function getGroqReply(userMessage, summary, financeSnapshot, expenses, budgetMonthLabel) {
   const apiKey = process.env.GROQ_API_KEY;
 
   if (!apiKey) {
@@ -107,7 +112,7 @@ async function getGroqReply(userMessage, summary, financeSnapshot, expenses) {
     messages: [
       {
         role: "system",
-        content: buildSystemPrompt(summary, financeSnapshot, expenses),
+        content: buildSystemPrompt(summary, financeSnapshot, expenses, budgetMonthLabel),
       },
       { role: "user", content: userMessage },
     ],
