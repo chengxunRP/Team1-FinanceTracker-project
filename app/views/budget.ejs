@@ -9,6 +9,7 @@
   if (typeof everythingElse === 'undefined') everythingElse = { amount: 0, categoryCount: 0, label: 'Other categories' };
   if (typeof budgetTotals === 'undefined') budgetTotals = { totalSpent: 0, totalBudgeted: 0 };
   if (typeof availableCategories === 'undefined') availableCategories = [];
+  if (typeof overallBudgetSection === 'undefined') overallBudgetSection = null;
 
   function formatMoney(value) {
     var num = Number(value);
@@ -63,19 +64,22 @@
             <circle class="spb-ring__fill <%= ringFillClass %>" cx="37" cy="37" r="29" fill="none" stroke-width="4" stroke-dasharray="<%= ringC %>" stroke-dashoffset="<%= ringOffset %>" transform="rotate(-90 37 37)"/>
           </svg>
           <div class="spb-card__ring-icon">
-            <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'md' }) %>
+            <%- include('partials/category-icon', { catName: row.displayName || row.name, catIcon: row.icon, catIconImage: row.iconImage, catColor: row.isCustom ? row.color : '', catIsCustom: row.isCustom, catSize: 'md' }) %>
           </div>
         </div>
         <div class="spb-card__body">
           <span class="spb-card__name"><%= row.displayName %></span>
           <span class="spb-card__status"><%= row.statusMessage %></span>
+          <% if (row.rolloverEnabled && row.rollover !== 0) { %>
+          <span class="spb-card__rollover"><%= row.rollover > 0 ? '+' : '' %><%= formatMoney(row.rollover) %> rollover</span>
+          <% } %>
           <% if (row.warningMessage) { %>
           <span class="spb-card__warning"><%= row.warningMessage %></span>
           <% } %>
         </div>
         <div class="spb-card__amounts">
           <span class="spb-card__spent"><%= formatMoney(row.actual) %></span>
-          <span class="spb-card__limit">of <%= formatMoney(row.budgeted) %></span>
+          <span class="spb-card__limit">of <%= formatMoney(row.availableBudget) %></span>
         </div>
       </a>
       <% }); %>
@@ -83,9 +87,54 @@
   </section>
   <% } %>
 
+  <% if (overallBudgetSection) {
+    var overallRow = overallBudgetSection.card;
+    var overallCardClass = overallRow.overspent ? 'spb-card--overspent' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? 'spb-card--warning' : '');
+    var overallRingR = 29;
+    var overallRingC = 2 * Math.PI * overallRingR;
+    var overallRingPct = Math.min(Math.max(overallRow.usedPct || 0, 0), 100);
+    var overallRingOffset = overallRingC * (1 - overallRingPct / 100);
+    var overallRingFillClass = overallRow.overspent ? 'spb-ring__fill--danger' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? 'spb-ring__fill--warning' : 'spb-ring__fill--default');
+    var overallRingWrapClass = overallRow.overspent ? ' spb-card__ring-wrap--alert' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? ' spb-card__ring-wrap--warning' : '');
+  %>
+  <section class="spb-summary spb-summary--overall">
+    <h2 class="spb-summary__title">All Categories Budget &bull; <strong><%= formatMoney(overallBudgetSection.spent) %></strong></h2>
+    <p class="spb-summary__sub">of <%= formatMoney(overallBudgetSection.budgeted) %> <%= overallBudgetSection.budgetSubtitle || 'budgeted' %></p>
+  </section>
+  <section class="spb-cards spb-cards--overall" aria-label="All Categories budget">
+    <div class="spb-cards__grid">
+      <a href="/budget/all-categories?month=<%= encodeURIComponent(budgetMonth) %>" class="spb-card <%= overallCardClass %>" aria-label="All Transactions">
+        <div class="spb-card__ring-wrap<%= overallRingWrapClass %>">
+          <svg class="spb-ring" viewBox="0 0 74 74" aria-hidden="true">
+            <circle class="spb-ring__track" cx="37" cy="37" r="29" fill="none" stroke-width="4"/>
+            <circle class="spb-ring__fill <%= overallRingFillClass %>" cx="37" cy="37" r="29" fill="none" stroke-width="4" stroke-dasharray="<%= overallRingC %>" stroke-dashoffset="<%= overallRingOffset %>" transform="rotate(-90 37 37)"/>
+          </svg>
+          <div class="spb-card__ring-icon">
+            <%- include('partials/category-icon', { catName: overallRow.displayName, catIconImage: overallRow.iconImage, catSize: 'md' }) %>
+          </div>
+        </div>
+        <div class="spb-card__body">
+          <span class="spb-card__name"><%= overallRow.displayName %></span>
+          <span class="spb-card__status"><%= overallRow.statusMessage %></span>
+          <% if (overallRow.rolloverEnabled && overallRow.rollover !== 0) { %>
+          <span class="spb-card__rollover"><%= overallRow.rollover > 0 ? '+' : '' %><%= formatMoney(overallRow.rollover) %> rollover</span>
+          <% } %>
+          <% if (overallRow.warningMessage) { %>
+          <span class="spb-card__warning"><%= overallRow.warningMessage %></span>
+          <% } %>
+        </div>
+        <div class="spb-card__amounts">
+          <span class="spb-card__spent"><%= formatMoney(overallRow.actual) %></span>
+          <span class="spb-card__limit">of <%= formatMoney(overallRow.availableBudget) %></span>
+        </div>
+      </a>
+    </div>
+  </section>
+  <% } %>
+
   <section class="spb-elsewhere">
     <h2 class="spb-elsewhere__title">Everything else &bull; <%= formatMoney(everythingElse.amount) %></h2>
-    <a href="/budget/everything-else?month=<%= encodeURIComponent(budgetMonth) %>" class="spb-elsewhere__card everything-card" aria-label="View unbudgeted spending">
+    <a href="/budget/everything-else?month=<%= encodeURIComponent(budgetMonth) %>&returnMonth=<%= encodeURIComponent(budgetMonth) %>" class="spb-elsewhere__card everything-card" aria-label="View unbudgeted spending">
       <div class="spb-elsewhere__row">
         <span class="spb-elsewhere__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
@@ -100,106 +149,11 @@
   </div>
 </div>
 
-<!-- Add budget modal -->
-<div class="spb-modal-overlay" id="addBudgetOverlay" hidden>
-  <div class="spb-modal" role="dialog" aria-labelledby="addBudgetTitle" aria-modal="true">
-    <header class="spb-modal__header" id="addBudgetHeader">
-      <h2 class="spb-modal__title" id="addBudgetTitle">Add a budget</h2>
-      <button type="button" class="spb-modal__close" id="closeAddBudget" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
-    </header>
-
-    <div class="spb-modal__search" id="addBudgetSearch">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-      <input type="search" id="categorySearch" placeholder="Search category" autocomplete="off">
-    </div>
-
-    <div class="spb-modal__body" id="categoryPickerStep">
-      <h3 class="spb-modal__section-title">Your categories</h3>
-      <a href="/categories" class="spb-modal__create">
-        <span class="spb-modal__create-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-        </span>
-        <span>Create a category</span>
-        <svg class="spb-modal__chevron" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-
-      <h3 class="spb-modal__section-title">General categories</h3>
-      <ul class="spb-category-list" id="categoryList">
-        <% availableCategories.forEach(function(cat) { %>
-        <li>
-          <button type="button" class="spb-category-item<%= cat.hasBudget ? ' spb-category-item--budgeted' : '' %>" data-category-id="<%= cat.id %>" data-category-name="<%= cat.displayName %>" data-is-bills="<%= cat.displayName === 'Bills & Utilities' ? '1' : '0' %>" data-spent="<%= cat.spentThisMonth || 0 %>" data-has-budget="<%= cat.hasBudget ? '1' : '0' %>"<%= cat.hasBudget ? ' aria-disabled="true"' : '' %>>
-            <%- include('partials/category-icon', { catName: cat.displayName || cat.name, catIcon: cat.icon, catSize: 'sm' }) %>
-            <span class="spb-category-item__name"><%= cat.displayName %></span>
-            <span class="spb-category-item__radio" aria-hidden="true"></span>
-          </button>
-        </li>
-        <% }); %>
-      </ul>
-      <% if (availableCategories.length === 0) { %>
-      <p class="spb-modal__empty">No categories found. Create a category first.</p>
-      <% } %>
-    </div>
-
-    <!-- Set amount step (hidden initially) -->
-    <div class="spb-modal__body spb-modal__body--amount" id="amountStep" hidden>
-      <header class="spb-modal__header spb-modal__header--step">
-        <button type="button" class="spb-modal__back" id="backToCategories" aria-label="Back">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <h2 class="spb-modal__title">Add a budget</h2>
-        <button type="button" class="spb-modal__close" id="closeAddBudgetAmount" aria-label="Close">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        </button>
-      </header>
-
-      <p class="spb-amount-prompt">How much would you like to budget for <strong id="selectedCategoryName">Category</strong>?</p>
-
-      <div class="spb-amount-input-wrap">
-        <input type="text" inputmode="decimal" id="budgetAmountInput" class="spb-amount-input" placeholder="Enter amount" autocomplete="off">
-      </div>
-
-      <aside class="spb-note">
-        <span class="spb-note__label">NOTE:</span>
-        <span class="spb-note__text" id="budgetSpentNote">You've spent $0.00 so far in <%= currentMonthName %>. Your budget will start over at the beginning of every month.</span>
-      </aside>
-
-      <div class="spb-rollover">
-        <span class="spb-rollover__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0113.66-5.66M20 12a8 8 0 01-13.66 5.66" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M16 6h4V2M8 18H4v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-        <div class="spb-rollover__text">
-          <strong>Make this budget a monthly rollover</strong>
-          <p>Every month the left to spend balance will rollover to the next month. <a href="#" class="spb-rollover__link">Learn more</a></p>
-        </div>
-        <label class="spb-toggle">
-          <input type="checkbox" id="rolloverToggle">
-          <span class="spb-toggle__track"></span>
-        </label>
-      </div>
-
-      <p class="spb-form-error" id="budgetFormError" hidden></p>
-
-      <button type="button" class="spb-btn spb-btn--save" id="saveBudgetBtn">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Bills warning dialog -->
-<div class="spb-modal-overlay spb-modal-overlay--alert" id="billsWarningOverlay" hidden>
-  <div class="spb-alert" role="alertdialog" aria-labelledby="billsAlertTitle" aria-modal="true">
-    <h2 class="spb-alert__title" id="billsAlertTitle">Attention!</h2>
-    <p class="spb-alert__text">Please note that spendWise tracks your bills automatically and the relevant amount was already subtracted from the Leftover.</p>
-    <p class="spb-alert__text">Create 'Bills &amp; Utilities' category for manual tracking purposes only.</p>
-    <div class="spb-alert__actions">
-      <button type="button" class="spb-alert__cancel" id="billsWarningCancel">Cancel</button>
-      <button type="button" class="spb-alert__proceed" id="billsWarningProceed">Proceed</button>
-    </div>
-  </div>
-</div>
+<%- include('partials/add-budget-modal', { availableCategories: availableCategories, budgetMonth: budgetMonth, budgetMonthLabel: budgetMonthLabel, currentMonthName: currentMonthName, hasOverallBudget: !!overallBudgetSection }) %>
 
 <script id="budgetPageData" type="application/json"><%- JSON.stringify({ budgetMonth: budgetMonth, availableCategories: availableCategories, currentMonthName: currentMonthName }) %></script>
-<script src="/js/budget.js"></script>
+<script src="/js/category-colours.js"></script>
+<script src="/js/modal-scroll.js?v=3"></script>
+<script src="/js/budget.js?v=27"></script>
 
 <%- include('partials/footer') %>

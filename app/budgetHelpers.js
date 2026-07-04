@@ -1,10 +1,17 @@
 // Budget calculation and validation helpers (Feature 4)
 
+function isExpenseCountedForBudget(expense) {
+  if (!expense) return true;
+  return !expense.isExcludedFromBudget;
+}
+
 function calculateTotalSpent(expenses) {
   let total = 0;
 
   for (let i = 0; i < expenses.length; i++) {
-    total += expenses[i].amount;
+    if (isExpenseCountedForBudget(expenses[i])) {
+      total += expenses[i].amount;
+    }
   }
 
   return total;
@@ -194,6 +201,7 @@ const {
 } = require("./categoryHelpers");
 
 module.exports = {
+  isExpenseCountedForBudget,
   calculateTotalSpent,
   validateMonthlyBudget,
   validateCategoryBudgetAmount,

@@ -1,0 +1,42 @@
+<%
+  var txnPickerCustom = (typeof customCategories !== 'undefined' && Array.isArray(customCategories))
+    ? customCategories
+    : [];
+  var txnPickerGeneral = (typeof generalCategories !== 'undefined' && Array.isArray(generalCategories))
+    ? generalCategories
+    : [];
+
+  if (!txnPickerCustom.length && !txnPickerGeneral.length) {
+    var txnPickerCategories = (typeof categories !== 'undefined' && Array.isArray(categories)) ? categories : [];
+    txnPickerCustom = txnPickerCategories.filter(function(c) {
+      return c.isCustom || Number(c.is_custom) === 1;
+    });
+    txnPickerGeneral = txnPickerCategories.filter(function(c) {
+      return !(c.isCustom || Number(c.is_custom) === 1);
+    });
+  }
+%>
+<div class="spb-modal-overlay spb-modal-overlay--nested txn-category-overlay pocketguard-style-overlay" id="txnCategoryOverlay" hidden>
+  <div class="spb-modal pocketguard-style-modal" role="dialog" aria-labelledby="txnCategoryTitle" aria-modal="true">
+    <header class="spb-modal__header">
+      <h2 class="spb-modal__title" id="txnCategoryTitle">Choose category</h2>
+      <button type="button" class="spb-modal__close" id="closeTxnCategoryPicker" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+
+    <div class="spb-modal__search">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      <input type="search" id="txnCategorySearch" placeholder="Search category" autocomplete="off">
+    </div>
+
+    <div class="spb-modal__body pocketguard-style-modal-body">
+      <%- include('shared-category-picker-lists', {
+        pickerMode: 'transaction',
+        customCategories: txnPickerCustom,
+        generalCategories: txnPickerGeneral,
+        selectedCategoryId: ''
+      }) %>
+    </div>
+  </div>
+</div>

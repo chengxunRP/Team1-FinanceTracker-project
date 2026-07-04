@@ -1,0 +1,220 @@
+(function () {
+  "use strict";
+
+  var overlay = document.getElementById("addExpenseOverlay");
+  if (!overlay) return;
+
+  var closeBtn = document.getElementById("closeAddExpenseModalBtn");
+  var cancelBtn = document.getElementById("closeAddExpenseModal");
+  var form = document.getElementById("addExpenseForm");
+  var categoryOverlay = document.getElementById("expenseCategoryOverlay");
+
+  var PLACEHOLDER_ICON =
+    '<span class="sw-category-icon sw-category-icon--sm">' +
+    '<span class="sw-category-icon__fallback" aria-hidden="true">' +
+    '<svg viewBox="0 0 24 24" fill="none" width="20" height="20">' +
+    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/>' +
+    '<path d="M8.5 12h7M12 8.5v7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>' +
+    "</svg></span></span>";
+
+  function getTodayLocalDateString() {
+    var now = new Date();
+    return (
+      now.getFullYear() +
+      "-" +
+      String(now.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(now.getDate()).padStart(2, "0")
+    );
+  }
+
+  function getModalDefaults() {
+    var el = document.getElementById("expenseModalDefaults");
+    if (!el) return null;
+    try {
+      return JSON.parse(el.textContent);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function applyDateDefaults(defaults) {
+    var dateInput = document.getElementById("date");
+    if (!dateInput) return;
+
+    var defaultDate =
+      (defaults && defaults.defaultDate) ||
+      (defaults && defaults.maxDate) ||
+      getTodayLocalDateString();
+    dateInput.value = defaultDate;
+    dateInput.removeAttribute("max");
+    dateInput.classList.remove("expense-date-input--invalid");
+
+    var dateError = document.getElementById("dateError");
+    if (dateError) dateError.hidden = true;
+  }
+
+  function applyCategoryDefaults(defaults) {
+    if (!defaults || !defaults.categoryId) return false;
+
+    var categoryIdInput = document.getElementById("categoryId");
+    var categoryLabel = document.getElementById("expenseCategoryLabel");
+    var categoryIconWrap = document.getElementById("expenseCategoryIconWrap");
+    if (!categoryIdInput) return false;
+
+    categoryIdInput.value = String(defaults.categoryId);
+
+    if (categoryLabel) {
+      categoryLabel.textContent = defaults.categoryName || "Choose category";
+      categoryLabel.classList.remove("expense-txn__category-value--placeholder");
+    }
+
+    var pickBtn = document.querySelector(
+      '.expense-cat-pick-item[data-category-id="' + String(defaults.categoryId) + '"]'
+    );
+    if (pickBtn && categoryIconWrap) {
+      var iconEl = pickBtn.querySelector(".sw-category-icon");
+      categoryIconWrap.innerHTML = iconEl ? iconEl.outerHTML : PLACEHOLDER_ICON;
+    }
+
+    document.querySelectorAll(".expense-cat-pick-item").forEach(function (item) {
+      var match =
+        String(item.getAttribute("data-category-id")) === String(defaults.categoryId);
+      item.classList.toggle("spb-category-item--selected", match);
+      var row = item.closest("li");
+      if (row) row.classList.toggle("spb-category-item-row--selected", match);
+    });
+
+    return true;
+  }
+
+  function clearCategorySelection() {
+    var categoryIdInput = document.getElementById("categoryId");
+    if (categoryIdInput) categoryIdInput.value = "";
+
+    var categoryLabel = document.getElementById("expenseCategoryLabel");
+    if (categoryLabel) {
+      categoryLabel.textContent = "Choose category";
+      categoryLabel.classList.add("expense-txn__category-value--placeholder");
+    }
+
+    var categoryIconWrap = document.getElementById("expenseCategoryIconWrap");
+    if (categoryIconWrap) categoryIconWrap.innerHTML = PLACEHOLDER_ICON;
+
+    document.querySelectorAll(".expense-cat-pick-item").forEach(function (item) {
+      item.classList.remove("spb-category-item--selected");
+      var row = item.closest("li");
+      if (row) row.classList.remove("spb-category-item-row--selected");
+    });
+  }
+
+  function resetForm() {
+    if (!form) return;
+    hideErrors();
+    form.reset();
+
+    var defaults = getModalDefaults();
+    applyDateDefaults(defaults);
+
+    if (!applyCategoryDefaults(defaults)) {
+      clearCategorySelection();
+    }
+
+    if (window.SwReceiptUpload) {
+      var receipt = window.SwReceiptUpload.get("addExpenseReceipt");
+      if (receipt) receipt.reset();
+    }
+  }
+
+  function openModal() {
+    resetForm();
+    if (window.SwModalScroll) {
+      SwModalScroll.relocate();
+    }
+    overlay.hidden = false;
+    if (window.SwModalScroll) {
+      SwModalScroll.onOpen(overlay);
+    } else {
+      overlay.scrollTop = 0;
+    }
+    var titleInput = document.getElementById("title");
+    if (titleInput) {
+      window.setTimeout(function () {
+        titleInput.focus();
+      }, 50);
+    }
+  }
+
+  function closeModal() {
+    overlay.hidden = true;
+    if (window.SwModalScroll) {
+      SwModalScroll.onClose();
+    }
+    hideErrors();
+  }
+
+  function hideErrors() {
+    var errBox = document.getElementById("addExpenseFormErrors");
+    if (errBox) {
+      errBox.hidden = true;
+      errBox.innerHTML = "";
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".js-open-add-expense")) return;
+    e.preventDefault();
+    openModal();
+  });
+
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || overlay.hidden) return;
+    if (categoryOverlay && !categoryOverlay.hidden) return;
+    closeModal();
+  });
+
+  var params = new URLSearchParams(window.location.search);
+  if (params.get("openAdd") === "1") {
+    openModal();
+    if (window.history.replaceState) {
+      var cleanUrl = window.location.pathname;
+      var kept = [];
+      params.forEach(function (val, key) {
+        if (key !== "openAdd" && key !== "addExpenseError") {
+          kept.push(encodeURIComponent(key) + "=" + encodeURIComponent(val));
+        }
+      });
+      if (kept.length) cleanUrl += "?" + kept.join("&");
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }
+
+  if (params.get("addExpenseError") === "1" && getModalDefaults()) {
+    openModal();
+    var errBox = document.getElementById("addExpenseFormErrors");
+    if (errBox) {
+      errBox.hidden = false;
+      errBox.textContent = "Unable to save expense. Please check the form and try again.";
+    }
+    if (window.history.replaceState) {
+      var errorCleanUrl = window.location.pathname;
+      var errorKept = [];
+      params.forEach(function (val, key) {
+        if (key !== "addExpenseError") {
+          errorKept.push(encodeURIComponent(key) + "=" + encodeURIComponent(val));
+        }
+      });
+      if (errorKept.length) errorCleanUrl += "?" + errorKept.join("&");
+      window.history.replaceState({}, "", errorCleanUrl);
+    }
+  }
+
+  window.openAddExpenseModal = openModal;
+})();

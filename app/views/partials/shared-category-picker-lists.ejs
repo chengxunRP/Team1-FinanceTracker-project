@@ -1,0 +1,113 @@
+<%
+  var scpMode = (typeof pickerMode !== 'undefined' && pickerMode) ? pickerMode : 'expense';
+  var scpCustom = (typeof customCategories !== 'undefined' && Array.isArray(customCategories)) ? customCategories : [];
+  var scpGeneral = (typeof generalCategories !== 'undefined' && Array.isArray(generalCategories)) ? generalCategories : [];
+  var scpSelectedId = (typeof selectedCategoryId !== 'undefined' && selectedCategoryId) ? String(selectedCategoryId) : '';
+  var scpHasOverallBudget = (typeof hasOverallBudget !== 'undefined') ? Boolean(hasOverallBudget) : false;
+  var scpCustomListId = scpMode === 'budget' ? 'customCategoryList' : (scpMode === 'transaction' ? 'txnCustomCategoryList' : 'expenseCustomCategoryList');
+  var scpGeneralListId = scpMode === 'budget' ? 'categoryList' : (scpMode === 'transaction' ? 'txnGeneralCategoryList' : 'expenseGeneralCategoryList');
+  var scpYourSectionId = scpMode === 'budget' ? 'yourCategoriesSection' : (scpMode === 'transaction' ? 'txnYourCategoriesSection' : 'expenseYourCategoriesSection');
+  var scpGeneralSectionId = scpMode === 'budget' ? 'generalCategoriesSection' : (scpMode === 'transaction' ? 'txnGeneralCategoriesSection' : 'expenseGeneralCategoriesSection');
+  var scpEmptyId = scpMode === 'budget' ? '' : (scpMode === 'transaction' ? 'txnCategoryEmpty' : 'expenseCategoryEmpty');
+  var scpPickExtraClass = (scpMode === 'expense' || scpMode === 'transaction') ? (scpMode === 'transaction' ? ' txn-cat-pick-item' : ' expense-cat-pick-item') : '';
+%>
+
+<section class="spb-modal__section" id="<%= scpYourSectionId %>">
+  <h3 class="spb-modal__section-title">Your categories</h3>
+  <% if (scpMode === 'budget') { %>
+  <button type="button" class="spb-modal__create" id="openCreateCategory">
+    <span class="spb-modal__create-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+    </span>
+    <span>Create a category</span>
+    <svg class="spb-modal__chevron" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <% } %>
+
+  <ul class="spb-category-list" id="<%= scpCustomListId %>">
+    <% scpCustom.forEach(function(cat) { %>
+    <% if (scpMode === 'budget') { %>
+    <li class="spb-category-row<%= cat.hasBudget ? ' spb-category-row--budgeted' : '' %>" data-category-id="<%= cat.id %>">
+      <div class="spb-category-row__main">
+        <button type="button" class="spb-category-item spb-category-item--grow<%= cat.hasBudget ? ' spb-category-item--budgeted' : '' %><%= String(cat.id) === scpSelectedId ? ' spb-category-item--selected' : '' %>" data-category-id="<%= cat.id %>" data-category-name="<%= cat.displayName || cat.name %>" data-spent="<%= cat.spentThisMonth || 0 %>" data-has-budget="<%= cat.hasBudget ? '1' : '0' %>"<%= cat.hasBudget ? ' aria-disabled="true"' : '' %>>
+          <%- include('category-icon', { catName: cat.displayName || cat.name, catIcon: cat.icon, catIconImage: cat.iconImage, catColor: cat.color, catIsCustom: true, catSize: 'sm' }) %>
+          <span class="spb-category-item__name"><%= cat.displayName || cat.name %></span>
+        </button>
+        <div class="spb-category-row__menu-wrap">
+          <button type="button" class="spb-category-menu-btn" aria-label="Category options" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>
+          </button>
+          <div class="spb-category-menu" hidden role="menu">
+            <button type="button" class="spb-category-menu__item" data-action="edit" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20h4l10.5-10.5a1.5 1.5 0 00-2.12-2.12L5.88 17.88 4 20z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>
+              Edit
+            </button>
+            <button type="button" class="spb-category-menu__item spb-category-menu__item--danger" data-action="delete" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Delete
+            </button>
+          </div>
+        </div>
+        <span class="spb-category-item__radio" aria-hidden="true"></span>
+      </div>
+    </li>
+    <% } else { %>
+    <li>
+      <button type="button" class="spb-category-item<%= scpPickExtraClass %><%= String(cat.id) === scpSelectedId ? ' spb-category-item--selected' : '' %>"
+        data-category-id="<%= cat.id %>" data-category-name="<%= cat.displayName || cat.name %>">
+        <%- include('category-icon', { catName: cat.displayName || cat.name, catIcon: cat.icon, catIconImage: cat.iconImage, catColor: cat.color, catIsCustom: true, catSize: 'sm' }) %>
+        <span class="spb-category-item__name"><%= cat.displayName || cat.name %></span>
+        <span class="spb-category-item__radio" aria-hidden="true"></span>
+      </button>
+    </li>
+    <% } %>
+    <% }); %>
+  </ul>
+</section>
+
+<% if (scpMode === 'budget') { %>
+<section class="spb-modal__section" id="allCategoriesSection">
+  <h3 class="spb-modal__section-title">All Categories</h3>
+  <ul class="spb-category-list" id="allCategoriesList">
+    <li>
+      <button type="button" class="spb-category-item<%= scpHasOverallBudget ? ' spb-category-item--budgeted' : '' %>" data-budget-type="all-categories" data-category-name="All Transactions" data-spent="0" data-has-budget="<%= scpHasOverallBudget ? '1' : '0' %>"<%= scpHasOverallBudget ? ' aria-disabled="true"' : '' %>>
+        <span class="sw-category-icon sw-category-icon--sm" title="All Transactions">
+          <img src="/categoryicon/all_categories.jpg" alt="" class="sw-category-icon__img" loading="lazy">
+        </span>
+        <span class="spb-category-item__text">
+          <span class="spb-category-item__name">All Transactions</span>
+          <span class="spb-category-item__desc">Budget for total spending across all categories.</span>
+        </span>
+        <span class="spb-category-item__radio" aria-hidden="true"></span>
+      </button>
+    </li>
+  </ul>
+</section>
+<% } %>
+
+<section class="spb-modal__section" id="<%= scpGeneralSectionId %>">
+  <h3 class="spb-modal__section-title">General categories</h3>
+  <ul class="spb-category-list" id="<%= scpGeneralListId %>">
+    <% scpGeneral.forEach(function(cat) { %>
+    <li>
+      <button type="button" class="spb-category-item<%= scpPickExtraClass %><%= cat.hasBudget ? ' spb-category-item--budgeted' : '' %><%= String(cat.id) === scpSelectedId ? ' spb-category-item--selected' : '' %>"
+        data-category-id="<%= cat.id %>" data-category-name="<%= cat.displayName || cat.name %>"
+        <% if (scpMode === 'budget') { %>data-spent="<%= cat.spentThisMonth || 0 %>" data-has-budget="<%= cat.hasBudget ? '1' : '0' %>"<%= cat.hasBudget ? ' aria-disabled="true"' : '' %><% } %>>
+        <%- include('category-icon', { catName: cat.displayName || cat.name, catIcon: cat.icon, catIconImage: cat.iconImage, catColor: '', catIsCustom: false, catSize: 'sm' }) %>
+        <span class="spb-category-item__name"><%= cat.displayName || cat.name %></span>
+        <% if (scpMode === 'expense') { %>
+        <span class="spb-category-item__radio" aria-hidden="true"></span>
+        <% } else if (scpMode === 'transaction') { %>
+        <span class="spb-category-item__radio" aria-hidden="true"></span>
+        <% } else { %>
+        <span class="spb-category-item__radio" aria-hidden="true"></span>
+        <% } %>
+      </button>
+    </li>
+    <% }); %>
+  </ul>
+</section>
+
+<% if (scpMode === 'expense' || scpMode === 'transaction') { %>
+<p class="spb-modal__empty" id="<%= scpEmptyId %>" hidden>No categories match your search.</p>
+<% } %>

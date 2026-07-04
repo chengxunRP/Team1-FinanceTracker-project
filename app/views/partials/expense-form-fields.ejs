@@ -1,0 +1,137 @@
+<%
+  var fieldExpense = (typeof expense !== 'undefined' && expense && typeof expense === 'object') ? expense : {};
+  var fieldCategories = (typeof categories !== 'undefined' && Array.isArray(categories)) ? categories : [];
+  var fieldIsEdit = typeof isEdit !== 'undefined' ? isEdit : false;
+  var fieldMaxDate = (typeof maxDate !== 'undefined' && maxDate) ? maxDate : new Date().toISOString().slice(0, 10);
+  var fieldFormAction = (typeof formAction !== 'undefined' && formAction) ? formAction : '/expenses';
+  var fieldInModal = typeof inModal !== 'undefined' ? inModal : false;
+  var fieldReturnTo = (typeof returnTo !== 'undefined' && returnTo) ? returnTo : '';
+  var fieldDefaultDate = fieldExpense.date || ((typeof defaultDate !== 'undefined' && defaultDate) ? defaultDate : fieldMaxDate);
+  var fieldSelectedCategoryId = '';
+
+  if (typeof selectedCategoryId !== 'undefined' && selectedCategoryId) {
+    fieldSelectedCategoryId = String(selectedCategoryId);
+  } else if (fieldExpense.categoryId) {
+    fieldSelectedCategoryId = String(fieldExpense.categoryId);
+  } else if (fieldExpense.category_id) {
+    fieldSelectedCategoryId = String(fieldExpense.category_id);
+  } else if (fieldExpense.categoryID) {
+    fieldSelectedCategoryId = String(fieldExpense.categoryID);
+  }
+
+  var fieldSelectedCat = fieldCategories.find(function(c) { return String(c.id) === fieldSelectedCategoryId; });
+%>
+<form method="POST" action="<%= fieldFormAction %>" enctype="multipart/form-data" class="expense-txn__form" id="<%= fieldInModal ? 'addExpenseForm' : 'expenseForm' %>">
+  <% if (fieldIsEdit) { %>
+    <input type="hidden" name="_method" value="PUT">
+  <% } %>
+
+  <input type="hidden" name="categoryId" id="categoryId" value="<%= fieldSelectedCategoryId %>" required>
+  <% if (fieldReturnTo) { %>
+  <input type="hidden" name="returnTo" id="expenseReturnTo" value="<%= fieldReturnTo %>">
+  <% } %>
+
+  <div class="expense-txn__field">
+    <span class="expense-txn__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M12 7v10M9.5 9.5c0-1.1 1.12-2 2.5-2s2.5.9 2.5 2-1.12 2-2.5 2h-1c-1.38 0-2.5.9-2.5 2s1.12 2 2.5 2 2.5-.9 2.5-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </span>
+    <div class="expense-txn__field-body">
+      <label class="expense-txn__label" for="amount">Amount</label>
+      <input type="number" id="amount" name="amount" class="expense-txn__input expense-txn__input--amount"
+        placeholder="0.00" step="0.01" min="0.01" value="<%= fieldExpense.amount || '' %>" required inputmode="decimal"<%= fieldInModal ? '' : ' autofocus' %>>
+    </div>
+  </div>
+
+  <div class="expense-txn__field">
+    <span class="expense-txn__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 10h16v8H4zM6 10V7a3 3 0 116 0v3" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M9 20h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+    </span>
+    <div class="expense-txn__field-body">
+      <label class="expense-txn__label" for="merchant_name">Merchant Name <span class="expense-txn__optional">(optional)</span></label>
+      <input type="text" id="merchant_name" name="merchant_name" class="expense-txn__input" maxlength="100"
+        placeholder="e.g. FairPrice, Shopee, MRT" value="<%= fieldExpense.merchantName || fieldExpense.merchant_name || '' %>">
+    </div>
+  </div>
+
+  <div class="expense-txn__field">
+    <span class="expense-txn__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 10h16v10H4z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M8 10V7a4 4 0 118 0v3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+    </span>
+    <div class="expense-txn__field-body">
+      <label class="expense-txn__label" for="title">Expense Title</label>
+      <input type="text" id="title" name="title" class="expense-txn__input"
+        placeholder="e.g. Chicken rice, MRT top-up…" value="<%= fieldExpense.title || '' %>" required<%= fieldInModal ? ' autofocus' : '' %>>
+    </div>
+  </div>
+
+  <button type="button" class="expense-txn__category-btn" id="openExpenseCategoryPicker" aria-haspopup="dialog">
+    <span class="expense-txn__category-icon" id="expenseCategoryIconWrap">
+      <% if (fieldSelectedCat) { %>
+        <%- include('category-icon', { catName: fieldSelectedCat.displayName || fieldSelectedCat.name, catIcon: fieldSelectedCat.icon, catIconImage: fieldSelectedCat.iconImage, catColor: fieldSelectedCat.color, catIsCustom: fieldSelectedCat.isCustom || Number(fieldSelectedCat.is_custom) === 1, catSize: 'sm' }) %>
+      <% } else { %>
+        <span class="sw-category-icon sw-category-icon--sm">
+          <span class="sw-category-icon__fallback" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/>
+              <path d="M8.5 12h7M12 8.5v7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+          </span>
+        </span>
+      <% } %>
+    </span>
+    <span class="expense-txn__category-body">
+      <span class="expense-txn__label">Category</span>
+      <span class="expense-txn__category-value<%= fieldSelectedCat ? '' : ' expense-txn__category-value--placeholder' %>" id="expenseCategoryLabel">
+        <%= fieldSelectedCat ? (fieldSelectedCat.displayName || fieldSelectedCat.name) : 'Choose category' %>
+      </span>
+    </span>
+    <svg class="expense-txn__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+
+  <div class="expense-txn__field">
+    <span class="expense-txn__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+    </span>
+    <div class="expense-txn__field-body">
+      <label class="expense-txn__label" for="date">Date</label>
+      <div class="expense-txn__date-wrap">
+        <input type="date" id="date" name="date" class="expense-txn__input expense-date-input"
+          value="<%= fieldDefaultDate %>" required>
+        <svg class="expense-txn__date-icon" viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <p class="expense-date-hint" style="margin:0.35rem 0 0;font-size:0.8rem;color:var(--grey-500,#6b7280);">Future dates are allowed for planned expenses.</p>
+      <p id="dateError" class="expense-date-error" role="alert" hidden style="margin:0.35rem 0 0;font-size:0.8rem;color:var(--danger,#dc2626);"></p>
+    </div>
+  </div>
+
+  <div class="expense-txn__field">
+    <span class="expense-txn__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12M6 12h8M6 16h10" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.75"/></svg>
+    </span>
+    <div class="expense-txn__field-body">
+      <label class="expense-txn__label" for="notes">Notes <span class="expense-txn__optional">(optional)</span></label>
+      <textarea id="notes" name="notes" class="expense-txn__textarea" rows="3" maxlength="255"
+        placeholder="Any extra details…"><%= fieldExpense.notes || '' %></textarea>
+    </div>
+  </div>
+
+  <div class="expense-txn__receipt<%= fieldInModal ? ' expense-txn__receipt--modal' : '' %>">
+    <%- include('receipt-upload', {
+      receiptMode: 'form',
+      receiptId: fieldInModal ? 'addExpenseReceipt' : 'expenseReceipt',
+      receiptExistingPath: (fieldIsEdit && fieldExpense.imagePath) ? fieldExpense.imagePath : '',
+      receiptInputName: 'expenseImage'
+    }) %>
+  </div>
+
+  <div class="expense-txn__actions<%= fieldInModal ? ' expense-txn__actions--centered' : '' %>">
+    <% if (fieldInModal) { %>
+      <button type="submit" class="btn expense-txn__save-btn">Save</button>
+    <% } else { %>
+      <a href="/expenses" class="btn btn--sm expense-txn__cancel-link">Cancel</a>
+      <button type="submit" class="btn btn--primary btn--sm">
+        <%= fieldIsEdit ? 'Save Changes' : 'Add Expense' %>
+      </button>
+    <% } %>
+  </div>
+</form>

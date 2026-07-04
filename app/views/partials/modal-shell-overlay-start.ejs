@@ -1,0 +1,17 @@
+<%
+  /*
+   * Shared modal shell — overlay + dialog open tags (from Add Budget modal).
+   * Params: overlayId, ariaLabelledBy
+   * Optional: overlayExtraClass, dialogExtraClass (defaults to pocketguard-style-modal)
+   */
+  var shellOverlayClass = 'spb-modal-overlay pocketguard-style-overlay';
+  if (typeof overlayExtraClass !== 'undefined' && overlayExtraClass) {
+    shellOverlayClass = 'spb-modal-overlay ' + overlayExtraClass;
+  }
+  var shellDialogClass = 'spb-modal pocketguard-style-modal';
+  if (typeof dialogExtraClass !== 'undefined' && dialogExtraClass) {
+    shellDialogClass += ' ' + dialogExtraClass;
+  }
+%>
+<div class="<%= shellOverlayClass %>" id="<%= overlayId %>" hidden>
+  <div class="<%= shellDialogClass %>" role="dialog" aria-labelledby="<%= ariaLabelledBy %>" aria-modal="true">

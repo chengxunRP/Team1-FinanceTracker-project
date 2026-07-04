@@ -1,0 +1,75 @@
+<%
+  var ruMode = (typeof receiptMode !== 'undefined' && receiptMode) ? receiptMode : 'form';
+  var ruId = (typeof receiptId !== 'undefined' && receiptId) ? receiptId : 'expenseReceipt';
+  var ruExisting = (typeof receiptExistingPath !== 'undefined' && receiptExistingPath) ? receiptExistingPath : '';
+  var ruExpenseId = (typeof receiptExpenseId !== 'undefined' && receiptExpenseId) ? String(receiptExpenseId) : '';
+  var ruInputName = (typeof receiptInputName !== 'undefined' && receiptInputName) ? receiptInputName : 'expenseImage';
+  var ruHasExisting = Boolean(ruExisting);
+%>
+<div
+  class="sw-receipt<%= ruHasExisting ? ' sw-receipt--saved' : '' %>"
+  id="<%= ruId %>"
+  data-receipt-upload
+  data-receipt-mode="<%= ruMode %>"
+  data-existing-path="<%= ruExisting %>"
+  <% if (ruExpenseId) { %>data-expense-id="<%= ruExpenseId %>"<% } %>
+>
+  <input
+    type="file"
+    name="<%= ruInputName %>"
+    id="<%= ruId %>Input"
+    accept="image/png,image/jpeg,image/jpg"
+    class="expense-upload-input-sr"
+    data-receipt-input
+  >
+  <% if (ruMode === 'form') { %>
+  <input type="hidden" name="removeImage" value="0" data-receipt-remove>
+  <% } %>
+
+  <!-- State 1: no file / no saved receipt -->
+  <div class="sw-receipt__state sw-receipt__state--empty" data-receipt-state="empty"<%= ruHasExisting ? ' hidden' : '' %>>
+    <button type="button" class="sw-receipt__row" data-receipt-pick aria-label="Attach receipt">
+      <span class="sw-receipt__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 12.5l7.2-7.2a3 3 0 114.2 4.2l-8.4 8.4a4.5 4.5 0 01-6.4-6.4l9-9a6 6 0 018.5 8.5l-9.2 9.2a7.5 7.5 0 01-10.6-10.6l8.5-8.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="sw-receipt__label">Attach receipt</span>
+      <svg class="sw-receipt__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <p class="sw-receipt__helper">PNG or JPG files with a max of 2 MB.</p>
+  </div>
+
+  <!-- State 2: file selected, not saved yet -->
+  <div class="sw-receipt__state sw-receipt__state--pending" data-receipt-state="pending" hidden>
+    <p class="sw-receipt__field-label">Attach receipt</p>
+    <div class="sw-receipt__pending-row">
+      <span class="sw-receipt__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 12.5l7.2-7.2a3 3 0 114.2 4.2l-8.4 8.4a4.5 4.5 0 01-6.4-6.4l9-9a6 6 0 018.5 8.5l-9.2 9.2a7.5 7.5 0 01-10.6-10.6l8.5-8.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="sw-receipt__filename" data-receipt-filename></span>
+      <button type="button" class="sw-receipt__icon-btn" data-receipt-clear aria-label="Clear selected file">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" class="sw-receipt__icon-btn" data-receipt-pick aria-label="Change image">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <p class="sw-receipt__helper">PNG or JPG files with a max of 2 MB.</p>
+  </div>
+
+  <!-- State 3: saved receipt -->
+  <div class="sw-receipt__state sw-receipt__state--saved" data-receipt-state="saved"<%= ruHasExisting ? '' : ' hidden' %>>
+    <div class="sw-receipt__preview-wrap">
+      <img
+        class="sw-receipt__preview"
+        data-receipt-preview
+        alt="Receipt"
+        <% if (ruHasExisting) { %>src="<%= ruExisting %>"<% } %>
+      >
+      <button type="button" class="sw-receipt__trash" data-receipt-delete aria-label="Delete receipt">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M8 7l1 12a1 1 0 001 1h4a1 1 0 001-1l1-12M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <p class="sw-receipt__feedback" data-receipt-feedback hidden></p>
+</div>
