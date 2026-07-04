@@ -18,7 +18,12 @@
         <svg viewBox="0 0 24 24" fill="none" width="13" height="13" style="margin-right:0.3rem" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Edit
       </a>
-      <form method="POST" action="/expenses/<%= expense.id %>" style="display:inline;" onsubmit="return confirm('Delete this expense?')">
+      <form method="POST" action="/expenses/<%= expense.id %>" style="display:inline;"
+            data-confirm
+            data-confirm-title="Are you sure?"
+            data-confirm-message="This cannot be undone."
+            data-confirm-action-text="Delete"
+            data-confirm-type="danger">
         <input type="hidden" name="_method" value="DELETE">
         <button type="submit" class="btn btn--sm" style="background:var(--danger-light);color:var(--danger);border:1px solid transparent;cursor:pointer;font-family:inherit;">
           <svg viewBox="0 0 24 24" fill="none" width="13" height="13" style="margin-right:0.3rem" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -33,12 +38,15 @@
 
     <!-- Category badge -->
     <div class="expense-cat-pill expense-cat-pill--detail" style="--cat-color:<%= expense.category.color %>;margin-bottom:1rem;">
-      <%- include('../partials/category-icon', { catName: expense.category.displayName || expense.category.name, catIcon: expense.category.icon, catSize: 'md' }) %>
+      <%- include('../partials/category-icon', { catName: expense.category.displayName || expense.category.name, catIcon: expense.category.icon, catIconImage: expense.category.iconImage, catColor: expense.category.color, catSize: 'md' }) %>
       <%= expense.category.displayName || expense.category.name %>
     </div>
 
     <!-- Title -->
     <h2 style="margin:0 0 0.5rem;font-size:1.45rem;font-weight:800;letter-spacing:-0.03em;color:var(--text);"><%= expense.title %></h2>
+    <% if (expense.merchantName) { %>
+      <p style="margin:0 0 0.75rem;font-size:0.95rem;font-weight:600;color:var(--text-muted);"><%= expense.merchantName %></p>
+    <% } %>
 
     <!-- Amount -->
     <div style="font-size:2.5rem;font-weight:800;letter-spacing:-0.04em;color:var(--blue-mid);margin-bottom:0.65rem;line-height:1.1;"><%= formatSGD(expense.amount) %></div>

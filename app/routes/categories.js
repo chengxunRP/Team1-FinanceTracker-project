@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const store = require('../expenseStore');
 const db = require('../config/db');
+const uploadCategoryIcon = require('../middleware/categoryIconUpload');
 
 const AVAILABLE_ICONS = [
   'food', 'transport', 'school', 'shopping',
@@ -44,6 +45,77 @@ async function categoriesWithStats() {
     total: Number(row.total),
   }));
 }
+
+// POST /categories/api — create custom category for budget modal
+router.post('/api', uploadCategoryIcon, async (req, res) => {
+  try {
+    if (req.uploadError) {
+      return res.status(400).json({ success: false, errors: [req.uploadError] });
+    }
+    const iconImagePath = req.file ? '/uploads/category-icons/' + req.file.filename : null;
+    const visualType = String(req.body.visualType || 'none').toLowerCase();
+    const category = await store.createCategory(req.body.name, {
+      visualType: iconImagePath && visualType !== 'color' ? 'image' : visualType,
+      color: req.body.color,
+      iconImagePath,
+    });
+    res.json({ success: true, category });
+  } catch (error) {
+    console.error('Database error creating category via API:', error);
+    const message = error.message || 'Unable to save category right now. Please try again.';
+    const status = error.code === 'VALIDATION' || error.code === 'DUPLICATE' ? 400 : 500;
+    res.status(status).json({ success: false, errors: [message] });
+  }
+});
+
+// PUT /categories/api/:id — update custom category
+router.put('/api/:id', uploadCategoryIcon, async (req, res) => {
+  try {
+    if (req.uploadError) {
+      return res.status(400).json({ success: false, errors: [req.uploadError] });
+    }
+    const payload = {
+      name: req.body.name,
+      visualType: req.body.visualType,
+      color: req.body.color,
+    };
+    if (req.file) {
+      payload.iconImagePath = '/uploads/category-icons/' + req.file.filename;
+    }
+    const category = await store.updateCustomCategory(req.params.id, payload);
+    res.json({ success: true, category });
+  } catch (error) {
+    console.error('Database error updating category via API:', error);
+    const message = error.message || 'Unable to update category right now. Please try again.';
+    const status =
+      error.code === 'VALIDATION' ||
+      error.code === 'DUPLICATE' ||
+      error.code === 'NOT_ALLOWED'
+        ? 400
+        : error.code === 'NOT_FOUND'
+          ? 404
+          : 500;
+    res.status(status).json({ success: false, errors: [message] });
+  }
+});
+
+// DELETE /categories/api/:id — JSON delete custom category
+router.delete('/api/:id', async (req, res) => {
+  try {
+    const result = await store.deleteCustomCategory(req.params.id);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Database error deleting category via API:', error);
+    const message = error.message || 'Unable to delete category right now. Please try again.';
+    const status =
+      error.code === 'NOT_ALLOWED'
+        ? 400
+        : error.code === 'NOT_FOUND'
+          ? 404
+          : 500;
+    res.status(status).json({ success: false, errors: [message] });
+  }
+});
 
 // GET /categories
 router.get('/', async (req, res) => {

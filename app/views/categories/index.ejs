@@ -61,7 +61,12 @@
                   Edit
                 </a>
                 <% if (cat.count === 0) { %>
-                  <form method="POST" action="/categories/<%= cat.id %>" style="display:inline;" onsubmit="return confirm('Delete this category?')">
+                  <form method="POST" action="/categories/<%= cat.id %>" style="display:inline;"
+                        data-confirm
+                        data-confirm-title="Are you sure?"
+                        data-confirm-message="This cannot be undone."
+                        data-confirm-action-text="Delete"
+                        data-confirm-type="danger">
                     <input type="hidden" name="_method" value="DELETE">
                     <button type="submit"
                       style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.3rem 0.65rem;border-radius:var(--radius-sm);font-size:0.78rem;font-weight:600;background:var(--danger-light);color:var(--danger);border:none;cursor:pointer;transition:all 0.15s;font-family:inherit;"

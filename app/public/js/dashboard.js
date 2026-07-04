@@ -95,6 +95,7 @@
     var total = 0;
 
     for (var i = 0; i < expenses.length; i++) {
+      if (expenses[i] && expenses[i].isExcludedFromBudget) continue;
       total += Number(expenses[i].amount) || 0;
     }
 
@@ -213,6 +214,7 @@
     var totals = {};
 
     for (var i = 0; i < expenses.length; i++) {
+      if (expenses[i] && expenses[i].isExcludedFromBudget) continue;
       var cat = expenses[i].category || "Other";
       totals[cat] = (totals[cat] || 0) + (Number(expenses[i].amount) || 0);
     }
@@ -357,7 +359,8 @@
         source: getExpenseSource(expense),
         date: formatExpenseDate(expense),
         amount: Number(expense.amount) || 0,
-        color: getCategoryColor(expense.category)
+        color: getCategoryColor(expense.category),
+        isExcludedFromBudget: Boolean(expense.isExcludedFromBudget),
       };
     });
   }
@@ -374,6 +377,7 @@
         var dayIndex = (day.getDay() + 6) % 7;
 
         for (var i = 0; i < expenses.length; i++) {
+          if (expenses[i] && expenses[i].isExcludedFromBudget) continue;
           var expenseDate = getExpenseDate(expenses[i]);
 
           if (
@@ -388,6 +392,7 @@
       }
     } else {
       for (var j = 0; j < expenses.length; j++) {
+        if (expenses[j] && expenses[j].isExcludedFromBudget) continue;
         amounts[j % 7] += Number(expenses[j].amount) || 0;
       }
     }
@@ -602,7 +607,7 @@
 
     for (var i = 0; i < transactions.length; i++) {
       var row = transactions[i];
-      html += '<li class="dash-txn-item">';
+      html += '<li class="dash-txn-item' + (row.isExcludedFromBudget ? " is-not-counted" : "") + '">';
       html += renderCategoryIcon(row.category, "sm");
       html += '<div class="dash-txn-main">';
       html += '<span class="dash-txn-cat">' + row.description + "</span>";
@@ -816,6 +821,34 @@
     initCardMenus();
     initFabButtons();
   }
+
+  document.addEventListener("sw-expense-updated", function (event) {
+    var detail = event.detail;
+    if (!detail || !detail.expense) return;
+
+    var fieldsChanged = detail.fieldsChanged || [];
+    var titleChanged = fieldsChanged.indexOf("title") !== -1;
+    var categoryChanged = fieldsChanged.indexOf("category") !== -1;
+    if (!titleChanged && !categoryChanged) return;
+
+    var expenseId = String(detail.expense.id);
+
+    for (var i = 0; i < allExpenses.length; i++) {
+      if (String(allExpenses[i].id) !== expenseId) continue;
+      if (titleChanged) {
+        allExpenses[i].title = detail.expense.title || "";
+        allExpenses[i].description = detail.expense.title || "";
+      }
+      if (categoryChanged) {
+        allExpenses[i].category = detail.expense.categoryName || "";
+      }
+      break;
+    }
+
+    if (document.getElementById("dashPage")) {
+      renderDashboard(currentMonthIndex);
+    }
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

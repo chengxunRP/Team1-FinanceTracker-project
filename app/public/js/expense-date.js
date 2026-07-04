@@ -1,14 +1,12 @@
 (function () {
   "use strict";
 
-  var FUTURE_DATE_ERROR = "The date cannot be later than today.";
+  var INVALID_DATE_ERROR = "Please enter a valid date.";
+  var REQUIRED_DATE_ERROR = "Date is required.";
+  var COMPLETE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-  function getTodayLocalDateString() {
-    var now = new Date();
-    var year = now.getFullYear();
-    var month = String(now.getMonth() + 1).padStart(2, "0");
-    var day = String(now.getDate()).padStart(2, "0");
-    return year + "-" + month + "-" + day;
+  function isCompleteDateValue(value) {
+    return COMPLETE_DATE_PATTERN.test(value);
   }
 
   function initExpenseDateValidation() {
@@ -20,6 +18,8 @@
       return;
     }
 
+    dateInput.removeAttribute("max");
+
     function applyValidStyle() {
       dateInput.classList.remove("expense-date-input--invalid");
       dateInput.style.borderColor = "var(--grey-300)";
@@ -27,20 +27,23 @@
       dateError.textContent = "";
     }
 
-    function applyInvalidStyle() {
+    function applyInvalidStyle(message) {
       dateInput.classList.add("expense-date-input--invalid");
       dateInput.style.borderColor = "var(--danger, #dc2626)";
-      dateError.textContent = FUTURE_DATE_ERROR;
+      dateError.textContent = message;
       dateError.hidden = false;
     }
 
     function validateDate() {
-      var today = getTodayLocalDateString();
-      dateInput.max = today;
-
       var value = dateInput.value;
-      if (value && value > today) {
-        applyInvalidStyle();
+
+      if (!value) {
+        applyInvalidStyle(REQUIRED_DATE_ERROR);
+        return false;
+      }
+
+      if (!isCompleteDateValue(value)) {
+        applyInvalidStyle(INVALID_DATE_ERROR);
         return false;
       }
 
@@ -48,9 +51,8 @@
       return true;
     }
 
-    dateInput.max = getTodayLocalDateString();
+    dateInput.addEventListener("blur", validateDate);
     dateInput.addEventListener("change", validateDate);
-    dateInput.addEventListener("input", validateDate);
 
     form.addEventListener("submit", function (event) {
       if (!validateDate()) {
@@ -59,7 +61,9 @@
       }
     });
 
-    validateDate();
+    if (isCompleteDateValue(dateInput.value)) {
+      applyValidStyle();
+    }
   }
 
   if (document.readyState === "loading") {

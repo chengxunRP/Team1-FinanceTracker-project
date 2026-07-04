@@ -9,11 +9,7 @@ const {
   buildBudgetSummary,
   getMonthlyHealthStatus,
 } = require("./budgetHelpers");
-const {
-  validateItemInput,
-  getSpendingRecommendation,
-  getFinanceSnapshot,
-} = require("./recommendationHelpers");
+const { getFinanceSnapshot } = require("./recommendationHelpers");
 const {
   SUGGESTED_QUESTIONS,
   buildFinBotReply,
@@ -28,15 +24,46 @@ const {
 } = require("./chatHistory");
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
-const { getCategoryDisplayNames } = require("./categoryHelpers");
 const financeHelpers = require("./financeHelpers");
-const { getCategoryImageUrl } = require("./categoryImageHelpers");
+const { getCategoryImageUrl, getCategoryVisual } = require("./categoryImageHelpers");
+const {
+  getTodayDateString,
+  getDefaultExpenseDateForBudgetMonth,
+} = require("./expenseValidationHelpers");
+const {
+  getIconMarkup,
+  isValidCustomIconKey,
+  LEGACY_STANDARD_ICONS,
+  getIconLibraryForClient,
+} = require("./customCategoryIcons");
+
+function getCustomCategoryIconMarkup(icon, size) {
+  if (
+    !icon ||
+    icon === "default-category" ||
+    !isValidCustomIconKey(icon) ||
+    LEGACY_STANDARD_ICONS.includes(icon)
+  ) {
+    return "";
+  }
+  return getIconMarkup(icon, size || "md");
+}
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+
+app.get("/js/custom-category-icon-data.js", function (req, res) {
+  res.type("application/javascript");
+  res.send(
+    "window.__SW_ICON_LIBRARY__=" +
+      JSON.stringify(getIconLibraryForClient()) +
+      ";"
+  );
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -48,6 +75,8 @@ app.use(function(req, res, next) {
     if (typeof locals === 'function') { cb = locals; locals = {}; }
     locals = locals || {};
     locals.getCategoryImageUrl = getCategoryImageUrl;
+    locals.getCategoryVisual = getCategoryVisual;
+    locals.getCustomCategoryIconMarkup = getCustomCategoryIconMarkup;
     var _cb = cb || function(err, str) {
       if (err) return next(err);
       res.send(str);
@@ -116,7 +145,9 @@ async function getBudgetPageData(budgetMonth) {
   const categorySpending = budgetStore.getCategorySpendingRows(spendingByCategoryId, categories);
   const categorySetupRows = await budgetStore.getCategorySetupRows(month, categories);
   const monthBudgets = await budgetStore.getCategoryBudgets(month);
-  const budgetedCategoryIds = monthBudgets.map((b) => b.categoryId);
+  const budgetedCategoryIds = monthBudgets
+    .filter((b) => budgetStore.isBudgetActiveForMonth(b, month))
+    .map((b) => b.categoryId);
   const everythingElse = budgetStore.getEverythingElseData(
     categories,
     budgetedCategoryIds,
@@ -226,13 +257,17 @@ app.get("/budget", async (req, res) => {
     const selectedMonth = budgetStore.normalizeBudgetMonth(
       req.query.month || budgetStore.getCurrentBudgetMonth()
     );
-    const pageData = await getBudgetPageData(selectedMonth);
+    const [pageData, overallBudgetSection] = await Promise.all([
+      getBudgetPageData(selectedMonth),
+      budgetStore.getOverallBudgetSectionData(selectedMonth),
+    ]);
     const successMessage =
       req.query.saved === "1" ? "Budgets saved successfully." : "";
     res.render("budget", {
       pageTitle: "Spending & Budgets",
       activePage: "budget",
       ...pageData,
+      overallBudgetSection,
       errors: [],
       successMessage,
     });
@@ -248,6 +283,7 @@ app.get("/budget", async (req, res) => {
       categorySpending: [],
       categorySetupRows: [],
       monthExpenseCount: 0,
+      overallBudgetSection: null,
       budgetMonth: budgetStore.getCurrentBudgetMonth(),
       budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
         budgetStore.getCurrentBudgetMonth()
@@ -473,7 +509,7 @@ app.post("/budget/setup", async (req, res) => {
 
 app.post("/budget/add", async (req, res) => {
   const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
-  const { categoryId, amount } = req.body;
+  const { categoryId, amount, rolloverEnabled } = req.body;
   const validation = validateCategoryBudgetAmount(amount);
 
   if (!categoryId) {
@@ -485,10 +521,62 @@ app.post("/budget/add", async (req, res) => {
   }
 
   try {
-    await budgetStore.setCategoryBudget(categoryId, budgetMonth, validation.budget);
-    res.json({ success: true, redirect: `/budget?month=${encodeURIComponent(budgetMonth)}&saved=1` });
+    const categories = await expenseStore.getCategories();
+    const category = categories.find((cat) => String(cat.id) === String(categoryId));
+    if (!category) {
+      return res.status(400).json({ errors: ["Category not found."] });
+    }
+
+    const existing = await budgetStore.getActiveBudgetForCategory(categoryId);
+    if (existing) {
+      return res.status(400).json({
+        errors: [
+          "This category already has an active budget. Edit the existing budget instead.",
+        ],
+      });
+    }
+
+    await budgetStore.createCategoryBudget(
+      categoryId,
+      validation.budget,
+      Boolean(rolloverEnabled)
+    );
+    res.json({
+      success: true,
+      redirect: `/budget?month=${encodeURIComponent(budgetMonth)}&saved=1`,
+    });
   } catch (error) {
     console.error("Database error adding category budget:", error);
+    if (error.code === "DUPLICATE") {
+      return res.status(400).json({ errors: [error.message] });
+    }
+    res.status(500).json({ errors: ["Unable to save budget. Please try again."] });
+  }
+});
+
+app.post("/budget/add-overall", async (req, res) => {
+  const { amount, rolloverEnabled, monthFromUrl } = req.body;
+  const validation = validateCategoryBudgetAmount(amount);
+
+  if (!validation.valid) {
+    return res.status(400).json({ errors: validation.errors });
+  }
+
+  try {
+    await budgetStore.saveOverallMonthlyBudget(
+      validation.budget,
+      Boolean(rolloverEnabled)
+    );
+
+    const redirect = monthFromUrl
+      ? `/budget?month=${encodeURIComponent(
+          budgetStore.normalizeBudgetMonth(req.body.budgetMonth)
+        )}`
+      : "/budget";
+
+    res.json({ success: true, redirect });
+  } catch (error) {
+    console.error("Database error saving overall monthly budget:", error);
     res.status(500).json({ errors: ["Unable to save budget. Please try again."] });
   }
 });
@@ -510,25 +598,223 @@ app.get("/budget/everything-else", async (req, res) => {
   const budgetMonth = budgetStore.normalizeBudgetMonth(
     req.query.month || budgetStore.getCurrentBudgetMonth()
   );
+  const returnMonth = req.query.returnMonth
+    ? budgetStore.normalizeBudgetMonth(req.query.returnMonth)
+    : null;
 
   try {
-    const categories = await expenseStore.getCategories();
+    const [categories, spendingByCategoryId, pickerData] = await Promise.all([
+      expenseStore.getCategories(),
+      budgetStore.getSpendingTotalsByCategoryId(budgetMonth),
+      expenseStore.getCategoriesForPicker(),
+    ]);
 
-    const detail = await budgetStore.getEverythingElseDetailData(
-      budgetMonth,
-      categories
-    );
+    const [detail, availableCategories, activeOverallBudget, monthOptions] =
+      await Promise.all([
+      budgetStore.getEverythingElseDetailData(budgetMonth, categories),
+      budgetStore.getAvailableCategoriesForBudget(
+        budgetMonth,
+        categories,
+        spendingByCategoryId
+      ),
+      budgetStore.getActiveOverallMonthlyBudget(),
+      budgetStore.getEverythingElseMonthOptions(budgetMonth),
+    ]);
 
     res.render("budget-everything-else", {
       pageTitle: "Everything else",
       activePage: "budget",
       budgetMonth,
+      returnMonth,
       budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+      monthOptions,
       detail,
+      availableCategories,
+      categories,
+      customCategories: pickerData.customCategories,
+      generalCategories: pickerData.generalCategories,
+      hasOverallBudget: Boolean(activeOverallBudget),
     });
   } catch (error) {
     console.error("Database error loading everything else detail:", error);
+    const backUrl = returnMonth
+      ? `/budget?month=${encodeURIComponent(returnMonth)}`
+      : "/budget";
+    res.redirect(backUrl);
+  }
+});
+
+app.get("/budget/all-categories", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+
+  try {
+    const [detail, pickerData, overallBudget] = await Promise.all([
+      budgetStore.getOverallBudgetDetailData(budgetMonth),
+      expenseStore.getCategoriesForPicker(),
+      budgetStore.getActiveOverallMonthlyBudget(),
+    ]);
+
+    if (!detail) {
+      return res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+    }
+
+    if (detail.inactive) {
+      const nav = budgetStore.getBudgetMonthNavigation(budgetMonth, detail.startMonth);
+      return res.render("budget-all-categories", {
+        pageTitle: "All Transactions",
+        activePage: "budget",
+        budgetMonth,
+        budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+        budgetInactive: true,
+        budgetStartMonth: detail.startMonth,
+        budgetStartMonthLabel: budgetStore.formatBudgetMonthLabel(detail.startMonth),
+        backMonth: nav.backMonth,
+        detail: null,
+        categories: pickerData.categories,
+        customCategories: pickerData.customCategories,
+        generalCategories: pickerData.generalCategories,
+        maxDate: getTodayDateString(),
+        defaultExpenseDate: getDefaultExpenseDateForBudgetMonth(budgetMonth),
+        expenseReturnTo: `/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`,
+      });
+    }
+
+    const nav = budgetStore.getBudgetMonthNavigation(budgetMonth, detail.startMonth);
+
+    res.render("budget-all-categories", {
+      pageTitle: "All Transactions",
+      activePage: "budget",
+      budgetMonth,
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+      backMonth: nav.backMonth,
+      overallBudget,
+      detail,
+      categories: pickerData.categories,
+      customCategories: pickerData.customCategories,
+      generalCategories: pickerData.generalCategories,
+      maxDate: getTodayDateString(),
+      defaultExpenseDate: getDefaultExpenseDateForBudgetMonth(budgetMonth),
+      expenseReturnTo: `/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`,
+      addExpenseError: req.query.addExpenseError === "1",
+      successMessage: req.query.saved === "1" ? "Budget updated successfully." : "",
+    });
+  } catch (error) {
+    console.error("Database error loading all categories budget detail:", error);
     res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+  }
+});
+
+app.post("/budget/all-categories", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || budgetStore.getCurrentBudgetMonth()
+  );
+  const { amount } = req.body;
+  const validation = validateCategoryBudgetAmount(amount);
+
+  if (!validation.valid) {
+    return res.status(400).json({ errors: validation.errors });
+  }
+
+  try {
+    await budgetStore.updateOverallMonthlyBudgetAmount(validation.budget);
+    res.json({
+      success: true,
+      redirect: `/budget/all-categories?month=${encodeURIComponent(budgetMonth)}&saved=1`,
+    });
+  } catch (error) {
+    console.error("Database error updating all categories budget:", error);
+    if (error.code === "NOT_FOUND") {
+      return res.status(404).json({ errors: [error.message] });
+    }
+    res.status(500).json({ errors: ["Unable to update budget. Please try again."] });
+  }
+});
+
+app.delete("/budget/all-categories", async (req, res) => {
+  const monthParam = req.query.month;
+  const budgetMonth = monthParam
+    ? budgetStore.normalizeBudgetMonth(monthParam)
+    : null;
+
+  try {
+    await budgetStore.deactivateOverallMonthlyBudget();
+    const redirect = budgetMonth
+      ? `/budget?month=${encodeURIComponent(budgetMonth)}`
+      : "/budget";
+    res.json({ success: true, redirect });
+  } catch (error) {
+    console.error("Database error deleting all categories budget:", error);
+    res.status(500).json({ errors: ["Unable to delete budget. Please try again."] });
+  }
+});
+
+app.post("/budget/all-categories/enable-rollover", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+
+  try {
+    await budgetStore.setOverallMonthlyBudgetRollover(true);
+    res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
+  } catch (error) {
+    console.error("Database error enabling all categories budget rollover:", error);
+    if (error.code === "NOT_FOUND") {
+      return res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+    }
+    res.status(500).send("Unable to enable rollover. Please try again.");
+  }
+});
+
+app.post("/budget/all-categories/disable-rollover", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+
+  try {
+    await budgetStore.setOverallMonthlyBudgetRollover(false);
+    res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
+  } catch (error) {
+    console.error("Database error disabling all categories budget rollover:", error);
+    if (error.code === "NOT_FOUND") {
+      return res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+    }
+    res.status(500).send("Unable to disable rollover. Please try again.");
+  }
+});
+
+app.post("/budget/all-categories/reset-rollover", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+
+  try {
+    await budgetStore.resetOverallRolloverForMonth(budgetMonth);
+    res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
+  } catch (error) {
+    console.error("Database error resetting all categories budget rollover:", error);
+    if (error.code === "NOT_FOUND" || error.code === "ROLLOVER_OFF") {
+      return res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
+    }
+    res.status(500).send("Unable to reset rollover. Please try again.");
+  }
+});
+
+app.post("/budget/all-categories/undo-reset-rollover", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+
+  try {
+    await budgetStore.undoOverallResetRolloverForMonth(budgetMonth);
+    res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
+  } catch (error) {
+    console.error("Database error undoing all categories budget rollover reset:", error);
+    if (error.code === "NOT_FOUND" || error.code === "ROLLOVER_OFF") {
+      return res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
+    }
+    res.status(500).send("Unable to undo reset rollover. Please try again.");
   }
 });
 
@@ -539,8 +825,9 @@ app.get("/budget/categories/:id", async (req, res) => {
   const categoryId = req.params.id;
 
   try {
-    const [categories, spendingByCategoryId] = await Promise.all([
+    const [categories, pickerData, spendingByCategoryId] = await Promise.all([
       expenseStore.getCategories(),
+      expenseStore.getCategoriesForPicker(),
       budgetStore.getSpendingTotalsByCategoryId(budgetMonth),
     ]);
 
@@ -555,12 +842,43 @@ app.get("/budget/categories/:id", async (req, res) => {
       return res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
     }
 
+    if (detail.inactive) {
+      const nav = budgetStore.getBudgetMonthNavigation(budgetMonth, detail.startMonth);
+      return res.render("budget-category", {
+        pageTitle: detail.category.displayName,
+        activePage: "budget",
+        budgetMonth,
+        budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+        budgetInactive: true,
+        budgetStartMonth: detail.startMonth,
+        budgetStartMonthLabel: budgetStore.formatBudgetMonthLabel(detail.startMonth),
+        backMonth: nav.backMonth,
+        detail: { category: detail.category },
+        categories,
+        customCategories: pickerData.customCategories,
+        generalCategories: pickerData.generalCategories,
+        maxDate: getTodayDateString(),
+        defaultExpenseDate: getDefaultExpenseDateForBudgetMonth(budgetMonth),
+        expenseReturnTo: `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`,
+      });
+    }
+
+    const nav = budgetStore.getBudgetMonthNavigation(budgetMonth, detail.startMonth);
+
     res.render("budget-category", {
       pageTitle: detail.category.displayName,
       activePage: "budget",
       budgetMonth,
       budgetMonthLabel: budgetStore.formatBudgetMonthLabel(budgetMonth),
+      backMonth: nav.backMonth,
       detail,
+      categories,
+      customCategories: pickerData.customCategories,
+      generalCategories: pickerData.generalCategories,
+      maxDate: getTodayDateString(),
+      defaultExpenseDate: getDefaultExpenseDateForBudgetMonth(budgetMonth),
+      expenseReturnTo: `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`,
+      addExpenseError: req.query.addExpenseError === "1",
       successMessage: req.query.saved === "1" ? "Budget updated successfully." : "",
     });
   } catch (error) {
@@ -569,10 +887,94 @@ app.get("/budget/categories/:id", async (req, res) => {
   }
 });
 
+app.post("/budget/categories/:id/enable-rollover", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+  const categoryId = req.params.id;
+
+  try {
+    await budgetStore.setCategoryBudgetRollover(categoryId, true);
+    res.redirect(
+      `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
+    );
+  } catch (error) {
+    console.error("Database error enabling category budget rollover:", error);
+    if (error.code === "NOT_FOUND") {
+      return res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+    }
+    res.status(500).send("Unable to enable rollover. Please try again.");
+  }
+});
+
+app.post("/budget/categories/:id/disable-rollover", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+  const categoryId = req.params.id;
+
+  try {
+    await budgetStore.setCategoryBudgetRollover(categoryId, false);
+    res.redirect(
+      `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
+    );
+  } catch (error) {
+    console.error("Database error disabling category budget rollover:", error);
+    if (error.code === "NOT_FOUND") {
+      return res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}`);
+    }
+    res.status(500).send("Unable to disable rollover. Please try again.");
+  }
+});
+
+app.post("/budget/categories/:id/reset-rollover", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+  const categoryId = req.params.id;
+
+  try {
+    await budgetStore.resetRolloverForMonth(categoryId, budgetMonth);
+    res.redirect(
+      `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
+    );
+  } catch (error) {
+    console.error("Database error resetting category budget rollover:", error);
+    if (error.code === "NOT_FOUND" || error.code === "ROLLOVER_OFF") {
+      return res.redirect(
+        `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
+      );
+    }
+    res.status(500).send("Unable to reset rollover. Please try again.");
+  }
+});
+
+app.post("/budget/categories/:id/undo-reset-rollover", async (req, res) => {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    req.body.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+  const categoryId = req.params.id;
+
+  try {
+    await budgetStore.undoResetRolloverForMonth(categoryId, budgetMonth);
+    res.redirect(
+      `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
+    );
+  } catch (error) {
+    console.error("Database error undoing category budget rollover reset:", error);
+    if (error.code === "NOT_FOUND" || error.code === "ROLLOVER_OFF") {
+      return res.redirect(
+        `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
+      );
+    }
+    res.status(500).send("Unable to undo reset rollover. Please try again.");
+  }
+});
+
 app.post("/budget/categories/:id", async (req, res) => {
   const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
   const categoryId = req.params.id;
-  const { amount } = req.body;
+  const { amount, rolloverEnabled } = req.body;
   const validation = validateCategoryBudgetAmount(amount);
 
   if (!validation.valid) {
@@ -580,21 +982,23 @@ app.post("/budget/categories/:id", async (req, res) => {
   }
 
   try {
-    await budgetStore.setCategoryBudget(categoryId, budgetMonth, validation.budget);
+    await budgetStore.updateCategoryBudget(
+      categoryId,
+      validation.budget,
+      rolloverEnabled === undefined ? undefined : Boolean(rolloverEnabled)
+    );
     res.json({
       success: true,
       redirect: `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}&saved=1`,
     });
   } catch (error) {
     console.error("Database error updating category budget:", error);
+    if (error.code === "NOT_FOUND") {
+      return res.status(404).json({ errors: [error.message] });
+    }
     res.status(500).json({ errors: ["Unable to update budget. Please try again."] });
   }
 });
-
-async function getRecommendationCategories() {
-  const categories = await expenseStore.getCategories();
-  return getCategoryDisplayNames(categories);
-}
 
 function ensureFinanceSnapshot(summary, financeSnapshotOrExpenses, categories, spendingByCategoryId) {
   if (
@@ -625,6 +1029,7 @@ function ensureFinanceSnapshot(summary, financeSnapshotOrExpenses, categories, s
 
     for (let i = 0; i < expenses.length; i++) {
       const expense = expenses[i];
+      if (expense.isExcludedFromBudget) continue;
       totals[expense.category] = (totals[expense.category] || 0) + expense.amount;
     }
 
@@ -652,85 +1057,6 @@ function ensureFinanceSnapshot(summary, financeSnapshotOrExpenses, categories, s
 
   return snapshot;
 }
-
-app.get("/recommendation", async (req, res) => {
-  try {
-    const { summary, financeSnapshot, budgetMonthLabel } = await getBudgetPageData();
-    const categories = await getRecommendationCategories();
-
-    res.render("recommendation", {
-      pageTitle: "Purchase Checker",
-      activePage: "recommendation",
-      summary,
-      financeSnapshot,
-      budgetMonthLabel,
-      categories,
-      errors: [],
-    });
-  } catch (error) {
-    console.error("Database error loading purchase checker:", error);
-    renderDbError(res, "recommendation", {
-      pageTitle: "Purchase Checker",
-      activePage: "recommendation",
-      summary: buildBudgetSummary(0, []),
-      financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
-      categories: [],
-    });
-  }
-});
-
-app.post("/recommendation", async (req, res) => {
-  const { itemName, itemPrice, category } = req.body;
-
-  try {
-    const pageData = await getBudgetPageData();
-    const { summary, expensesInMonth, financeSnapshot, budgetMonthLabel } = pageData;
-    const validation = validateItemInput(itemName, itemPrice, category);
-    const categories = await getRecommendationCategories();
-
-    if (!validation.valid) {
-      return res.render("recommendation", {
-        pageTitle: "Purchase Checker",
-        activePage: "recommendation",
-        summary,
-        financeSnapshot,
-        budgetMonthLabel,
-        categories,
-        errors: validation.errors,
-        formValues: { itemName, itemPrice, category },
-      });
-    }
-
-    const recommendation = getSpendingRecommendation(summary, expensesInMonth, {
-      itemName: validation.itemName,
-      itemPrice: validation.itemPrice,
-      category: validation.category,
-    });
-
-    res.render("recommendation", {
-      pageTitle: "Purchase Checker",
-      activePage: "recommendation",
-      summary,
-      financeSnapshot,
-      budgetMonthLabel,
-      categories,
-      errors: [],
-      recommendation,
-      formValues: { itemName, itemPrice, category },
-    });
-  } catch (error) {
-    console.error("Database error processing purchase checker:", error);
-    res.status(500).render("recommendation", {
-      pageTitle: "Purchase Checker",
-      activePage: "recommendation",
-      summary: buildBudgetSummary(0, []),
-      financeSnapshot: ensureFinanceSnapshot(buildBudgetSummary(0, []), []),
-      categories: [],
-      errors: ["Unable to process recommendation right now. Please try again."],
-      formValues: { itemName, itemPrice, category },
-    });
-  }
-});
 
 function renderChatbotPage(
   res,
@@ -893,6 +1219,20 @@ app.use('/expenses',   expenseRoutes);
 app.use('/categories', categoryRoutes);
 // --- End Expense CRUD routes ---
 
-app.listen(PORT, () => {
+const server = app.listen(PORT);
+
+server.on("listening", () => {
   console.log(`spendWise running at http://localhost:${PORT}`);
+});
+
+server.on("error", (err) => {
+  if (err && err.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use.`);
+    console.error("Close the other terminal running node/nodemon, or run:");
+    console.error("netstat -ano | findstr :3000");
+    console.error("taskkill /PID <PID> /F");
+  } else {
+    console.error(err);
+  }
+  process.exit(1);
 });

@@ -45,7 +45,8 @@ function getCategoryTotal(expenses, category) {
   let total = 0;
 
   for (let i = 0; i < expenses.length; i++) {
-    if (categoryNamesMatch(expenses[i].category, category)) {
+    if (!expenses[i].isExcludedFromBudget &&
+        categoryNamesMatch(expenses[i].category, category)) {
       total += expenses[i].amount;
     }
   }
@@ -57,6 +58,7 @@ function getSpendingByCategory(expenses) {
   const totals = {};
 
   for (let i = 0; i < expenses.length; i++) {
+    if (expenses[i].isExcludedFromBudget) continue;
     const cat = expenses[i].category;
     totals[cat] = (totals[cat] || 0) + expenses[i].amount;
   }

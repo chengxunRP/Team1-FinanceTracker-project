@@ -1,0 +1,216 @@
+/*
+ * Shared modal shell — extracted from the working Add Budget modal.
+ *
+ * HTML structure (reference):
+ *   <div class="spb-modal-overlay pocketguard-style-overlay" id="…" hidden>
+ *     <div class="spb-modal pocketguard-style-modal" role="dialog" aria-labelledby="…" aria-modal="true">
+ *       <header class="spb-modal__header">…</header>
+ *       <div class="spb-modal__body pocketguard-style-modal-body">…</div>
+ *     </div>
+ *   </div>
+ *
+ * Scroll: overlay scrolls (overflow-y: auto); card does not scroll internally.
+ * Body lock: add class "modal-open" on html/body via SwModalScroll (modal-scroll.js).
+ */
+
+/* --- Background scroll lock while any modal overlay is open --- */
+
+html.modal-open,
+body.modal-open {
+  overflow: hidden;
+}
+
+html.modal-open .app-sidebar,
+html.modal-open .app-main,
+body.modal-open .app-sidebar,
+body.modal-open .app-main {
+  overflow: hidden;
+}
+
+html:has(.spb-modal-overlay:not([hidden])),
+body:has(.spb-modal-overlay:not([hidden])) {
+  overflow: hidden;
+}
+
+html:has(.spb-modal-overlay:not([hidden])) .app-sidebar,
+html:has(.spb-modal-overlay:not([hidden])) .app-main,
+body:has(.spb-modal-overlay:not([hidden])) .app-sidebar,
+body:has(.spb-modal-overlay:not([hidden])) .app-main {
+  overflow: hidden;
+}
+
+/* --- Overlay (full-viewport scroll container) --- */
+
+.spb-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 48px 16px;
+  box-sizing: border-box;
+}
+
+.spb-modal-overlay > .spb-modal {
+  margin: 0 auto;
+  width: 100%;
+}
+
+.spb-modal-overlay > .spb-alert {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 360px;
+}
+
+.spb-modal-overlay:not(.pocketguard-style-overlay) {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.spb-modal-overlay[hidden] {
+  display: none;
+}
+
+.spb-modal-overlay.pocketguard-style-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.spb-modal-overlay--alert {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 600px) {
+  .spb-modal-overlay {
+    padding: 24px 12px;
+  }
+}
+
+/* --- Card (centered in overlay, no internal scroll) --- */
+
+.pocketguard-style-modal {
+  width: 100%;
+  max-width: min(460px, calc(100vw - 32px));
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.spb-modal.pocketguard-style-modal {
+  max-width: min(460px, calc(100vw - 32px));
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.pocketguard-style-modal .spb-modal__header {
+  flex-shrink: 0;
+}
+
+.pocketguard-style-modal .spb-modal__search {
+  flex-shrink: 0;
+}
+
+.pocketguard-style-modal-body,
+.pocketguard-style-modal .pocketguard-style-modal-body,
+.pocketguard-style-modal .spb-modal__body {
+  flex: 0 0 auto;
+  overflow: visible;
+  max-height: none;
+}
+
+@media (max-width: 600px) {
+  .pocketguard-style-modal {
+    border-radius: 14px;
+  }
+}
+
+/* --- Shell chrome (same as Add Budget header/body; wins when loaded after spb.css) --- */
+
+.spb-modal-overlay.pocketguard-style-overlay > .spb-modal.pocketguard-style-modal {
+  width: 100%;
+  max-width: min(460px, calc(100vw - 32px));
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  background: var(--white);
+  overflow: visible;
+}
+
+.pocketguard-style-modal .spb-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.pocketguard-style-modal .spb-modal__title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.pocketguard-style-modal .spb-modal__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pocketguard-style-modal .spb-modal__close:hover {
+  background: var(--grey-100);
+}
+
+.pocketguard-style-modal .spb-modal__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pocketguard-style-modal .spb-modal__body {
+  overflow: visible;
+  padding: 0 1.15rem 1.15rem;
+}
+
+.pocketguard-style-modal .spb-modal__intro {
+  margin: 0 0 1rem;
+  padding-top: 0.85rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.pocketguard-style-modal .spb-modal__errors {
+  margin-bottom: 1rem;
+}
+
+/* Transaction detail popup — same card shell & overlay scroll as Add Budget */
+.pocketguard-style-modal.transaction-detail-modal {
+  padding: 0;
+  overflow: visible;
+  max-height: none;
+}
+
+.pocketguard-style-modal.transaction-detail-modal > .transaction-detail-modal__hero {
+  flex-shrink: 0;
+}
+
+.pocketguard-style-modal.transaction-detail-modal > .transaction-detail-modal__body,
+.pocketguard-style-modal.transaction-detail-modal > .spb-modal__body.transaction-detail-modal__body {
+  flex: 0 0 auto;
+  overflow: visible;
+  max-height: none;
+}

@@ -1,0 +1,13 @@
+<%
+  /*
+   * Shared modal header — title + close button (from Add Budget modal).
+   * Params: title, titleId, closeId
+   * Optional: headerId, headerExtraClass
+   */
+%>
+<header class="spb-modal__header<% if (typeof headerExtraClass !== 'undefined' && headerExtraClass) { %> <%= headerExtraClass %><% } %>"<% if (typeof headerId !== 'undefined' && headerId) { %> id="<%= headerId %>"<% } %>>
+  <h2 class="spb-modal__title" id="<%= titleId %>"><%= title %></h2>
+  <button type="button" class="spb-modal__close" id="<%= closeId %>" aria-label="Close">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+</header>
