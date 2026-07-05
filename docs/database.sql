@@ -82,6 +82,23 @@ CREATE TABLE IF NOT EXISTS monthly_budget (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
+-- Table: savings_goals
+-- One savings target per month. Progress is calculated from monthly_budget minus
+-- counted expenses for the selected month.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS savings_goals (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  goal_month    CHAR(7)       NOT NULL COMMENT 'YYYY-MM',
+  title         VARCHAR(120)  NOT NULL DEFAULT 'Monthly savings goal',
+  target_amount DECIMAL(10,2) NOT NULL,
+  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uq_savings_goals_month (goal_month),
+  INDEX idx_savings_goals_month (goal_month)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
 -- Table: chat_sessions
 -- FinBot chat sessions (currently in-memory in app/chatHistory.js).
 -- session_id matches the finbotSession cookie UUID from app/sessionCookie.js.
@@ -174,6 +191,7 @@ ON DUPLICATE KEY UPDATE amount = VALUES(amount);
 -- JOIN categories c ON c.id = e.category_id
 -- ORDER BY e.expense_date DESC;
 -- SELECT * FROM monthly_budget;
+-- SELECT * FROM savings_goals ORDER BY goal_month DESC;
 -- SELECT cs.session_id, cm.sender, cm.message_text, cm.created_at
 -- FROM chat_messages cm
 -- JOIN chat_sessions cs ON cs.id = cm.session_id

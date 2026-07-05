@@ -190,6 +190,26 @@ LOCK TABLES `monthly_budget` WRITE;
 INSERT INTO `monthly_budget` VALUES (1,1000.00,'2026-06-25 15:12:55');
 /*!40000 ALTER TABLE `monthly_budget` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `savings_goals`
+--
+
+DROP TABLE IF EXISTS `savings_goals`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `savings_goals` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `goal_month` char(7) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'YYYY-MM',
+  `title` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Monthly savings goal',
+  `target_amount` decimal(10,2) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_savings_goals_month` (`goal_month`),
+  KEY `idx_savings_goals_month` (`goal_month`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

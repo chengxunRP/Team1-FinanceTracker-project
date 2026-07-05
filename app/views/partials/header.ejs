@@ -55,8 +55,7 @@
           <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 4h10v16H7zM9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span class="sidebar-link__label">Monthly Report</span>
         </a>
-        <%# Savings Goal: no route or DB table yet (see db/init.sql) — placeholder link only %>
-        <a href="#" class="sidebar-link sidebar-link--soon" title="Savings Goal">
+        <a href="/savings-goal" class="sidebar-link<%= activePage === 'savings-goal' ? ' sidebar-link--active' : '' %>" title="Savings Goal">
           <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.75"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
           <span class="sidebar-link__label">Savings Goal</span>
         </a>

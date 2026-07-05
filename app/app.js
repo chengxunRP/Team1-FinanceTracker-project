@@ -26,6 +26,7 @@ const {
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
 const financeHelpers = require("./financeHelpers");
+const savingsGoalStore = require("./savingsGoalStore");
 const { getCategoryImageUrl, getCategoryVisual } = require("./categoryImageHelpers");
 const {
   getTodayDateString,
@@ -189,6 +190,32 @@ function renderDbError(res, view, locals) {
   });
 }
 
+async function renderSavingsGoalPage(req, res, options = {}) {
+  const selectedMonth = budgetStore.normalizeBudgetMonth(
+    options.budgetMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+  const pageData = await savingsGoalStore.getSavingsGoalPageData(selectedMonth);
+  const savedMessage =
+    req.query.saved === "1" ? "Savings goal saved successfully." : "";
+  const deletedMessage =
+    req.query.deleted === "1" ? "Savings goal removed successfully." : "";
+
+  return res.status(options.statusCode || 200).render("savings-goal", {
+    pageTitle: "Savings Goal",
+    activePage: "savings-goal",
+    ...pageData,
+    errors: options.errors || [],
+    successMessage: options.successMessage || savedMessage || deletedMessage,
+    formValues:
+      options.formValues ||
+      {
+        title: pageData.goal ? pageData.goal.title : "Monthly savings goal",
+        targetAmount: pageData.goal ? pageData.goal.targetAmount : "",
+        goalMonth: selectedMonth,
+      },
+  });
+}
+
 async function renderOverviewPage(req, res) {
   try {
     const budgetMonth = budgetStore.normalizeBudgetMonth(req.query.month || undefined);
@@ -249,6 +276,107 @@ app.get("/home", async (req, res) => {
       pageTitle: "Home",
       activePage: "landing",
       summary: buildBudgetSummary(0, []),
+    });
+  }
+});
+
+app.get("/savings-goal", async (req, res) => {
+  try {
+    await renderSavingsGoalPage(req, res);
+  } catch (error) {
+    console.error("Database error loading savings goal page:", error);
+    res.status(500).render("savings-goal", {
+      pageTitle: "Savings Goal",
+      activePage: "savings-goal",
+      goal: null,
+      budgetMonth: budgetStore.getCurrentBudgetMonth(),
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
+        budgetStore.getCurrentBudgetMonth()
+      ),
+      monthlyBudget: 0,
+      totalSpent: 0,
+      availableToSave: 0,
+      targetAmount: 0,
+      savedAmount: 0,
+      remainingToGoal: 0,
+      rawProgressPct: 0,
+      progressPct: 0,
+      achieved: false,
+      statusKey: "empty",
+      statusLabel: "Unavailable",
+      statusMessage: "Savings goal data could not be loaded.",
+      errors: ["Unable to load savings goal data right now. Please try again."],
+      successMessage: "",
+      formValues: {
+        title: "Monthly savings goal",
+        targetAmount: "",
+        goalMonth: budgetStore.getCurrentBudgetMonth(),
+      },
+    });
+  }
+});
+
+app.post("/savings-goal", async (req, res) => {
+  const validation = savingsGoalStore.validateSavingsGoalInput({
+    goalMonth: req.body.goalMonth,
+    title: req.body.title,
+    targetAmount: req.body.targetAmount,
+  });
+
+  if (!validation.valid) {
+    return renderSavingsGoalPage(req, res, {
+      statusCode: 400,
+      budgetMonth: validation.values.goalMonth,
+      errors: validation.errors,
+      formValues: {
+        title: req.body.title || "",
+        targetAmount: req.body.targetAmount || "",
+        goalMonth: validation.values.goalMonth,
+      },
+    }).catch((error) => {
+      console.error("Database error reloading invalid savings goal form:", error);
+      res.status(500).send("Unable to load savings goal form. Please try again.");
+    });
+  }
+
+  try {
+    await savingsGoalStore.saveGoal(validation.values);
+    res.redirect(
+      `/savings-goal?month=${encodeURIComponent(validation.values.goalMonth)}&saved=1`
+    );
+  } catch (error) {
+    console.error("Database error saving savings goal:", error);
+    const errors =
+      error.code === "VALIDATION" && Array.isArray(error.errors)
+        ? error.errors
+        : ["Unable to save savings goal right now. Please try again."];
+    await renderSavingsGoalPage(req, res, {
+      statusCode: 500,
+      budgetMonth: validation.values.goalMonth,
+      errors,
+      formValues: {
+        title: req.body.title || "",
+        targetAmount: req.body.targetAmount || "",
+        goalMonth: validation.values.goalMonth,
+      },
+    });
+  }
+});
+
+app.post("/savings-goal/delete", async (req, res) => {
+  const goalMonth = budgetStore.normalizeBudgetMonth(
+    req.body.goalMonth || req.query.month || budgetStore.getCurrentBudgetMonth()
+  );
+
+  try {
+    await savingsGoalStore.deleteGoal(goalMonth);
+    res.redirect(`/savings-goal?month=${encodeURIComponent(goalMonth)}&deleted=1`);
+  } catch (error) {
+    console.error("Database error deleting savings goal:", error);
+    await renderSavingsGoalPage(req, res, {
+      statusCode: 500,
+      budgetMonth: goalMonth,
+      errors: ["Unable to remove savings goal right now. Please try again."],
     });
   }
 });

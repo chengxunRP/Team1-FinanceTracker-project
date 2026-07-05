@@ -5673,3 +5673,496 @@ a.dash-card--clickable {
     min-width: 120px;
   }
 }
+
+/* ----- Savings Goal Tracker ----- */
+
+.savings-page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+.savings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.savings-header__text {
+  min-width: 0;
+}
+
+.savings-eyebrow {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--blue);
+}
+
+.savings-header h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.savings-header p {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.savings-month-form {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 13rem;
+}
+
+.savings-month-form label,
+.savings-form label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.savings-month-form__control {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.savings-month-form input,
+.savings-form input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text);
+  font: inherit;
+}
+
+.savings-month-form input:focus,
+.savings-form input:focus {
+  outline: 2px solid rgba(156, 39, 176, 0.22);
+  border-color: var(--blue-mid);
+}
+
+.savings-month-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--blue);
+  color: var(--white);
+  cursor: pointer;
+}
+
+.savings-month-form button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.savings-alert {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.savings-alert p {
+  margin: 0;
+}
+
+.savings-alert p + p {
+  margin-top: 0.35rem;
+}
+
+.savings-alert--error {
+  background: var(--danger-light);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+}
+
+.savings-alert--success {
+  background: var(--green-light);
+  color: var(--green);
+  border: 1px solid var(--success-border);
+}
+
+.savings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.85fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.savings-progress-card,
+.savings-form-card,
+.savings-breakdown article {
+  background: var(--white);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.savings-progress-card {
+  min-height: 430px;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 1.5rem 2rem;
+  align-items: center;
+}
+
+.savings-progress-card__top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.savings-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--grey-100);
+  color: var(--text-muted);
+}
+
+.savings-status--success {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.savings-status--near,
+.savings-status--active {
+  background: var(--blue-light);
+  color: var(--blue);
+}
+
+.savings-status--behind {
+  background: var(--warning-light);
+  color: var(--warning-text);
+}
+
+.savings-progress-card__month {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.savings-ring {
+  --progress: 0;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      #16a34a 0 calc(var(--progress) * 1%),
+      #e5e7eb calc(var(--progress) * 1%) 100%
+    );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+.savings-ring__inner {
+  width: 142px;
+  height: 142px;
+  border-radius: 50%;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--grey-200);
+}
+
+.savings-ring__inner strong {
+  font-size: 2.2rem;
+  line-height: 1;
+  color: var(--text);
+}
+
+.savings-ring__inner span {
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.savings-progress-card__main {
+  min-width: 0;
+}
+
+.savings-progress-card__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.savings-progress-card__main strong {
+  display: block;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.05;
+  color: var(--green);
+}
+
+.savings-progress-card__main p {
+  max-width: 30rem;
+  margin: 0.75rem 0 0;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.savings-metric-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.savings-metric-row div {
+  min-width: 0;
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--grey-50);
+  border: 1px solid var(--grey-100);
+}
+
+.savings-metric-row span,
+.savings-breakdown span {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.savings-metric-row strong,
+.savings-breakdown strong {
+  color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.savings-form-card {
+  padding: 1.25rem;
+}
+
+.savings-form-card__head {
+  margin-bottom: 1rem;
+}
+
+.savings-form-card h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.15rem;
+}
+
+.savings-form-card p {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.savings-form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.savings-money-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  overflow: hidden;
+}
+
+.savings-money-input:focus-within {
+  outline: 2px solid rgba(156, 39, 176, 0.22);
+  border-color: var(--blue-mid);
+}
+
+.savings-money-input span {
+  width: 2.5rem;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--grey-50);
+  border-right: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.savings-money-input input {
+  border: none;
+  border-radius: 0;
+}
+
+.savings-money-input input:focus {
+  outline: none;
+}
+
+.savings-submit-btn,
+.savings-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.savings-submit-btn svg,
+.savings-delete-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.savings-submit-btn {
+  margin-top: 0.35rem;
+  border: none;
+  background: var(--blue);
+  color: var(--white);
+}
+
+.savings-submit-btn:hover {
+  background: var(--blue-dark);
+}
+
+.savings-delete-form {
+  margin: 0.75rem 0 0;
+}
+
+.savings-delete-btn {
+  border: 1px solid var(--danger-border);
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.savings-delete-btn:hover {
+  background: var(--danger);
+  color: var(--white);
+}
+
+.savings-breakdown {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.savings-breakdown article {
+  padding: 1rem 1.1rem;
+}
+
+.savings-breakdown article:nth-child(1) {
+  border-top: 3px solid #1d4ed8;
+}
+
+.savings-breakdown article:nth-child(2) {
+  border-top: 3px solid #dc2626;
+}
+
+.savings-breakdown article:nth-child(3) {
+  border-top: 3px solid #16a34a;
+}
+
+.savings-breakdown article:nth-child(4) {
+  border-top: 3px solid #7c3aed;
+}
+
+@media (max-width: 980px) {
+  .savings-grid,
+  .savings-breakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .savings-progress-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .savings-progress-card__top,
+  .savings-metric-row {
+    width: 100%;
+  }
+
+  .savings-progress-card__main p {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .savings-header {
+    flex-direction: column;
+  }
+
+  .savings-month-form {
+    width: 100%;
+  }
+
+  .savings-progress-card {
+    padding: 1rem;
+  }
+
+  .savings-ring {
+    width: 178px;
+    height: 178px;
+  }
+
+  .savings-ring__inner {
+    width: 120px;
+    height: 120px;
+  }
+
+  .savings-ring__inner strong {
+    font-size: 1.8rem;
+  }
+
+  .savings-metric-row {
+    grid-template-columns: 1fr;
+  }
+}
