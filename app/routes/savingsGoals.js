@@ -23,8 +23,20 @@ function buildFormValues(values = {}, month) {
   };
 }
 
+function buildSavingsPageRedirect(month, statusKey) {
+  const query = new URLSearchParams({
+    month: budgetStore.normalizeBudgetMonth(month),
+  });
+
+  if (statusKey) query.set(statusKey, "1");
+
+  return `/savings-goals?${query.toString()}#savings-goal-view`;
+}
+
 async function renderSavingsPage(res, month, locals = {}) {
   const pageData = await savingsGoalStore.getSavingsPageData(month);
+  const isEditingGoal =
+    typeof locals.isEditingGoal === "boolean" ? locals.isEditingGoal : false;
 
   return res.render("savings-goals", {
     pageTitle: "Savings Goal",
@@ -32,6 +44,7 @@ async function renderSavingsPage(res, month, locals = {}) {
     ...pageData,
     errors: locals.errors || [],
     successMessage: locals.successMessage || "",
+    isEditingGoal,
     formValues:
       locals.formValues ||
       (pageData.goal
@@ -65,7 +78,10 @@ router.get("/", async (req, res) => {
             ? "Savings goal deleted."
             : "";
 
-    await renderSavingsPage(res, month, { successMessage });
+    await renderSavingsPage(res, month, {
+      successMessage,
+      isEditingGoal: req.query.edit === "1",
+    });
   } catch (error) {
     console.error("Database error loading savings goal page:", error);
     res.status(500).render("savings-goals", {
@@ -74,15 +90,9 @@ router.get("/", async (req, res) => {
       goal: null,
       budgetMonth: month,
       budgetMonthLabel: budgetStore.formatBudgetMonthLabel(month),
-      financeSummary: {
-        monthlyBudget: 0,
-        spentThisMonth: 0,
-        remainingBudget: 0,
-        budgetUsedPercent: 0,
-        monthExpenseCount: 0,
-      },
       errors: ["Unable to load savings goals right now. Please try again."],
       successMessage: "",
+      isEditingGoal: false,
       formValues: buildFormValues({}, month),
     });
   }
@@ -95,18 +105,20 @@ router.post("/", async (req, res) => {
   if (!validation.valid) {
     return renderSavingsPage(res, month, {
       errors: validation.errors,
+      isEditingGoal: true,
       formValues: buildFormValues(req.body, month),
     });
   }
 
   try {
     await savingsGoalStore.saveSavingsGoal(validation.values);
-    res.redirect(`/savings-goals?month=${encodeURIComponent(month)}&saved=1`);
+    res.redirect(buildSavingsPageRedirect(month, "saved"));
   } catch (error) {
     console.error("Database error saving savings goal:", error);
     res.status(500);
     await renderSavingsPage(res, month, {
       errors: ["Unable to save savings goal right now. Please try again."],
+      isEditingGoal: true,
       formValues: buildFormValues(req.body, month),
     });
   }
@@ -124,17 +136,21 @@ router.post("/:id/progress", async (req, res) => {
   }
 
   try {
-    const goal = await savingsGoalStore.updateSavingsGoalProgress(
+    const goal = await savingsGoalStore.addSavingsGoalProgress(
       req.params.id,
-      validation.currentAmount
+      validation.amountToAdd
     );
-    res.redirect(
-      `/savings-goals?month=${encodeURIComponent(goal.goalMonth)}&progress=1`
-    );
+    res.redirect(buildSavingsPageRedirect(goal.goalMonth, "progress"));
   } catch (error) {
     console.error("Database error updating savings goal progress:", error);
     if (error.code === "NOT_FOUND") {
       return res.redirect(`/savings-goals?month=${encodeURIComponent(month)}`);
+    }
+    if (error.code === "AMOUNT_TOO_LARGE") {
+      return renderSavingsPage(res, month, {
+        errors: ["Saved amount is too large."],
+        formValues: buildFormValues(req.body, month),
+      });
     }
     res.status(500);
     await renderSavingsPage(res, month, {

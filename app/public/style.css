@@ -823,6 +823,35 @@ a.btn:hover { text-decoration: none; }
   flex: 1 1 220px;
 }
 
+.savings-goal-summary {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.savings-goal-summary div {
+  padding: 0.85rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--grey-50);
+}
+
+.savings-goal-summary span {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.savings-goal-summary strong {
+  display: block;
+  color: var(--text);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
 .savings-goal-form {
   display: grid;
   gap: 1rem;

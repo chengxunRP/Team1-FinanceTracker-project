@@ -1,6 +1,5 @@
 const db = require("./config/db");
 const budgetStore = require("./budgetStore");
-const financeHelpers = require("./financeHelpers");
 
 const DEFAULT_GOAL_NAME = "Savings goal";
 const MAX_GOAL_NAME_LENGTH = 120;
@@ -158,20 +157,22 @@ function validateSavingsGoalInput(body) {
 
 function validateSavingsProgressInput(body) {
   const errors = [];
-  const currentAmount = parseMoneyInput(body.currentAmount ?? body.current_amount);
+  const amountToAdd = parseMoneyInput(
+    body.amountToAdd ?? body.amount_to_add ?? body.currentAmount ?? body.current_amount
+  );
 
-  if (Number.isNaN(currentAmount)) {
-    errors.push("Current saved amount must be a valid number.");
-  } else if (currentAmount < 0) {
-    errors.push("Current saved amount cannot be negative.");
-  } else if (currentAmount > MAX_AMOUNT) {
-    errors.push("Current saved amount is too large.");
+  if (Number.isNaN(amountToAdd)) {
+    errors.push("Amount saved must be a valid number.");
+  } else if (amountToAdd <= 0) {
+    errors.push("Amount saved must be greater than zero.");
+  } else if (amountToAdd > MAX_AMOUNT) {
+    errors.push("Amount saved is too large.");
   }
 
   return {
     valid: errors.length === 0,
     errors,
-    currentAmount: Number.isNaN(currentAmount) ? 0 : roundMoney(currentAmount),
+    amountToAdd: Number.isNaN(amountToAdd) ? 0 : roundMoney(amountToAdd),
   };
 }
 
@@ -263,6 +264,26 @@ async function updateSavingsGoalProgress(id, currentAmount) {
   return getGoalById(id);
 }
 
+async function addSavingsGoalProgress(id, amountToAdd) {
+  const goal = await getGoalById(id);
+
+  if (!goal) {
+    const err = new Error("Savings goal not found.");
+    err.code = "NOT_FOUND";
+    throw err;
+  }
+
+  const nextAmount = roundMoney(goal.currentAmount + amountToAdd);
+
+  if (nextAmount > MAX_AMOUNT) {
+    const err = new Error("Saved amount is too large.");
+    err.code = "AMOUNT_TOO_LARGE";
+    throw err;
+  }
+
+  return updateSavingsGoalProgress(id, nextAmount);
+}
+
 async function deleteSavingsGoal(id) {
   await ensureSavingsGoalsTable();
 
@@ -275,22 +296,12 @@ async function deleteSavingsGoal(id) {
 
 async function getSavingsPageData(goalMonth) {
   const month = budgetStore.normalizeBudgetMonth(goalMonth);
-  const [goal, finance] = await Promise.all([
-    getGoalForMonth(month),
-    financeHelpers.getBudgetSummary(month),
-  ]);
+  const goal = await getGoalForMonth(month);
 
   return {
     goal,
     budgetMonth: month,
     budgetMonthLabel: budgetStore.formatBudgetMonthLabel(month),
-    financeSummary: {
-      monthlyBudget: finance.summary.monthlyBudget,
-      spentThisMonth: finance.summary.totalSpent,
-      remainingBudget: finance.summary.remainingBudget,
-      budgetUsedPercent: finance.summary.percentageUsed,
-      monthExpenseCount: finance.monthExpenseCount,
-    },
   };
 }
 
@@ -301,6 +312,7 @@ module.exports = {
   getGoalForMonth,
   saveSavingsGoal,
   updateSavingsGoalProgress,
+  addSavingsGoalProgress,
   deleteSavingsGoal,
   getSavingsPageData,
 };

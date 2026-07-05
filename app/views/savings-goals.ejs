@@ -5,15 +5,7 @@
   if (typeof errors === 'undefined') errors = [];
   if (typeof successMessage === 'undefined') successMessage = '';
   if (typeof formValues === 'undefined') formValues = {};
-  if (typeof financeSummary === 'undefined') {
-    financeSummary = {
-      monthlyBudget: 0,
-      spentThisMonth: 0,
-      remainingBudget: 0,
-      budgetUsedPercent: 0,
-      monthExpenseCount: 0,
-    };
-  }
+  if (typeof isEditingGoal === 'undefined') isEditingGoal = false;
 
   function formatMoney(value) {
     var num = Number(value) || 0;
@@ -26,6 +18,9 @@
   var currentSaved = goal ? goal.currentAmount : 0;
   var targetAmount = goal ? goal.targetAmount : 0;
   var progressClass = goal ? goal.progressWidthClass : 'progress-bar__fill--w0';
+  var editGoalUrl = '/savings-goals?month=' + encodeURIComponent(budgetMonth) + '&edit=1#savings-goal-edit';
+  var viewGoalUrl = '/savings-goals?month=' + encodeURIComponent(budgetMonth) + '#savings-goal-view';
+  var showGoalForm = !goal || isEditingGoal;
 %>
 
 <div class="savings-page">
@@ -76,7 +71,7 @@
   </section>
 
   <div class="savings-layout">
-    <section class="card-panel savings-progress-card">
+    <section class="card-panel savings-progress-card" id="savings-goal-view">
       <% if (goal) { %>
         <div class="savings-goal-title-row">
           <div>
@@ -94,36 +89,21 @@
           <div class="progress-bar__fill <%= progressClass %>"></div>
         </div>
 
-        <div class="savings-mini-grid">
-          <div>
-            <span>Monthly budget</span>
-            <strong><%= formatMoney(financeSummary.monthlyBudget) %></strong>
-          </div>
-          <div>
-            <span>Spent this month</span>
-            <strong><%= formatMoney(financeSummary.spentThisMonth) %></strong>
-          </div>
-          <div>
-            <span>Budget left</span>
-            <strong><%= formatMoney(financeSummary.remainingBudget) %></strong>
-          </div>
-        </div>
-
         <form method="POST" action="/savings-goals/<%= goal.id %>/progress" class="savings-progress-form">
           <input type="hidden" name="goalMonth" value="<%= budgetMonth %>">
           <div class="form-group">
-            <label for="currentAmountQuick">Current saved amount</label>
+            <label for="amountToAddQuick">Add saved amount</label>
             <input
               type="number"
-              min="0"
+              min="0.01"
               step="0.01"
-              id="currentAmountQuick"
-              name="currentAmount"
-              value="<%= goal.currentAmount %>"
+              id="amountToAddQuick"
+              name="amountToAdd"
+              placeholder="50.00"
               required
             >
           </div>
-          <button type="submit" class="btn btn--success btn--sm">Update Progress</button>
+          <button type="submit" class="btn btn--success btn--sm">Add Progress</button>
         </form>
 
         <form method="POST" action="/savings-goals/<%= goal.id %>" data-confirm data-confirm-title="Delete savings goal?" data-confirm-message="This removes the goal for <%= budgetMonthLabel %>." data-confirm-action-text="Delete" data-confirm-type="danger">
@@ -142,9 +122,30 @@
       <% } %>
     </section>
 
-    <aside class="card-panel savings-form-card">
+    <aside class="card-panel savings-form-card" id="savings-goal-edit">
+      <% if (goal && !showGoalForm) { %>
+        <h2>This Month's Goal</h2>
+        <p class="card-panel__intro">Your saved goal for this month.</p>
+
+        <div class="savings-goal-summary">
+          <div>
+            <span>Goal name</span>
+            <strong><%= goal.goalName %></strong>
+          </div>
+          <div>
+            <span>Target amount</span>
+            <strong><%= formatMoney(goal.targetAmount) %></strong>
+          </div>
+          <div>
+            <span>Saved amount</span>
+            <strong><%= formatMoney(goal.currentAmount) %></strong>
+          </div>
+        </div>
+
+        <a href="<%= editGoalUrl %>" class="btn btn--secondary btn--block">Edit Goal</a>
+      <% } else { %>
       <h2><%= goal ? 'Edit Goal' : 'Create Goal' %></h2>
-      <p class="card-panel__intro">Example: save $300 this month.</p>
+      <p class="card-panel__intro"><%= goal ? 'Make changes to this savings goal.' : 'Example: save $300 this month.' %></p>
 
       <form method="POST" action="/savings-goals" class="savings-goal-form">
         <input type="hidden" name="goalMonth" value="<%= budgetMonth %>">
@@ -191,7 +192,11 @@
         <button type="submit" class="btn btn--primary btn--block">
           <%= goal ? 'Save Changes' : 'Create Savings Goal' %>
         </button>
+        <% if (goal) { %>
+          <a href="<%= viewGoalUrl %>" class="btn btn--secondary btn--block">Cancel</a>
+        <% } %>
       </form>
+      <% } %>
     </aside>
   </div>
 </div>
