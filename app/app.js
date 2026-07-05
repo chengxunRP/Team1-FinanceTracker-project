@@ -41,6 +41,14 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+const session = require("express-session");
+app.use(session({
+  secret: "spendwise-dev-secret-change-me",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 24 }, // 1 day
+}));
+
 // --- expense-nav script middleware ---
 app.use(function(req, res, next) {
   var _render = res.render.bind(res);
@@ -48,6 +56,7 @@ app.use(function(req, res, next) {
     if (typeof locals === 'function') { cb = locals; locals = {}; }
     locals = locals || {};
     locals.getCategoryImageUrl = getCategoryImageUrl;
+    locals.currentUser = (req.session && req.session.userId) ? { id: req.session.userId, name: req.session.userName } : null;
     var _cb = cb || function(err, str) {
       if (err) return next(err);
       res.send(str);
@@ -891,6 +900,11 @@ const expenseRoutes  = require('./routes/expenses');
 const categoryRoutes = require('./routes/categories');
 app.use('/expenses',   expenseRoutes);
 app.use('/categories', categoryRoutes);
+
+const authRoutes = require('./routes/auth');
+app.use('/', authRoutes);
+const profileRoutes = require('./routes/profile');
+app.use('/profile', profileRoutes);
 // --- End Expense CRUD routes ---
 
 app.listen(PORT, () => {
