@@ -1,0 +1,146 @@
+<!-- Transaction detail popup (same shell as Add Budget) -->
+<%- include('modal-shell-overlay-start', {
+  overlayId: 'transactionDetailOverlay',
+  ariaLabelledBy: 'transactionDetailHeaderTitle',
+  dialogExtraClass: 'transaction-detail-modal'
+}) %>
+    <div class="transaction-detail-modal__hero" id="transactionDetailHero">
+      <div class="transaction-detail-modal__hero-bg" id="transactionDetailHeroBg" aria-hidden="true"></div>
+      <div class="transaction-detail-modal__hero-overlay" aria-hidden="true"></div>
+      <button type="button" class="transaction-detail-modal__close" id="closeTransactionDetailModal" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="transaction-detail-modal__hero-text">
+        <p class="transaction-detail-modal__hero-amount" id="transactionDetailHeaderAmount"></p>
+        <p class="transaction-detail-modal__hero-title" id="transactionDetailHeaderTitle"></p>
+      </div>
+    </div>
+    <div class="spb-modal__body pocketguard-style-modal-body transaction-detail-modal__body">
+      <div class="transaction-detail-modal__fields expense-txn__form">
+        <button type="button" class="transaction-detail-modal__field transaction-detail-modal__field--editable expense-txn__field" data-txn-edit-field="date" aria-label="Edit transaction date">
+          <span class="expense-txn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          </span>
+          <span class="expense-txn__field-body">
+            <span class="expense-txn__label">Transaction date</span>
+            <span class="transaction-detail-modal__value" id="transactionDetailDate"></span>
+          </span>
+          <svg class="transaction-detail-modal__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="transaction-detail-modal__field transaction-detail-modal__field--editable expense-txn__field" data-txn-edit-field="amount" aria-label="Edit amount">
+          <span class="expense-txn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M12 7v10M9.5 9.5c0-1.1 1.12-2 2.5-2s2.5.9 2.5 2-1.12 2-2.5 2h-1c-1.38 0-2.5.9-2.5 2s1.12 2 2.5 2 2.5-.9 2.5-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </span>
+          <span class="expense-txn__field-body">
+            <span class="expense-txn__label">Amount</span>
+            <span class="transaction-detail-modal__value transaction-detail-modal__value--amount" id="transactionDetailAmount"></span>
+          </span>
+          <svg class="transaction-detail-modal__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="transaction-detail-modal__field transaction-detail-modal__field--editable expense-txn__field" data-txn-edit-field="title" aria-label="Edit expense title">
+          <span class="expense-txn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6 7h12M6 11h12M6 15h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.75"/></svg>
+          </span>
+          <span class="expense-txn__field-body">
+            <span class="expense-txn__label">Expense title</span>
+            <span class="transaction-detail-modal__value" id="transactionDetailExpenseTitle"></span>
+          </span>
+          <svg class="transaction-detail-modal__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="transaction-detail-modal__field transaction-detail-modal__field--editable expense-txn__field" data-txn-edit-field="merchant" aria-label="Edit merchant name">
+          <span class="expense-txn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 10h16v8H4zM6 10V7a3 3 0 116 0v3" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M9 20h6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          </span>
+          <span class="expense-txn__field-body">
+            <span class="expense-txn__label">Merchant name</span>
+            <span class="transaction-detail-modal__value" id="transactionDetailMerchant"></span>
+          </span>
+          <svg class="transaction-detail-modal__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="transaction-detail-modal__field transaction-detail-modal__field--editable expense-txn__field" data-txn-edit-field="category" aria-label="Edit category">
+          <span class="expense-txn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 10h16v10H4z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M8 10V7a4 4 0 118 0v3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          </span>
+          <span class="expense-txn__field-body">
+            <span class="expense-txn__label">Category name</span>
+            <span class="transaction-detail-modal__category-row">
+              <span class="transaction-detail-modal__category-icon" id="transactionDetailCategoryIcon" aria-hidden="true"></span>
+              <span class="transaction-detail-modal__value transaction-detail-modal__value--category" id="transactionDetailCategory"></span>
+            </span>
+          </span>
+          <svg class="transaction-detail-modal__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="transaction-detail-modal__field transaction-detail-modal__field--editable transaction-detail-modal__field--notes expense-txn__field" data-txn-edit-field="notes" aria-label="Edit notes">
+          <span class="expense-txn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12M6 12h8M6 16h10" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.75"/></svg>
+          </span>
+          <span class="expense-txn__field-body">
+            <span class="expense-txn__label">Notes</span>
+            <span class="transaction-detail-modal__value transaction-detail-modal__notes-display" id="transactionDetailNotesDisplay">Add notes for this transaction...</span>
+          </span>
+          <svg class="transaction-detail-modal__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <textarea id="transactionDetailNotesInput" class="expense-txn__textarea transaction-detail-modal__notes-input" rows="3" maxlength="255" hidden aria-hidden="true" tabindex="-1"></textarea>
+      </div>
+      <div class="transaction-detail-modal__receipt-panel" id="transactionDetailReceiptPanel">
+        <div class="expense-txn__receipt expense-txn__receipt--modal expense-txn__receipt--detail">
+          <%- include('receipt-upload', {
+            receiptMode: 'api',
+            receiptId: 'transactionDetailReceipt',
+            receiptExistingPath: '',
+            receiptExpenseId: '',
+            receiptInputName: 'expenseImage'
+          }) %>
+        </div>
+      </div>
+      <div class="transaction-detail-modal__actions" id="transactionDetailActions">
+        <div class="transaction-detail-modal__action-row">
+          <span class="expense-txn__icon transaction-detail-modal__action-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M5 5l14 14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          </span>
+          <span class="transaction-detail-modal__action-label">Don't count</span>
+          <label class="spb-toggle transaction-detail-modal__toggle">
+            <input type="checkbox" id="transactionDetailDontCount" aria-label="Don't count this transaction in budget totals">
+            <span class="spb-toggle__track"></span>
+          </label>
+        </div>
+        <button type="button" class="transaction-detail-modal__action-row transaction-detail-modal__action-row--danger" id="transactionDetailDelete">
+          <span class="expense-txn__icon transaction-detail-modal__action-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M8 7l1 12a1 1 0 001 1h4a1 1 0 001-1l1-12M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="transaction-detail-modal__action-label">Delete transaction</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <button type="button" class="transaction-detail-nav transaction-detail-nav--prev" id="transactionDetailPrev" aria-label="Previous transaction" hidden>
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button type="button" class="transaction-detail-nav transaction-detail-nav--next" id="transactionDetailNext" aria-label="Next transaction" hidden>
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+
+<!-- Nested field edit modal (Phase 2) -->
+<div class="spb-modal-overlay spb-modal-overlay--nested txn-field-edit-overlay" id="transactionFieldEditOverlay" hidden>
+  <div class="spb-modal txn-field-edit-modal" role="dialog" aria-labelledby="transactionFieldEditTitle" aria-modal="true">
+    <header class="spb-modal__header">
+      <h2 class="spb-modal__title" id="transactionFieldEditTitle">Change amount</h2>
+      <button type="button" class="spb-modal__close" id="closeTransactionFieldEdit" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="spb-modal__body pocketguard-style-modal-body txn-field-edit-modal__body">
+      <div class="txn-field-edit-modal__input-wrap">
+        <input type="text" id="transactionFieldEditInput" class="txn-field-edit-modal__input" autocomplete="off" aria-describedby="transactionFieldEditHelper">
+        <textarea id="transactionFieldEditTextarea" class="txn-field-edit-modal__textarea" rows="4" maxlength="255" hidden aria-describedby="transactionFieldEditHelper"></textarea>
+        <button type="button" class="txn-field-edit-modal__clear" id="transactionFieldEditClear" aria-label="Clear" hidden>
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <p class="txn-field-edit-modal__helper" id="transactionFieldEditHelper">Enter transaction amount.</p>
+      <p class="spb-form-error" id="transactionFieldEditError" hidden></p>
+      <button type="button" class="spb-btn spb-btn--save txn-field-edit-modal__save" id="saveTransactionFieldEdit">Save</button>
+    </div>
+  </div>
+</div>

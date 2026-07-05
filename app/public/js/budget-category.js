@@ -4,14 +4,17 @@
   var pageData = {};
   var selectedMonth = null;
   var graphDidDrag = false;
+  var isOverallBudget = false;
 
   function loadPageData() {
     var el = document.getElementById("budgetCategoryData");
     if (!el || !el.textContent) return;
     try {
       pageData = JSON.parse(el.textContent);
+      isOverallBudget = pageData.budgetType === "overall";
     } catch (e) {
       pageData = {};
+      isOverallBudget = false;
     }
   }
 
@@ -28,18 +31,30 @@
     return "-$" + Math.abs(num).toFixed(2);
   }
 
+  function isTxExcluded(tx) {
+    return tx && tx.isExcludedFromBudget === true;
+  }
+
   function computeStats(transactions) {
     var total = 0;
     var largest = 0;
     for (var i = 0; i < transactions.length; i++) {
       var amount = Number(transactions[i].amount) || 0;
-      total += amount;
-      if (amount > largest) largest = amount;
+      if (!isTxExcluded(transactions[i])) {
+        total += amount;
+        if (amount > largest) largest = amount;
+      }
     }
     return {
       transactionCount: transactions.length,
       totalAmount: total,
-      avgTransaction: transactions.length ? total / transactions.length : 0,
+      avgTransaction: (function () {
+        var counted = 0;
+        for (var j = 0; j < transactions.length; j++) {
+          if (!isTxExcluded(transactions[j])) counted += 1;
+        }
+        return counted ? total / counted : 0;
+      })(),
       largestTransaction: largest,
     };
   }
@@ -60,7 +75,7 @@
     if (selectedMonth) {
       titleEl.textContent = (pageData.monthLabels && pageData.monthLabels[selectedMonth]) || selectedMonth;
     } else {
-      titleEl.textContent = "History";
+      titleEl.textContent = isOverallBudget ? "All transactions" : "History";
     }
 
     var count = stats.transactionCount;
@@ -102,7 +117,10 @@
     if (!list) return;
 
     var searchInput = document.getElementById("transactionSearch");
-    var q = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    var q = searchInput ? searchInput.value : "";
+    var matchesSearch =
+      window.SwTransactionSearch &&
+      window.SwTransactionSearch.transactionMatchesSearch;
     var items = list.querySelectorAll(".spb-transaction-item");
     var emptyEl = document.getElementById("transactionEmpty");
     var visible = 0;
@@ -110,28 +128,34 @@
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
       var month = item.getAttribute("data-budget-month");
-      var searchText = item.getAttribute("data-search") || "";
       var monthMatch = !selectedMonth || month === selectedMonth;
-      var searchMatch = !q || searchText.indexOf(q) !== -1;
+      var searchMatch = matchesSearch ? matchesSearch(item, q) : true;
       var show = monthMatch && searchMatch;
       item.hidden = !show;
       if (show) visible += 1;
     }
 
     if (emptyEl) {
+      var emptyCategoryText = isOverallBudget
+        ? "No transactions yet."
+        : "No transactions for this category.";
       if (items.length === 0) {
-        emptyEl.textContent = "No transactions for this category.";
+        emptyEl.textContent = emptyCategoryText;
         emptyEl.hidden = false;
       } else if (visible === 0) {
-        if (q) {
+        if (q && q.trim()) {
           emptyEl.textContent = "No transactions match your search.";
         } else if (selectedMonth) {
-          emptyEl.textContent =
-            "No transactions in " +
-            ((pageData.monthLabels && pageData.monthLabels[selectedMonth]) || selectedMonth) +
-            ".";
+          if (isOverallBudget) {
+            emptyEl.textContent = "No transactions for this month.";
+          } else {
+            emptyEl.textContent =
+              "No transactions in " +
+              ((pageData.monthLabels && pageData.monthLabels[selectedMonth]) || selectedMonth) +
+              ".";
+          }
         } else {
-          emptyEl.textContent = "No transactions for this category.";
+          emptyEl.textContent = emptyCategoryText;
         }
         emptyEl.hidden = false;
       } else {
@@ -144,6 +168,8 @@
     var stats;
     if (selectedMonth) {
       stats = computeStats(getTransactionsForScope());
+    } else if (pageData.transactions && pageData.transactions.length) {
+      stats = computeStats(pageData.transactions);
     } else {
       stats = pageData.historyAll || computeStats(pageData.transactions || []);
     }
@@ -152,6 +178,158 @@
     updateChartSelection();
     applyTransactionFilters();
   }
+
+  function formatChartMoney(value) {
+    var num = Number(value);
+    if (Number.isNaN(num) || num <= 0) return "$0";
+    if (num % 1 === 0) return "$" + num.toLocaleString();
+    return "$" + num.toFixed(2);
+  }
+
+  function getMonthTotalsFromTransactions() {
+    var totals = {};
+    var txs = pageData.transactions || [];
+    for (var i = 0; i < txs.length; i++) {
+      var tx = txs[i];
+      if (isTxExcluded(tx)) continue;
+      var month = tx.budgetMonth;
+      if (!month) continue;
+      totals[month] = (totals[month] || 0) + (Number(tx.amount) || 0);
+    }
+    return totals;
+  }
+
+  function updateChartBarsFromTransactions() {
+    var monthTotals = getMonthTotalsFromTransactions();
+    var cols = document.querySelectorAll(".spb-bar-chart__col--clickable");
+    if (!cols.length) return;
+
+    var maxAmount = 0;
+    for (var monthKey in monthTotals) {
+      if (monthTotals[monthKey] > maxAmount) maxAmount = monthTotals[monthKey];
+    }
+
+    for (var i = 0; i < cols.length; i++) {
+      var col = cols[i];
+      var budgetMonth = col.getAttribute("data-budget-month");
+      var amount = monthTotals[budgetMonth] || 0;
+      var valueEl = col.querySelector(".spb-bar-chart__value");
+      var barWrap = col.querySelector(".spb-bar-chart__bar-wrap");
+      var activeBar = col.querySelector(".spb-bar-chart__bar--active");
+      var zeroBar = col.querySelector(".spb-bar-chart__bar--zero");
+
+      if (valueEl) {
+        valueEl.textContent = formatChartMoney(amount);
+        valueEl.classList.toggle("spb-bar-chart__value--zero", amount <= 0);
+      }
+
+      if (barWrap) {
+        if (amount > 0) {
+          if (zeroBar) zeroBar.remove();
+          var bar = activeBar;
+          if (!bar) {
+            bar = document.createElement("div");
+            bar.className = "spb-bar-chart__bar spb-bar-chart__bar--active";
+            barWrap.appendChild(bar);
+          }
+          var pct = maxAmount > 0 ? Math.max(4, (amount / maxAmount) * 100) : 0;
+          bar.style.height = pct + "%";
+        } else {
+          if (activeBar) activeBar.remove();
+          if (!zeroBar) {
+            var zero = document.createElement("div");
+            zero.className = "spb-bar-chart__bar spb-bar-chart__bar--zero";
+            barWrap.appendChild(zero);
+          }
+        }
+      }
+    }
+  }
+
+  function applyExpenseUpdateToPageData(detail) {
+    if (!detail || !detail.expense) return;
+    var expense = detail.expense;
+    var previous = detail.previous || {};
+    var txs = pageData.transactions || [];
+    var txIndex = -1;
+
+    for (var i = 0; i < txs.length; i++) {
+      if (String(txs[i].id) === String(expense.id)) {
+        txIndex = i;
+        break;
+      }
+    }
+
+    if (txIndex === -1) return;
+
+    txs[txIndex].amount = Number(expense.amount) || 0;
+    txs[txIndex].budgetMonth = String(expense.date || "").slice(0, 7);
+
+    if (pageData.chartData && previous.date) {
+      var oldMonth = String(previous.date).slice(0, 7);
+      var newMonth = String(expense.date || "").slice(0, 7);
+      var oldAmount = Number(previous.amount) || 0;
+      var newAmount = Number(expense.amount) || 0;
+
+      for (var c = 0; c < pageData.chartData.length; c++) {
+        var bar = pageData.chartData[c];
+        if (bar.budgetMonth === oldMonth) {
+          bar.amount = Math.max(0, (Number(bar.amount) || 0) - oldAmount);
+        }
+        if (bar.budgetMonth === newMonth) {
+          bar.amount = (Number(bar.amount) || 0) + newAmount;
+        }
+      }
+    } else if (pageData.chartData) {
+      var monthKey = String(expense.date || "").slice(0, 7);
+      for (var j = 0; j < pageData.chartData.length; j++) {
+        if (pageData.chartData[j].budgetMonth === monthKey) {
+          pageData.chartData[j].amount = getMonthTotalsFromTransactions()[monthKey] || 0;
+          break;
+        }
+      }
+    }
+  }
+
+  document.addEventListener("sw-expense-updated", function (event) {
+    var detail = event.detail;
+    if (!detail || !detail.expense) return;
+
+    var fieldsChanged = detail.fieldsChanged || [];
+    var amountOrDateChanged =
+      fieldsChanged.indexOf("amount") !== -1 ||
+      fieldsChanged.indexOf("date") !== -1;
+    var exclusionChanged =
+      fieldsChanged.indexOf("isExcludedFromBudget") !== -1;
+
+    // Amount, date, and Don't count affect budget summary cards — reload so
+    // spent/remaining/charts stay consistent with server-side totals.
+    if (amountOrDateChanged || exclusionChanged) {
+      window.location.reload();
+      return;
+    }
+
+    if (fieldsChanged.indexOf("category") !== -1) {
+      var expense = detail.expense;
+      var txId = String(expense.id);
+      var isOverall = pageData.budgetType === "overall";
+
+      if (!isOverall && String(pageData.categoryId) !== String(expense.categoryId)) {
+        window.location.reload();
+        return;
+      }
+
+      if (isOverall) {
+        var trigger = document.querySelector(
+          '.js-transaction-detail-trigger[data-expense-id="' + txId + '"]'
+        );
+        if (trigger) {
+          var tagEl = trigger.querySelector(".spb-transaction-item__tag");
+          if (tagEl) tagEl.textContent = expense.categoryName || "CASH";
+        }
+      }
+    }
+  });
 
   function toggleGraphMonth(budgetMonth) {
     if (!budgetMonth) return;
@@ -403,7 +581,11 @@
     var overlay = document.getElementById("editBudgetOverlay");
     if (!overlay) return;
     overlay.hidden = false;
-    document.body.classList.add("spb-modal-open");
+    if (window.SwModalScroll) {
+      SwModalScroll.onOpen(overlay);
+    } else {
+      overlay.scrollTop = 0;
+    }
     var input = document.getElementById("editBudgetAmount");
     if (input) input.focus();
   }
@@ -412,17 +594,24 @@
     var overlay = document.getElementById("editBudgetOverlay");
     if (!overlay) return;
     overlay.hidden = true;
-    document.body.classList.remove("spb-modal-open");
+    if (window.SwModalScroll) {
+      SwModalScroll.onClose();
+    }
   }
 
   function saveEditBudget() {
     var input = document.getElementById("editBudgetAmount");
     var errorEl = document.getElementById("editBudgetError");
-    if (!input || !pageData.categoryId) return;
+    if (!input) return;
+    if (!isOverallBudget && !pageData.categoryId) return;
 
     if (errorEl) errorEl.hidden = true;
 
-    fetch("/budget/categories/" + pageData.categoryId, {
+    var editUrl = isOverallBudget
+      ? "/budget/all-categories"
+      : "/budget/categories/" + pageData.categoryId;
+
+    fetch(editUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -453,11 +642,12 @@
       });
   }
 
-  function deleteBudget() {
-    if (!pageData.categoryId) return;
-    if (!window.confirm("Delete this budget? This cannot be undone.")) return;
+  function performDeleteBudget() {
+    var deleteUrl = isOverallBudget
+      ? "/budget/all-categories?month=" + encodeURIComponent(pageData.budgetMonth)
+      : "/budget/categories/" + pageData.categoryId + "?month=" + encodeURIComponent(pageData.budgetMonth);
 
-    fetch("/budget/categories/" + pageData.categoryId + "?month=" + encodeURIComponent(pageData.budgetMonth), {
+    fetch(deleteUrl, {
       method: "DELETE",
     })
       .then(function (res) {
@@ -472,10 +662,29 @@
       });
   }
 
+  function deleteBudget() {
+    if (!isOverallBudget && !pageData.categoryId) return;
+
+    if (window.SwConfirm && typeof window.SwConfirm.ask === "function") {
+      window.SwConfirm.ask({
+        title: "Are you sure?",
+        message: "This cannot be undone.",
+        actionText: "Delete",
+        type: "danger",
+      }).then(function (confirmed) {
+        if (confirmed) performDeleteBudget();
+      });
+      return;
+    }
+
+    performDeleteBudget();
+  }
+
   loadPageData();
 
   var editBtn = document.getElementById("editBudgetBtn");
-  var settingsBtn = document.getElementById("openEditBudget");
+  var settingsBtn = document.getElementById("openBudgetSettings");
+  var settingsMenu = document.getElementById("budgetSettingsMenu");
   var deleteBtn = document.getElementById("deleteBudgetBtn");
   var closeEdit = document.getElementById("closeEditBudget");
   var saveEdit = document.getElementById("saveEditBudget");
@@ -483,8 +692,56 @@
   var editOverlay = document.getElementById("editBudgetOverlay");
 
   if (editBtn) editBtn.addEventListener("click", openEditModal);
-  if (settingsBtn) settingsBtn.addEventListener("click", openEditModal);
   if (deleteBtn) deleteBtn.addEventListener("click", deleteBudget);
+
+  function closeSettingsMenu() {
+    if (!settingsMenu || !settingsBtn) return;
+    settingsMenu.hidden = true;
+    settingsBtn.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleSettingsMenu() {
+    if (!settingsMenu || !settingsBtn) return;
+    var willOpen = settingsMenu.hidden;
+    settingsMenu.hidden = !willOpen;
+    settingsBtn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  }
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      toggleSettingsMenu();
+    });
+  }
+
+  if (settingsMenu) {
+    settingsMenu.addEventListener("click", function (e) {
+      e.stopPropagation();
+    });
+  }
+
+  var addTransactionBtn = document.getElementById("openAddTransaction");
+  if (addTransactionBtn) {
+    addTransactionBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      closeSettingsMenu();
+      if (typeof window.openAddExpenseModal === "function") {
+        window.openAddExpenseModal();
+      }
+    });
+  }
+
+  document.addEventListener("click", function () {
+    closeSettingsMenu();
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      closeSettingsMenu();
+      closeEditModal();
+    }
+  });
+
   if (closeEdit) closeEdit.addEventListener("click", closeEditModal);
   if (saveEdit) saveEdit.addEventListener("click", saveEditBudget);
 
@@ -504,8 +761,4 @@
   bindGraphDragScroll();
   initCategoryGraph();
   refreshHistoryView();
-
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") closeEditModal();
-  });
 })();

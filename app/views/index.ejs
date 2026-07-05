@@ -218,12 +218,12 @@
   </section>
 
   <div class="dash-fab-group" aria-label="Quick actions">
-    <a href="/expenses/new" class="dash-fab dash-fab--add" id="dashFabAdd" aria-label="Add expense">+</a>
+    <a href="/expenses?openAdd=1" class="dash-fab dash-fab--add" id="dashFabAdd" aria-label="Add expense">+</a>
     <button type="button" class="dash-fab dash-fab--remove" id="dashFabRemove" aria-label="Remove expense">&minus;</button>
   </div>
 </div>
 
 <script id="dashData" type="application/json"><%- JSON.stringify({ monthlyBudget: summary.monthlyBudget, expenses: expenses, categoryBudgets: typeof categoryRows !== 'undefined' ? categoryRows : [], budgetMonth: typeof budgetMonth !== 'undefined' ? budgetMonth : '' }) %></script>
-<script src="/js/dashboard.js"></script>
+<script src="/js/dashboard.js?v=3"></script>
 
 <%- include('partials/footer') %>

@@ -1,0 +1,105 @@
+/* Shared confirmation modal (PocketGuard-style) */
+
+body.sw-confirm-open {
+  overflow: hidden;
+}
+
+.sw-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.sw-confirm-overlay[hidden] {
+  display: none;
+}
+
+.sw-confirm {
+  width: 100%;
+  max-width: 360px;
+  padding: 1.75rem 1.5rem 1.35rem;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+  text-align: left;
+}
+
+.sw-confirm__title {
+  margin: 0 0 0.45rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.sw-confirm__message {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.sw-confirm__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.sw-confirm__cancel {
+  min-width: 4.5rem;
+  padding: 0.7rem 0.9rem;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+  cursor: pointer;
+}
+
+.sw-confirm__cancel:hover,
+.sw-confirm__cancel:focus-visible {
+  color: #374151;
+}
+
+.sw-confirm__action {
+  min-width: 5.5rem;
+  padding: 0.7rem 1.15rem;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: #ef4444;
+}
+
+.sw-confirm__action:hover,
+.sw-confirm__action:focus-visible {
+  background: #dc2626;
+}
+
+.sw-confirm__action--warning {
+  background: #f59e0b;
+}
+
+.sw-confirm__action--warning:hover,
+.sw-confirm__action--warning:focus-visible {
+  background: #d97706;
+}
+
+.sw-confirm__action:disabled,
+.sw-confirm__cancel:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}

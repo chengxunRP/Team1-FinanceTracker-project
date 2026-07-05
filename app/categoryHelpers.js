@@ -40,14 +40,32 @@ function getDisplayCategoryName(name) {
   return getStandardCategoryName(name);
 }
 
+function normalizeIconImagePath(path) {
+  if (!path) return null;
+  const value = String(path).trim();
+  if (!value) return null;
+  if (value.startsWith("/")) return value;
+  if (value.startsWith("uploads/")) return `/${value.replace(/^\/+/, "")}`;
+  return `/uploads/category-icons/${value.replace(/^\/+/, "")}`;
+}
+
 function enrichCategory(category) {
   if (!category) return category;
 
   const displayName = getDisplayCategoryName(category.name);
+  const iconImage = normalizeIconImagePath(
+    category.iconImage ?? category.icon_image ?? null
+  );
+  const isCustom =
+    Number(category.is_custom ?? category.isCustom) === 1 ||
+    category.icon === "default-category";
 
   return {
     ...category,
     displayName,
+    iconImage,
+    icon_image: iconImage,
+    isCustom,
   };
 }
 
@@ -77,6 +95,10 @@ function isBillsCategory(category) {
   );
 }
 
+function isCustomCategory(category) {
+  return Number(category?.is_custom) === 1;
+}
+
 function getCategoryDisplayNames(categories) {
   return enrichCategories(categories).map((cat) => cat.displayName);
 }
@@ -87,7 +109,9 @@ module.exports = {
   getDisplayCategoryName,
   enrichCategory,
   enrichCategories,
+  normalizeIconImagePath,
   compareCategoriesForSort,
   isBillsCategory,
+  isCustomCategory,
   getCategoryDisplayNames,
 };

@@ -23,7 +23,8 @@ async function getMonthlyExpenseTotal(budgetMonth) {
   const [rows] = await db.query(
     `SELECT CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
      FROM expenses
-     WHERE expense_date >= ? AND expense_date < ?`,
+     WHERE expense_date >= ? AND expense_date < ?
+       AND COALESCE(is_excluded_from_budget, 0) = 0`,
     [startDate, endExclusive]
   );
 

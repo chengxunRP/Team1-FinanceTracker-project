@@ -34,13 +34,17 @@ function isPurchaseQuestion(message) {
 }
 
 function calculatePurchaseImpact(summary, itemPrice) {
-  const spendingAfter = summary.totalSpent + itemPrice;
-  const remainingAfter = summary.monthlyBudget - spendingAfter;
-  const percentAfter = Math.round((spendingAfter / summary.monthlyBudget) * 100);
+  const monthlyBudget = Number(summary.monthlyBudget) || 0;
+  const totalSpent = Number(summary.totalSpent) || 0;
+  const remainingBudget = Number(summary.remainingBudget) || 0;
+  const spendingAfter = totalSpent + itemPrice;
+  const remainingAfter = monthlyBudget - spendingAfter;
+  const percentAfter =
+    monthlyBudget > 0 ? Math.round((spendingAfter / monthlyBudget) * 100) : 100;
 
   let level = "safe";
 
-  if (percentAfter >= 100 || itemPrice > summary.remainingBudget) {
+  if (monthlyBudget <= 0 || percentAfter >= 100 || itemPrice > remainingBudget) {
     level = "not_recommended";
   } else if (percentAfter >= 80) {
     level = "warning";
@@ -48,9 +52,9 @@ function calculatePurchaseImpact(summary, itemPrice) {
 
   return {
     itemPrice,
-    totalSpent: summary.totalSpent,
-    monthlyBudget: summary.monthlyBudget,
-    remainingBudget: summary.remainingBudget,
+    totalSpent,
+    monthlyBudget,
+    remainingBudget,
     spendingAfter,
     remainingAfter,
     percentAfter,

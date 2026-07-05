@@ -1,0 +1,54 @@
+<%
+  var modalExpense = (typeof expense !== 'undefined' && expense && typeof expense === 'object') ? expense : {};
+  var modalCustomCategories = (typeof customCategories !== 'undefined' && Array.isArray(customCategories)) ? customCategories : [];
+  var modalGeneralCategories = (typeof generalCategories !== 'undefined' && Array.isArray(generalCategories)) ? generalCategories : [];
+  var modalCategories = (typeof categories !== 'undefined' && Array.isArray(categories)) ? categories : [];
+  if (!modalCustomCategories.length && !modalGeneralCategories.length && modalCategories.length) {
+    modalCustomCategories = modalCategories.filter(function(c) { return c.isCustom || Number(c.is_custom) === 1; });
+    modalGeneralCategories = modalCategories.filter(function(c) { return !(c.isCustom || Number(c.is_custom) === 1); });
+  }
+  var modalMaxDate = (typeof maxDate !== 'undefined' && maxDate) ? maxDate : new Date().toISOString().slice(0, 10);
+  var modalDefaultDate = (typeof defaultDate !== 'undefined' && defaultDate) ? defaultDate : modalMaxDate;
+  var modalReturnTo = (typeof returnTo !== 'undefined' && returnTo) ? returnTo : '';
+  var modalSelectedCategoryId = '';
+
+  if (typeof selectedCategoryId !== 'undefined' && selectedCategoryId) {
+    modalSelectedCategoryId = String(selectedCategoryId);
+  } else if (modalExpense.categoryId) {
+    modalSelectedCategoryId = String(modalExpense.categoryId);
+  } else if (modalExpense.category_id) {
+    modalSelectedCategoryId = String(modalExpense.category_id);
+  } else if (modalExpense.categoryID) {
+    modalSelectedCategoryId = String(modalExpense.categoryID);
+  }
+%>
+<!-- Add Expense modal (same shell as Add Budget) -->
+<%- include('modal-shell-overlay-start', { overlayId: 'addExpenseOverlay', ariaLabelledBy: 'addExpenseTitle' }) %>
+<%- include('modal-shell-header', {
+  title: 'Add Expense',
+  titleId: 'addExpenseTitle',
+  closeId: 'closeAddExpenseModalBtn'
+}) %>
+
+<div class="spb-modal__body pocketguard-style-modal-body">
+      <p class="spb-modal__intro">Record a new expense to track your spending.</p>
+      <div id="addExpenseFormErrors" class="form-errors spb-modal__errors" hidden></div>
+      <%- include('expense-form-fields', {
+        expense: modalExpense,
+        categories: modalCategories.length ? modalCategories : modalCustomCategories.concat(modalGeneralCategories),
+        selectedCategoryId: modalSelectedCategoryId,
+        isEdit: false,
+        maxDate: modalMaxDate,
+        defaultDate: modalDefaultDate,
+        returnTo: modalReturnTo,
+        formAction: '/expenses',
+        inModal: true
+      }) %>
+</div>
+<%- include('modal-shell-overlay-end') %>
+
+<%- include('expense-category-picker-modal', {
+  customCategories: modalCustomCategories,
+  generalCategories: modalGeneralCategories,
+  selectedCategoryId: modalSelectedCategoryId
+}) %>

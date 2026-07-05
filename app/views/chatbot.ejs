@@ -1,41 +1,138 @@
 <%- include('partials/header') %>
 
+<%
+  if (typeof liveSummary === 'undefined' || !liveSummary) {
+    liveSummary = {
+      hasBudget: Number(summary && summary.monthlyBudget) > 0,
+      hasCategoryBudgets: false,
+      hasAllTransactionsBudget: false,
+      categoryBudgetTotal: 0,
+      categoryBudgetSpent: 0,
+      categoryBudgetRemaining: 0,
+      topBudgetedCategoryName: '—',
+      topBudgetedCategorySpent: 0,
+      allTransactionsBudget: 0,
+      allTransactionsSpent: summary ? summary.totalSpent : 0,
+      allTransactionsRemaining: 0,
+      everythingElseTotal: 0,
+      monthlyBudgetTotal: summary ? summary.monthlyBudget : 0,
+      spentThisMonth: summary ? summary.totalSpent : 0,
+      remainingThisMonth: summary ? summary.remainingBudget : 0,
+      percentageUsed: summary ? summary.percentageUsed : 0,
+      expenseCountThisMonth: typeof monthExpenseCount !== 'undefined' ? monthExpenseCount : 0,
+      topCategoryName: financeSnapshot ? financeSnapshot.highestCategory : '—',
+      topCategorySpent: financeSnapshot ? financeSnapshot.highestCategoryAmount : 0,
+      budgetSource: 'none',
+    };
+  }
+
+  function formatMoney(value) {
+    var num = Number(value);
+    if (Number.isNaN(num)) return '0';
+    if (num % 1 === 0) return String(num);
+    return num.toFixed(2);
+  }
+
+  function remainingValueClass(value) {
+    return Number(value) < 0
+      ? 'finbot-stat__value--danger'
+      : 'finbot-stat__value--green';
+  }
+%>
+
 <div class="finbot-page">
   <header class="finbot-header">
     <span class="eyebrow">Finance assistant</span>
     <h1>FinBot</h1>
-    <p>Your friendly finance helper — ask about spending, budget, and whether a purchase makes sense.</p>
+    <p>Your friendly finance helper — ask about spending, budgets, and whether a purchase is safe.</p>
   </header>
 
   <div class="finbot-layout">
     <aside class="finbot-sidebar">
-      <section class="card-panel finbot-card">
-        <h2>Your snapshot</h2>
-        <p class="finbot-scope-note"><%= typeof budgetMonthLabel !== 'undefined' ? budgetMonthLabel : 'Current month' %> — monthly totals from MySQL</p>
-        <div class="finbot-stats">
-          <div class="finbot-stat">
-            <span class="finbot-stat__label">Monthly budget</span>
-            <span class="finbot-stat__value finbot-stat__value--blue">$<%= summary.monthlyBudget %></span>
+      <section class="finbot-card finbot-card--snapshot">
+        <div class="finbot-card__head">
+          <h2>Your snapshot</h2>
+          <span class="finbot-month-pill"><%= budgetMonthLabel || 'Current month' %></span>
+        </div>
+        <p class="finbot-scope-note">Live totals from MySQL · Don't count excluded</p>
+
+        <div class="finbot-snapshot-section">
+          <h3 class="finbot-snapshot-section__title">Category Budgets</h3>
+          <p class="finbot-snapshot-section__hint">Only categories with a normal budget</p>
+          <div class="finbot-stats">
+            <% if (liveSummary.hasCategoryBudgets || Number(liveSummary.categoryBudgetTotal) > 0) { %>
+            <div class="finbot-stat">
+              <span class="finbot-stat__label">Budgeted</span>
+              <span class="finbot-stat__value finbot-stat__value--blue">$<%= formatMoney(liveSummary.categoryBudgetTotal) %></span>
+              <span class="finbot-stat__sub">Category budgets</span>
+            </div>
+            <div class="finbot-stat">
+              <span class="finbot-stat__label">Spent in budgeted categories</span>
+              <span class="finbot-stat__value finbot-stat__value--purple">$<%= formatMoney(liveSummary.categoryBudgetSpent) %></span>
+              <span class="finbot-stat__sub">Excludes unbudgeted spending</span>
+            </div>
+            <div class="finbot-stat">
+              <span class="finbot-stat__label">Remaining</span>
+              <span class="finbot-stat__value <%= remainingValueClass(liveSummary.categoryBudgetRemaining) %>">$<%= formatMoney(liveSummary.categoryBudgetRemaining) %></span>
+              <span class="finbot-stat__sub"><%= liveSummary.categoryBudgetPctUsed || 0 %>% of category budgets used</span>
+            </div>
+            <div class="finbot-stat finbot-stat--highlight">
+              <span class="finbot-stat__label">Top budgeted category</span>
+              <span class="finbot-stat__value finbot-stat__value--sm"><%= liveSummary.topBudgetedCategoryName || '—' %></span>
+              <span class="finbot-stat__sub">$<%= formatMoney(liveSummary.topBudgetedCategorySpent || 0) %> spent</span>
+            </div>
+            <% } else { %>
+            <div class="finbot-stat">
+              <span class="finbot-stat__label">Category budgets</span>
+              <span class="finbot-stat__value finbot-stat__value--muted">None set</span>
+              <span class="finbot-stat__sub">Add category budgets on Spending &amp; Budgets</span>
+            </div>
+            <% } %>
           </div>
-          <div class="finbot-stat">
-            <span class="finbot-stat__label">Spent this month</span>
-            <span class="finbot-stat__value finbot-stat__value--blue">$<%= summary.totalSpent %></span>
-            <span class="finbot-stat__sub"><%= typeof monthExpenseCount !== 'undefined' ? monthExpenseCount : 0 %> expense<%= (typeof monthExpenseCount !== 'undefined' ? monthExpenseCount : 0) === 1 ? '' : 's' %></span>
-          </div>
-          <div class="finbot-stat">
-            <span class="finbot-stat__label">Remaining this month</span>
-            <span class="finbot-stat__value finbot-stat__value--green">$<%= summary.remainingBudget %></span>
-          </div>
-          <div class="finbot-stat finbot-stat--highlight">
-            <span class="finbot-stat__label">Top category this month</span>
-            <span class="finbot-stat__value finbot-stat__value--sm"><%= financeSnapshot.highestCategory %></span>
-            <span class="finbot-stat__sub">$<%= financeSnapshot.highestCategoryAmount %> spent</span>
+        </div>
+
+        <div class="finbot-snapshot-section">
+          <h3 class="finbot-snapshot-section__title">All Transactions</h3>
+          <p class="finbot-snapshot-section__hint">All counted spending this month</p>
+          <div class="finbot-stats">
+            <% if (liveSummary.hasAllTransactionsBudget || Number(liveSummary.allTransactionsBudget) > 0) { %>
+            <div class="finbot-stat">
+              <span class="finbot-stat__label">Available budget</span>
+              <span class="finbot-stat__value finbot-stat__value--blue">$<%= formatMoney(liveSummary.allTransactionsBudget) %></span>
+              <span class="finbot-stat__sub">All Categories Budget</span>
+            </div>
+            <% } else { %>
+            <div class="finbot-stat">
+              <span class="finbot-stat__label">Available budget</span>
+              <span class="finbot-stat__value finbot-stat__value--muted">Not set</span>
+              <span class="finbot-stat__sub">Add All Categories Budget on Spending &amp; Budgets</span>
+            </div>
+            <% } %>
+            <div class="finbot-stat">
+              <span class="finbot-stat__label">Total spent</span>
+              <span class="finbot-stat__value finbot-stat__value--purple">$<%= formatMoney(liveSummary.allTransactionsSpent != null ? liveSummary.allTransactionsSpent : liveSummary.spentThisMonth) %></span>
+              <span class="finbot-stat__sub"><%= liveSummary.expenseCountThisMonth %> expense<%= liveSummary.expenseCountThisMonth === 1 ? '' : 's' %></span>
+            </div>
+            <% if (liveSummary.hasAllTransactionsBudget || Number(liveSummary.allTransactionsBudget) > 0) { %>
+            <div class="finbot-stat">
+              <span class="finbot-stat__label">Remaining</span>
+              <span class="finbot-stat__value <%= remainingValueClass(liveSummary.allTransactionsRemaining) %>">$<%= formatMoney(liveSummary.allTransactionsRemaining) %></span>
+              <span class="finbot-stat__sub"><%= liveSummary.allTransactionsPctUsed || 0 %>% of budget used</span>
+            </div>
+            <% } %>
+            <div class="finbot-stat finbot-stat--highlight">
+              <span class="finbot-stat__label">Everything Else</span>
+              <span class="finbot-stat__value finbot-stat__value--sm">$<%= formatMoney(liveSummary.everythingElseTotal || 0) %></span>
+              <span class="finbot-stat__sub">Unbudgeted category spending</span>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="card-panel finbot-card">
-        <h2>Try asking</h2>
+      <section class="finbot-card">
+        <div class="finbot-card__head">
+          <h2>Try asking</h2>
+        </div>
         <div class="finbot-suggestions">
           <% suggestedQuestions.forEach(function(question) { %>
           <form method="POST" action="/chatbot">
@@ -43,46 +140,57 @@
           </form>
           <% }); %>
         </div>
-        <p class="finbot-note"><%= groqAiMode ? 'Groq AI replies — using your MySQL budget and expense data.' : 'Rule-based replies — add GROQ_API_KEY in app/.env for Groq AI mode.' %></p>
+        <p class="finbot-note"><%= groqAiMode ? 'Groq AI replies — numbers always come from your MySQL data.' : 'Rule-based replies — add GROQ_API_KEY in app/.env for Groq AI mode.' %></p>
       </section>
     </aside>
 
-    <section class="card-panel finbot-chat">
+    <section class="finbot-chat">
       <div class="finbot-chat__header">
         <span class="finbot-avatar" aria-hidden="true">🤖</span>
-        <div>
+        <div class="finbot-chat__identity">
           <strong>FinBot</strong>
           <span class="finbot-status">Online · <%= groqAiMode ? 'Groq AI mode' : 'rule-based mode' %></span>
         </div>
         <form method="POST" action="/chatbot/clear" class="finbot-clear-form">
-          <button type="submit" class="btn btn--sm">Clear chat</button>
+          <button type="submit" class="finbot-clear-btn">Clear chat</button>
         </form>
       </div>
 
-      <div class="finbot-messages">
-        <% messages.forEach(function(message) { %>
-        <article class="finbot-bubble finbot-bubble--<%= message.sender === 'user' ? 'user' : 'assistant' %>">
-          <% if (message.sender === 'bot') { %>
+      <div class="finbot-messages" id="finbotMessages">
+        <% if (!messages || !messages.length) { %>
+        <article class="finbot-bubble finbot-bubble--assistant finbot-bubble--welcome">
           <span class="finbot-bubble__label">FinBot</span>
+          <div class="finbot-bubble__text">Hi, I'm FinBot. I can help you understand your spending, budgets, and whether a purchase is safe.</div>
+        </article>
+        <% } %>
+        <% (messages || []).forEach(function(message) { %>
+        <article class="finbot-bubble finbot-bubble--<%= message.sender === 'user' ? 'user' : 'assistant' %>">
+          <% if (message.sender === 'bot' || message.sender === 'assistant') { %>
+          <span class="finbot-bubble__label">FinBot</span>
+          <% } else { %>
+          <span class="finbot-bubble__label">You</span>
           <% } %>
           <div class="finbot-bubble__text"><%= message.text %></div>
         </article>
         <% }); %>
       </div>
 
-      <form class="finbot-input-row" method="POST" action="/chatbot">
+      <form class="finbot-input-row" method="POST" action="/chatbot" id="finbotChatForm">
         <input
           type="text"
           name="message"
+          id="finbotInput"
           placeholder="Type your question…"
           value="<%= inputText %>"
           autocomplete="off"
           required
         >
-        <button type="submit" class="btn btn--primary">Send</button>
+        <button type="submit" class="finbot-send-btn" id="finbotSendBtn">Send</button>
       </form>
     </section>
   </div>
 </div>
+
+<script src="/js/finbot-chat.js?v=3"></script>
 
 <%- include('partials/footer') %>
