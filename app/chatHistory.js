@@ -1,26 +1,30 @@
 // FinBot chat history stored in MySQL (chat_sessions + chat_messages)
 
 const db = require("./config/db");
+const { getRequestUserId } = require("./requestUserContext");
+const { requireUserId } = require("./userScope");
 
 function createWelcomeMessage(welcomeText) {
   return { sender: "bot", text: welcomeText };
 }
 
 async function getOrCreateSession(sessionId) {
-  const [existing] = await db.query(
-    "SELECT id FROM chat_sessions WHERE session_id = ? LIMIT 1",
-    [sessionId]
+  const userId = getRequestUserId() || requireUserId();
+
+  const [existingByUser] = await db.query(
+    "SELECT id FROM chat_sessions WHERE user_id = ? LIMIT 1",
+    [userId]
   );
 
-  if (existing.length) {
-    return existing[0].id;
+  if (existingByUser.length) {
+    return existingByUser[0].id;
   }
 
+  const stableSessionId = `user-${userId}`;
   const [result] = await db.query(
-    "INSERT INTO chat_sessions (session_id) VALUES (?)",
-    [sessionId]
+    "INSERT INTO chat_sessions (session_id, user_id) VALUES (?, ?)",
+    [stableSessionId, userId]
   );
-
   return result.insertId;
 }
 

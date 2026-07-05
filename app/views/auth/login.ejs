@@ -1,0 +1,45 @@
+<%- include('../partials/header') %>
+
+<div style="display:flex;justify-content:center;padding:2rem 0;">
+  <div class="card-panel" style="width:100%;max-width:400px;">
+
+    <div class="page-header" style="margin-bottom:1.25rem;">
+      <span class="eyebrow">Finance Tracker</span>
+      <h1>Welcome back</h1>
+      <p>Log in to see your expenses and budget.</p>
+    </div>
+
+    <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+      <div class="form-errors">
+        <% errors.forEach(function(err) { %><p>⚠ <%= err %></p><% }) %>
+      </div>
+    <% } %>
+
+    <form method="POST" action="/login" style="display:grid;gap:1rem;">
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com"
+          value="<%= typeof formValues !== 'undefined' ? (formValues.email || '') : '' %>"
+          required autofocus
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Your password"
+          required
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--sm btn--block" style="margin-top:0.25rem;">
+        Log In
+      </button>
+    </form>
+
+    <p style="text-align:center;margin-top:1.25rem;font-size:0.85rem;color:var(--text-muted);">
+      Don't have an account? <a href="/register" style="color:var(--blue-mid);font-weight:600;">Register</a>
+    </p>
+
+  </div>
+<

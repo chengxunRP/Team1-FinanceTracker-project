@@ -2,7 +2,11 @@ const express = require('express');
 const router = express.Router();
 const store = require('../expenseStore');
 const db = require('../config/db');
+const { requireLogin } = require('../authHelpers');
+const { requireUserId } = require('../userScope');
 const uploadCategoryIcon = require('../middleware/categoryIconUpload');
+
+router.use(requireLogin);
 
 const AVAILABLE_ICONS = [
   'food', 'transport', 'school', 'shopping',
@@ -22,6 +26,7 @@ const AVAILABLE_COLORS = [
 ];
 
 async function categoriesWithStats() {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       c.id,
@@ -31,9 +36,12 @@ async function categoriesWithStats() {
       COUNT(e.id) AS count,
       COALESCE(SUM(e.amount), 0) AS total
     FROM categories c
-    LEFT JOIN expenses e ON e.category_id = c.id
+    LEFT JOIN expenses e ON e.category_id = c.id AND e.user_id = ?
+    WHERE (c.is_custom = 0 OR (c.is_custom = 1 AND c.user_id = ?))
+      AND (c.is_deleted IS NULL OR c.is_deleted = 0)
     GROUP BY c.id, c.name, c.icon, c.color
-    ORDER BY c.name ASC`
+    ORDER BY c.name ASC`,
+    [userId, userId]
   );
 
   return rows.map((row) => ({
@@ -239,9 +247,10 @@ router.put('/:id', async (req, res) => {
 // POST /categories/:id  (_method=DELETE)
 router.delete('/:id', async (req, res) => {
   try {
+    const userId = requireUserId();
     const [rows] = await db.query(
-      'SELECT COUNT(*) AS count FROM expenses WHERE category_id = ?',
-      [Number(req.params.id)]
+      'SELECT COUNT(*) AS count FROM expenses WHERE category_id = ? AND user_id = ?',
+      [Number(req.params.id), userId]
     );
     const inUse = Number(rows[0].count) > 0;
     if (!inUse) {

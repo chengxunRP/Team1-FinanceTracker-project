@@ -2,15 +2,19 @@
 // Date scope: expense_date >= monthStart AND expense_date < nextMonthStart (year-aware).
 
 const db = require("./config/db");
+const { requireUserId } = require("./userScope");
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
 const { getStandardCategoryName } = require("./categoryHelpers");
 const { buildBudgetSummary } = require("./budgetHelpers");
 
-/** Sum all expenses (all-time). */
+/** Sum all expenses (all-time) for the logged-in user only. */
 async function getAllTimeExpenseTotal() {
+  const userId = requireUserId();
   const [rows] = await db.query(
-    `SELECT CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total FROM expenses`
+    `SELECT CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
+     FROM expenses WHERE user_id = ?`,
+    [userId]
   );
   return Number(rows[0].total) || 0;
 }
@@ -19,13 +23,15 @@ async function getAllTimeExpenseTotal() {
 async function getMonthlyExpenseTotal(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(budgetMonth);
   const { startDate, endExclusive } = budgetStore.getBudgetMonthDateRange(month);
+  const userId = requireUserId();
 
   const [rows] = await db.query(
     `SELECT CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
      FROM expenses
      WHERE expense_date >= ? AND expense_date < ?
+       AND user_id = ?
        AND COALESCE(is_excluded_from_budget, 0) = 0`,
-    [startDate, endExclusive]
+    [startDate, endExclusive, userId]
   );
 
   return Number(rows[0].total) || 0;
@@ -33,8 +39,13 @@ async function getMonthlyExpenseTotal(budgetMonth) {
 
 /** Count expenses for a budget month. Pass null/undefined for all-time count. */
 async function getExpenseCountForMonth(budgetMonth) {
+  const userId = requireUserId();
+
   if (!budgetMonth) {
-    const [rows] = await db.query("SELECT COUNT(*) AS count FROM expenses");
+    const [rows] = await db.query(
+      "SELECT COUNT(*) AS count FROM expenses WHERE user_id = ?",
+      [userId]
+    );
     return Number(rows[0].count) || 0;
   }
 
@@ -44,8 +55,9 @@ async function getExpenseCountForMonth(budgetMonth) {
   const [rows] = await db.query(
     `SELECT COUNT(*) AS count
      FROM expenses
-     WHERE expense_date >= ? AND expense_date < ?`,
-    [startDate, endExclusive]
+     WHERE expense_date >= ? AND expense_date < ?
+       AND user_id = ?`,
+    [startDate, endExclusive, userId]
   );
 
   return Number(rows[0].count) || 0;
@@ -59,12 +71,15 @@ async function getCategoryTotals(budgetMonth) {
     );
   }
 
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       category_id AS categoryId,
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
      FROM expenses
-     GROUP BY category_id`
+     WHERE user_id = ?
+     GROUP BY category_id`,
+    [userId]
   );
 
   const totals = {};
@@ -123,6 +138,35 @@ function buildFinanceSnapshot(summary, spendingByCategoryId, categories, scope) 
     highestCategoryId: highest.categoryId || null,
     highestCategoryAmount: highest.amount,
     spendingByCategory,
+  };
+}
+
+/** Current-month category budget totals — same source as Spending & Budgets (budgetTotals). */
+async function getCategoryBudgetTotalsSummary(budgetMonth) {
+  const month = budgetStore.normalizeBudgetMonth(
+    budgetMonth || budgetStore.getCurrentBudgetMonth()
+  );
+
+  const [categories, spendingByCategoryId] = await Promise.all([
+    expenseStore.getCategories(),
+    budgetStore.getSpendingTotalsByCategoryId(month),
+  ]);
+
+  const hasCategoryBudgets = await budgetStore.hasCategoryBudgetsForMonth(month);
+  const categoryRows = hasCategoryBudgets
+    ? await budgetStore.getBudgetRows(month, categories, spendingByCategoryId)
+    : [];
+  const budgetTotals = budgetStore.getBudgetTotals(categoryRows);
+
+  const budget = Number(budgetTotals.totalBudgeted) || 0;
+  const spent = Number(budgetTotals.totalSpent) || 0;
+
+  return {
+    budgetMonth: month,
+    budget,
+    spent,
+    remaining: budget - spent,
+    percentUsed: budget > 0 ? Math.round((spent / budget) * 100) : 0,
   };
 }
 
@@ -189,6 +233,7 @@ module.exports = {
   getCategoryTotals,
   getHighestSpendingCategory,
   buildFinanceSnapshot,
+  getCategoryBudgetTotalsSummary,
   getBudgetSummary,
   getAllTimeFinanceData,
   mapSpendingByCategory,

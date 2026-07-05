@@ -1,0 +1,162 @@
+<%- include('../partials/header') %>
+
+<%
+  function formatProfileInputNumber(value) {
+    if (value === null || value === undefined) return '';
+    return Number(value);
+  }
+%>
+
+<div style="width:100%;padding:1.5rem 0;">
+
+  <div class="page-header" style="text-align:center;max-width:520px;width:100%;margin:0 auto 1.25rem;">
+    <span class="eyebrow">Finance Tracker</span>
+    <h1>Profile Settings</h1>
+  </div>
+
+  <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+    <div class="form-errors" style="max-width:520px;width:100%;margin:0 auto 1.25rem;">
+      <% errors.forEach(function(err) { %><p>⚠ <%= err %></p><% }) %>
+    </div>
+  <% } %>
+
+  <% if (typeof success !== 'undefined' && success) { %>
+    <div style="background:#e6f7ec;border:1px solid #43a047;color:#2e7d32;padding:0.85rem 1.1rem;border-radius:var(--radius-sm);font-size:0.9rem;font-weight:600;max-width:520px;width:100%;margin:0 auto 1.25rem;">
+      ✓ Profile updated successfully.
+    </div>
+  <% } %>
+
+  <!-- ===== SUMMARY VIEW (default) ===== -->
+  <div id="summaryView" class="card-panel" style="max-width:520px;width:100%;margin:0 auto 1.25rem;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.1rem;">
+      <div>
+        <h2 style="margin:0 0 0.15rem;font-size:1.15rem;font-weight:700;"><%= user.name %></h2>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-muted);"><%= user.email %></p>
+      </div>
+      <button type="button" onclick="showEditForm()" class="btn btn--primary btn--sm">Edit</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;">
+      <div style="background:var(--grey-100, #f5f5f7);border-radius:var(--radius-sm);padding:0.9rem 1rem;">
+        <p style="margin:0 0 0.25rem;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">Monthly Income</p>
+        <p style="margin:0;font-size:1.3rem;font-weight:700;color:var(--text);">
+          <%= user.currency || 'USD' %> <%= summary.income.toFixed(2) %>
+        </p>
+      </div>
+
+      <div style="background:var(--grey-100, #f5f5f7);border-radius:var(--radius-sm);padding:0.9rem 1rem;">
+        <p style="margin:0 0 0.25rem;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">Monthly Budget</p>
+        <p style="margin:0;font-size:1.3rem;font-weight:700;color:var(--text);">
+          <%= user.currency || 'USD' %> <%= summary.budget.toFixed(2) %>
+        </p>
+      </div>
+
+      <div style="background:var(--grey-100, #f5f5f7);border-radius:var(--radius-sm);padding:0.9rem 1rem;">
+        <p style="margin:0 0 0.25rem;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">Spent This Month</p>
+        <p style="margin:0;font-size:1.3rem;font-weight:700;color:#d32f2f;">
+          <%= user.currency || 'USD' %> <%= summary.spent.toFixed(2) %>
+        </p>
+      </div>
+
+      <div style="background:var(--grey-100, #f5f5f7);border-radius:var(--radius-sm);padding:0.9rem 1rem;">
+        <p style="margin:0 0 0.25rem;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">Remaining</p>
+        <p style="margin:0;font-size:1.3rem;font-weight:700;color:<%= summary.remaining < 0 ? '#d32f2f' : '#2e7d32' %>;">
+          <%= user.currency || 'USD' %> <%= summary.remaining.toFixed(2) %>
+        </p>
+      </div>
+    </div>
+
+    <% if (summary.budget > 0) { %>
+      <div style="margin-top:1rem;">
+        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.35rem;">
+          <span>Budget used</span>
+          <span><%= summary.percentUsed %>%</span>
+        </div>
+        <div style="background:var(--grey-200,#eee);border-radius:999px;height:8px;overflow:hidden;">
+          <div style="height:100%;border-radius:999px;width:<%= Math.min(summary.percentUsed, 100) %>%;background:<%= summary.percentUsed >= 100 ? '#d32f2f' : (summary.percentUsed >= 80 ? '#f9a825' : '#43a047') %>;"></div>
+        </div>
+      </div>
+    <% } %>
+
+    <div style="margin-top:0.85rem;padding:0.85rem 1rem;background:var(--grey-100, #f5f5f7);border-radius:var(--radius-sm);">
+      <p style="margin:0 0 0.25rem;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">Email Budget Notifications</p>
+      <p style="margin:0;font-size:0.95rem;font-weight:600;color:var(--text);">
+        <%= user.email_alerts_enabled ? 'On' : 'Off' %>
+      </p>
+    </div>
+  </div>
+
+  <!-- ===== EDIT FORM (hidden by default) ===== -->
+  <div id="editView" class="card-panel" style="max-width:480px;width:100%;margin:0 auto 1.25rem;display:none;">
+    <h2 style="margin:0 0 0.25rem;font-size:1rem;font-weight:700;">Edit Your Details</h2>
+    <p style="margin:0 0 1.15rem;font-size:0.85rem;color:var(--text-muted);">
+      Set your income, currency, and default budget so spendWise fits you.
+    </p>
+
+    <form method="POST" action="/profile" style="display:grid;gap:1rem;">
+
+      <div class="form-group">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" value="<%= user.name || '' %>" required
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+      </div>
+
+      <div class="form-group">
+        <label for="monthlyIncome">Monthly Income</label>
+        <input type="number" step="0.01" min="0" id="monthlyIncome" name="monthlyIncome"
+          value="<%= formatProfileInputNumber(user.monthly_income) %>" placeholder="e.g. 3000"
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+      </div>
+
+      <div class="form-group">
+        <label for="currency">Preferred Currency</label>
+        <select id="currency" name="currency"
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+          <% currencies.forEach(function(c) { %>
+            <option value="<%= c %>" <%= user.currency === c ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="defaultBudget">Default Monthly Budget</label>
+        <input type="number" step="0.01" min="0" id="defaultBudget" name="defaultBudget"
+          value="<%= formatProfileInputNumber(user.default_budget) %>" placeholder="e.g. 500"
+          style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+        <p style="margin:0.4rem 0 0;font-size:0.78rem;color:var(--text-muted);line-height:1.35;">Profile preference only. Live monthly budget above comes from Spending &amp; Budgets.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="emailAlertsEnabled" style="display:flex;align-items:center;gap:0.55rem;cursor:pointer;">
+          <input type="checkbox" id="emailAlertsEnabled" name="emailAlertsEnabled" value="1"
+            <%= user.email_alerts_enabled ? 'checked' : '' %>
+            style="width:1rem;height:1rem;accent-color:var(--primary, #1976d2);">
+          <span>Email budget notifications</span>
+        </label>
+        <p style="margin:0.4rem 0 0 1.55rem;font-size:0.78rem;color:var(--text-muted);line-height:1.35;">Get email alerts at 80% and 100% of your monthly budget.</p>
+      </div>
+
+      <div style="display:flex;gap:0.6rem;margin-top:0.25rem;">
+        <button type="submit" class="btn btn--primary btn--sm" style="flex:1;">Save Changes</button>
+        <button type="button" onclick="showSummaryView()" class="btn btn--sm" style="flex:1;background:var(--grey-200,#eee);border:none;">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+<script>
+  function showEditForm() {
+    document.getElementById('summaryView').style.display = 'none';
+    document.getElementById('editView').style.display = 'block';
+  }
+  function showSummaryView() {
+    document.getElementById('editView').style.display = 'none';
+    document.getElementById('summaryView').style.display = 'block';
+  }
+  <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+    showEditForm();
+  <% } %>
+</script>
+
+<%- include('../partials/footer') %>
