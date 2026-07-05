@@ -1258,8 +1258,11 @@ app.use((req, res, next) => {
 });
 const expenseRoutes  = require('./routes/expenses');
 const categoryRoutes = require('./routes/categories');
+const savingsGoalRoutes = require('./routes/savingsGoals');
 app.use('/expenses',   expenseRoutes);
 app.use('/categories', categoryRoutes);
+app.use('/savings-goals', savingsGoalRoutes);
+app.get('/savings-goal', (req, res) => res.redirect('/savings-goals'));
 // --- End Expense CRUD routes ---
 
 const server = app.listen(PORT);

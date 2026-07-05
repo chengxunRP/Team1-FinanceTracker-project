@@ -1,0 +1,199 @@
+<%- include('partials/header') %>
+
+<%
+  if (typeof goal === 'undefined') goal = null;
+  if (typeof errors === 'undefined') errors = [];
+  if (typeof successMessage === 'undefined') successMessage = '';
+  if (typeof formValues === 'undefined') formValues = {};
+  if (typeof financeSummary === 'undefined') {
+    financeSummary = {
+      monthlyBudget: 0,
+      spentThisMonth: 0,
+      remainingBudget: 0,
+      budgetUsedPercent: 0,
+      monthExpenseCount: 0,
+    };
+  }
+
+  function formatMoney(value) {
+    var num = Number(value) || 0;
+    if (num % 1 === 0) return '$' + num.toLocaleString();
+    return '$' + num.toFixed(2);
+  }
+
+  var progressValue = goal ? goal.progressPercent : 0;
+  var remainingAmount = goal ? goal.remainingAmount : 0;
+  var currentSaved = goal ? goal.currentAmount : 0;
+  var targetAmount = goal ? goal.targetAmount : 0;
+  var progressClass = goal ? goal.progressWidthClass : 'progress-bar__fill--w0';
+%>
+
+<div class="savings-page">
+  <div class="savings-page__head">
+    <div class="page-header">
+      <span class="eyebrow">Savings Goal</span>
+      <h1><%= budgetMonthLabel %></h1>
+      <p>Set one monthly savings target and update your saved amount as you go.</p>
+    </div>
+
+    <form method="GET" action="/savings-goals" class="savings-month-form">
+      <label for="month">Month</label>
+      <input type="month" id="month" name="month" value="<%= budgetMonth %>">
+      <button type="submit" class="btn btn--secondary btn--sm">View</button>
+    </form>
+  </div>
+
+  <% if (errors.length > 0) { %>
+    <div class="form-errors">
+      <% errors.forEach(function(err) { %><p><%= err %></p><% }) %>
+    </div>
+  <% } %>
+
+  <% if (successMessage) { %>
+    <div class="form-success"><%= successMessage %></div>
+  <% } %>
+
+  <section class="stat-grid savings-stats">
+    <article class="stat-card">
+      <span class="stat-card__label">Target</span>
+      <span class="stat-card__value stat-card__value--blue"><%= formatMoney(targetAmount) %></span>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__label">Saved</span>
+      <span class="stat-card__value stat-card__value--green"><%= formatMoney(currentSaved) %></span>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__label">Remaining</span>
+      <span class="stat-card__value"><%= formatMoney(remainingAmount) %></span>
+    </article>
+    <article class="stat-card">
+      <span class="stat-card__label">Progress</span>
+      <span class="stat-card__value"><%= progressValue %>%</span>
+      <% if (goal) { %>
+        <span class="pill pill--<%= goal.statusBadge %>"><%= goal.statusLabel %></span>
+      <% } %>
+    </article>
+  </section>
+
+  <div class="savings-layout">
+    <section class="card-panel savings-progress-card">
+      <% if (goal) { %>
+        <div class="savings-goal-title-row">
+          <div>
+            <h2><%= goal.goalName %></h2>
+            <p class="card-panel__intro"><%= goal.statusMessage %></p>
+          </div>
+          <span class="savings-goal-badge"><%= budgetMonthLabel %></span>
+        </div>
+
+        <div class="progress-meta">
+          <span><%= formatMoney(goal.currentAmount) %> saved</span>
+          <span><%= formatMoney(goal.targetAmount) %> goal</span>
+        </div>
+        <div class="progress-bar savings-progress-bar" aria-label="Savings progress">
+          <div class="progress-bar__fill <%= progressClass %>"></div>
+        </div>
+
+        <div class="savings-mini-grid">
+          <div>
+            <span>Monthly budget</span>
+            <strong><%= formatMoney(financeSummary.monthlyBudget) %></strong>
+          </div>
+          <div>
+            <span>Spent this month</span>
+            <strong><%= formatMoney(financeSummary.spentThisMonth) %></strong>
+          </div>
+          <div>
+            <span>Budget left</span>
+            <strong><%= formatMoney(financeSummary.remainingBudget) %></strong>
+          </div>
+        </div>
+
+        <form method="POST" action="/savings-goals/<%= goal.id %>/progress" class="savings-progress-form">
+          <input type="hidden" name="goalMonth" value="<%= budgetMonth %>">
+          <div class="form-group">
+            <label for="currentAmountQuick">Current saved amount</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              id="currentAmountQuick"
+              name="currentAmount"
+              value="<%= goal.currentAmount %>"
+              required
+            >
+          </div>
+          <button type="submit" class="btn btn--success btn--sm">Update Progress</button>
+        </form>
+
+        <form method="POST" action="/savings-goals/<%= goal.id %>" data-confirm data-confirm-title="Delete savings goal?" data-confirm-message="This removes the goal for <%= budgetMonthLabel %>." data-confirm-action-text="Delete" data-confirm-type="danger">
+          <input type="hidden" name="_method" value="DELETE">
+          <input type="hidden" name="goalMonth" value="<%= budgetMonth %>">
+          <button type="submit" class="savings-delete-btn">Delete goal</button>
+        </form>
+      <% } else { %>
+        <div class="savings-empty-state">
+          <span class="savings-empty-state__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M6 8h9.5a3 3 0 010 6H8a3 3 0 000 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <h2>No savings goal yet</h2>
+          <p>Create a target for <%= budgetMonthLabel %>.</p>
+        </div>
+      <% } %>
+    </section>
+
+    <aside class="card-panel savings-form-card">
+      <h2><%= goal ? 'Edit Goal' : 'Create Goal' %></h2>
+      <p class="card-panel__intro">Example: save $300 this month.</p>
+
+      <form method="POST" action="/savings-goals" class="savings-goal-form">
+        <input type="hidden" name="goalMonth" value="<%= budgetMonth %>">
+
+        <div class="form-group">
+          <label for="goalName">Goal name</label>
+          <input
+            type="text"
+            id="goalName"
+            name="goalName"
+            maxlength="120"
+            value="<%= formValues.goalName || (goal ? goal.goalName : '') %>"
+            placeholder="Save $300 this month"
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="targetAmount">Target amount</label>
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            id="targetAmount"
+            name="targetAmount"
+            value="<%= formValues.targetAmount || (goal ? goal.targetAmount : '') %>"
+            placeholder="300.00"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="currentAmount">Current saved amount</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            id="currentAmount"
+            name="currentAmount"
+            value="<%= formValues.currentAmount || (goal ? goal.currentAmount : 0) %>"
+            placeholder="0.00"
+          >
+        </div>
+
+        <button type="submit" class="btn btn--primary btn--block">
+          <%= goal ? 'Save Changes' : 'Create Savings Goal' %>
+        </button>
+      </form>
+    </aside>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
