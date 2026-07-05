@@ -11,6 +11,14 @@ const {
   normalizeMerchantName,
 } = require('../expenseValidationHelpers');
 const { isExpenseCountedForBudget } = require('../budgetHelpers');
+const { requireLogin } = require('../authHelpers');
+const { scheduleBudgetAlertCheck } = require('../budgetAlertEmailService');
+
+router.use(requireLogin);
+
+function triggerBudgetAlerts(req) {
+  scheduleBudgetAlertCheck(req.session.userId);
+}
 
 function formatSGD(amount) {
   return '$' + Number(amount).toFixed(2);
@@ -243,6 +251,7 @@ router.post('/', uploadExpenseImage, async (req, res) => {
       notes: (notes || '').trim(),
       imagePath: expenseImagePath,
     });
+    triggerBudgetAlerts(req);
     const safeReturnTo = getSafeExpenseReturnTo(req.body.returnTo);
     if (safeReturnTo) {
       return res.redirect(safeReturnTo);
@@ -369,6 +378,7 @@ async function handleExpenseUpdate(req, res) {
       notes: (notes || '').trim(),
       imagePath: expenseImagePath,
     });
+    triggerBudgetAlerts(req);
     res.redirect('/expenses');
   } catch (error) {
     console.error('Database error updating expense:', error);
@@ -412,6 +422,7 @@ router.post('/:id/update-date', async (req, res) => {
     }
 
     const expense = await store.getExpenseById(req.params.id);
+    triggerBudgetAlerts(req);
     res.json({ success: true, expense: expenseToJson(expense) });
   } catch (error) {
     console.error('Database error updating expense date:', error);
@@ -437,6 +448,7 @@ router.post('/:id/update-amount', async (req, res) => {
     }
 
     const expense = await store.getExpenseById(req.params.id);
+    triggerBudgetAlerts(req);
     res.json({ success: true, expense: expenseToJson(expense) });
   } catch (error) {
     console.error('Database error updating expense amount:', error);
@@ -555,6 +567,7 @@ router.post('/:id/update-excluded-from-budget', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Expense not found.' });
     }
 
+    triggerBudgetAlerts(req);
     res.json({ success: true, isExcludedFromBudget: excluded });
   } catch (error) {
     console.error('Database error updating expense exclusion flag:', error);
@@ -662,6 +675,7 @@ router.post('/:id/delete', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Expense not found.' });
     }
 
+    triggerBudgetAlerts(req);
     res.json({ success: true, id: String(req.params.id) });
   } catch (error) {
     console.error('Database error deleting expense:', error);

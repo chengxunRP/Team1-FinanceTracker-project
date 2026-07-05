@@ -45,6 +45,8 @@ const CATEGORY_IMAGES_BY_NAME = {
   School: CATEGORY_IMAGES_BY_ICON.school,
   Entertainment: CATEGORY_IMAGES_BY_ICON.entertainment,
   Shopping: CATEGORY_IMAGES_BY_ICON.shopping,
+  "Business Services": CATEGORY_IMAGES_BY_ICON.business_services,
+  "Cash & ATM": CATEGORY_IMAGES_BY_ICON.cash_atm,
   "Other categories": "",
   Others: "",
   Other: "",
@@ -55,14 +57,14 @@ function getCategoryImageUrl(name, icon) {
     return CATEGORY_IMAGES_BY_ICON[icon];
   }
 
+  if (name && CATEGORY_IMAGES_BY_NAME[name]) {
+    return CATEGORY_IMAGES_BY_NAME[name];
+  }
+
   const standardName = getStandardCategoryName(name);
 
   if (standardName && CATEGORY_IMAGES_BY_NAME[standardName]) {
     return CATEGORY_IMAGES_BY_NAME[standardName];
-  }
-
-  if (name && CATEGORY_IMAGES_BY_NAME[name]) {
-    return CATEGORY_IMAGES_BY_NAME[name];
   }
 
   return "";
@@ -90,7 +92,7 @@ function getCategoryVisual(category) {
     return { type: "default" };
   }
 
-  const src = getCategoryImageUrl(cat.name || cat.displayName, cat.icon);
+  const src = getCategoryImageUrl(cat.name, cat.icon);
   if (src) {
     return { type: "generalIcon", src };
   }

@@ -2,24 +2,48 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const financeHelpers = require('../financeHelpers');
-const budgetStore = require('../budgetStore');
+const { requireLogin } = require('../authHelpers');
+
+router.use(requireLogin);
 
 const CURRENCIES = ['USD', 'SGD', 'MYR', 'EUR', 'GBP', 'JPY', 'AUD'];
+const USER_FIELDS =
+  'id, name, email, monthly_income, currency, default_budget, email_alerts_enabled';
 
-async function buildSummary(user) {
-  const budgetMonth = budgetStore.getCurrentBudgetMonth();
-  const spent = await financeHelpers.getMonthlyExpenseTotal(budgetMonth);
-  const budget = user.default_budget != null ? Number(user.default_budget) : 0;
-  const remaining = budget - spent;
-  const percentUsed = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+function parseOptionalNumber(value) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function parseEmailAlertsEnabled(value) {
+  return (
+    value === true ||
+    value === 1 ||
+    value === '1' ||
+    value === 'on' ||
+    value === 'true'
+  );
+}
+
+async function buildSummary() {
+  const monthSummary = await financeHelpers.getCategoryBudgetTotalsSummary();
 
   return {
-    budgetMonth,
-    income: user.monthly_income != null ? Number(user.monthly_income) : 0,
-    budget,
-    spent,
-    remaining,
-    percentUsed,
+    budgetMonth: monthSummary.budgetMonth,
+    budget: monthSummary.budget,
+    spent: monthSummary.spent,
+    remaining: monthSummary.remaining,
+    percentUsed: monthSummary.percentUsed,
+  };
+}
+
+function buildRenderUser(row, income) {
+  return {
+    ...row,
+    income: income != null ? Number(income) : 0,
   };
 }
 
@@ -27,7 +51,7 @@ async function buildSummary(user) {
 router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, name, email, monthly_income, currency, default_budget FROM users WHERE id = ?',
+      `SELECT ${USER_FIELDS} FROM users WHERE id = ?`,
       [req.session.userId]
     );
 
@@ -35,12 +59,14 @@ router.get('/', async (req, res) => {
       return res.redirect('/login');
     }
 
-    const summary = await buildSummary(rows[0]);
+    const user = rows[0];
+    const summary = await buildSummary();
+    summary.income = user.monthly_income != null ? Number(user.monthly_income) : 0;
 
     res.render('auth/profile', {
       pageTitle: 'Profile Settings',
       activePage: 'profile',
-      user: rows[0],
+      user,
       currencies: CURRENCIES,
       summary,
       errors: [],
@@ -55,20 +81,36 @@ router.get('/', async (req, res) => {
 // POST /profile — update settings
 router.post('/', async (req, res) => {
   const { name, monthlyIncome, currency, defaultBudget } = req.body;
+  const emailAlertsEnabled = parseEmailAlertsEnabled(req.body.emailAlertsEnabled);
   const errors = [];
 
   if (!name || !name.trim()) errors.push('Name is required.');
-  if (monthlyIncome && isNaN(Number(monthlyIncome))) errors.push('Monthly income must be a number.');
-  if (defaultBudget && isNaN(Number(defaultBudget))) errors.push('Default budget must be a number.');
+  if (monthlyIncome !== '' && monthlyIncome != null && isNaN(Number(monthlyIncome))) {
+    errors.push('Monthly income must be a number.');
+  }
+  if (defaultBudget !== '' && defaultBudget != null && isNaN(Number(defaultBudget))) {
+    errors.push('Default budget must be a number.');
+  }
+
+  const parsedMonthlyIncome = parseOptionalNumber(monthlyIncome);
+  const parsedDefaultBudget = parseOptionalNumber(defaultBudget);
 
   try {
     if (errors.length) {
       const [rows] = await db.query(
-        'SELECT id, name, email, monthly_income, currency, default_budget FROM users WHERE id = ?',
+        `SELECT ${USER_FIELDS} FROM users WHERE id = ?`,
         [req.session.userId]
       );
-      const draftUser = { ...rows[0], name, monthly_income: monthlyIncome, currency, default_budget: defaultBudget };
-      const summary = await buildSummary(draftUser);
+      const draftUser = {
+        ...rows[0],
+        name,
+        monthly_income: parsedMonthlyIncome,
+        currency,
+        default_budget: parsedDefaultBudget,
+        email_alerts_enabled: emailAlertsEnabled ? 1 : 0,
+      };
+      const summary = await buildSummary();
+      summary.income = parsedMonthlyIncome != null ? Number(parsedMonthlyIncome) : 0;
       return res.render('auth/profile', {
         pageTitle: 'Profile Settings',
         activePage: 'profile',
@@ -82,13 +124,14 @@ router.post('/', async (req, res) => {
 
     await db.query(
       `UPDATE users
-       SET name = ?, monthly_income = ?, currency = ?, default_budget = ?
+       SET name = ?, monthly_income = ?, currency = ?, default_budget = ?, email_alerts_enabled = ?
        WHERE id = ?`,
       [
         name.trim(),
-        monthlyIncome ? Number(monthlyIncome) : null,
+        parsedMonthlyIncome,
         currency || 'USD',
-        defaultBudget ? Number(defaultBudget) : null,
+        parsedDefaultBudget,
+        emailAlertsEnabled ? 1 : 0,
         req.session.userId,
       ]
     );
@@ -96,16 +139,18 @@ router.post('/', async (req, res) => {
     req.session.userName = name.trim();
 
     const [rows] = await db.query(
-      'SELECT id, name, email, monthly_income, currency, default_budget FROM users WHERE id = ?',
+      `SELECT ${USER_FIELDS} FROM users WHERE id = ?`,
       [req.session.userId]
     );
 
-    const summary = await buildSummary(rows[0]);
+    const user = rows[0];
+    const summary = await buildSummary();
+    summary.income = user.monthly_income != null ? Number(user.monthly_income) : 0;
 
     res.render('auth/profile', {
       pageTitle: 'Profile Settings',
       activePage: 'profile',
-      user: rows[0],
+      user,
       currencies: CURRENCIES,
       summary,
       errors: [],
@@ -116,7 +161,14 @@ router.post('/', async (req, res) => {
     res.status(500).render('auth/profile', {
       pageTitle: 'Profile Settings',
       activePage: 'profile',
-      user: { id: req.session.userId, name, monthly_income: monthlyIncome, currency, default_budget: defaultBudget },
+      user: {
+        id: req.session.userId,
+        name,
+        monthly_income: parsedMonthlyIncome,
+        currency,
+        default_budget: parsedDefaultBudget,
+        email_alerts_enabled: emailAlertsEnabled ? 1 : 0,
+      },
       currencies: CURRENCIES,
       summary: { budgetMonth: '', income: 0, budget: 0, spent: 0, remaining: 0, percentUsed: 0 },
       errors: ['Unable to save changes right now. Please try again.'],

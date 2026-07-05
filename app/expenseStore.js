@@ -1,4 +1,5 @@
 const db = require("./config/db");
+const { requireUserId, expenseUserClause, accessibleCategoryClause, ownedCustomCategoryClause, generalCategoryClause } = require("./userScope");
 const {
   enrichCategory,
   enrichCategories,
@@ -22,7 +23,7 @@ async function getCategoryColumns() {
       FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = DATABASE()
         AND TABLE_NAME = 'categories'
-        AND COLUMN_NAME IN ('is_custom', 'is_deleted', 'deleted_at', 'icon_image')`
+        AND COLUMN_NAME IN ('is_custom', 'is_deleted', 'deleted_at', 'icon_image', 'user_id')`
     );
     const names = new Set(rows.map((r) => r.COLUMN_NAME));
     categoryColumnsCache = {
@@ -30,6 +31,7 @@ async function getCategoryColumns() {
       hasIsDeleted: names.has("is_deleted"),
       hasDeletedAt: names.has("deleted_at"),
       hasIconImage: names.has("icon_image"),
+      hasUserId: names.has("user_id"),
     };
   } catch (error) {
     categoryColumnsCache = {
@@ -37,6 +39,7 @@ async function getCategoryColumns() {
       hasIsDeleted: false,
       hasDeletedAt: false,
       hasIconImage: false,
+      hasUserId: false,
     };
   }
   return categoryColumnsCache;
@@ -118,12 +121,21 @@ async function getCategoryById(categoryId) {
   if (columns.hasIsDeleted) query += ", is_deleted";
   if (columns.hasIconImage) query += ", icon_image";
   query += " FROM categories WHERE id = ?";
+  const params = [Number(categoryId)];
+  if (columns.hasUserId && columns.hasIsCustom) {
+    const accessible = accessibleCategoryClause();
+    query += ` AND ${accessible.clause}`;
+    params.push(...accessible.params);
+  } else if (columns.hasUserId) {
+    query += " AND user_id = ?";
+    params.push(requireUserId());
+  }
   if (columns.hasIsDeleted) {
     query += " AND (is_deleted IS NULL OR is_deleted = 0)";
   }
   query += " LIMIT 1";
 
-  const [rows] = await db.query(query, [Number(categoryId)]);
+  const [rows] = await db.query(query, params);
   if (!rows.length) return null;
   return mapCategoryRow(rows[0]);
 }
@@ -134,9 +146,19 @@ async function getCategoryByIdIncludingDeleted(categoryId) {
   if (columns.hasIsCustom) query += ", is_custom";
   if (columns.hasIsDeleted) query += ", is_deleted";
   if (columns.hasIconImage) query += ", icon_image";
-  query += " FROM categories WHERE id = ? LIMIT 1";
+  query += " FROM categories WHERE id = ?";
+  const params = [Number(categoryId)];
+  if (columns.hasUserId && columns.hasIsCustom) {
+    const accessible = accessibleCategoryClause();
+    query += ` AND ${accessible.clause}`;
+    params.push(...accessible.params);
+  } else if (columns.hasUserId) {
+    query += " AND user_id = ?";
+    params.push(requireUserId());
+  }
+  query += " LIMIT 1";
 
-  const [rows] = await db.query(query, [Number(categoryId)]);
+  const [rows] = await db.query(query, params);
   if (!rows.length) return null;
   return mapCategoryRow(rows[0]);
 }
@@ -150,24 +172,35 @@ async function findCategoryByNameIncludingDeleted(name) {
   if (columns.hasIsCustom) query += ", is_custom";
   if (columns.hasIsDeleted) query += ", is_deleted";
   if (columns.hasIconImage) query += ", icon_image";
-  query += " FROM categories WHERE LOWER(name) = LOWER(?) LIMIT 1";
+  query += " FROM categories WHERE LOWER(name) = LOWER(?)";
+  const params = [trimmed];
+  if (columns.hasUserId && columns.hasIsCustom) {
+    const accessible = accessibleCategoryClause();
+    query += ` AND ${accessible.clause}`;
+    params.push(...accessible.params);
+  } else if (columns.hasUserId) {
+    query += " AND user_id = ?";
+    params.push(requireUserId());
+  }
+  query += " LIMIT 1";
 
-  const [rows] = await db.query(query, [trimmed]);
+  const [rows] = await db.query(query, params);
   if (!rows.length) return null;
   return mapCategoryRow(rows[0]);
 }
 
 async function categoryHasExpensesOrBudgets(categoryId) {
+  const userId = requireUserId();
   const [expenseRows] = await db.query(
-    "SELECT COUNT(*) AS count FROM expenses WHERE category_id = ?",
-    [Number(categoryId)]
+    "SELECT COUNT(*) AS count FROM expenses WHERE category_id = ? AND user_id = ?",
+    [Number(categoryId), userId]
   );
   const expenseCount = Number(expenseRows[0].count) || 0;
   if (expenseCount > 0) return true;
 
   const [budgetRows] = await db.query(
-    "SELECT COUNT(*) AS count FROM category_budgets WHERE category_id = ?",
-    [Number(categoryId)]
+    "SELECT COUNT(*) AS count FROM category_budgets WHERE category_id = ? AND user_id = ?",
+    [Number(categoryId), userId]
   );
   return Number(budgetRows[0].count) > 0;
 }
@@ -190,6 +223,10 @@ async function restoreSoftDeletedCategory(categoryId, trimmedName, visual) {
   }
   sql += " WHERE id = ?";
   params.push(Number(categoryId));
+  if (columns.hasUserId) {
+    sql += " AND user_id = ?";
+    params.push(requireUserId());
+  }
 
   await db.query(sql, params);
 }
@@ -198,11 +235,20 @@ async function categoryNameExists(name, excludeId) {
   const trimmed = String(name || "").trim();
   let query =
     "SELECT id, name, is_custom FROM categories WHERE LOWER(name) = LOWER(?)";
+  const params = [trimmed];
   const columns = await getCategoryColumns();
+  if (columns.hasUserId && columns.hasIsCustom) {
+    const accessible = accessibleCategoryClause();
+    query += ` AND ${accessible.clause}`;
+    params.push(...accessible.params);
+  } else if (columns.hasUserId) {
+    query += " AND user_id = ?";
+    params.push(requireUserId());
+  }
   if (columns.hasIsDeleted) {
     query += " AND (is_deleted IS NULL OR is_deleted = 0)";
   }
-  const [rows] = await db.query(query, [trimmed]);
+  const [rows] = await db.query(query, params);
   return rows.find((row) => String(row.id) !== String(excludeId || ""));
 }
 
@@ -210,24 +256,61 @@ async function insertCategoryRow(trimmed, visual) {
   const icon = DEFAULT_CUSTOM_ICON_KEY;
   const { color, iconImage } = visual;
   const columns = await getCategoryColumns();
+  const userId = columns.hasUserId ? requireUserId() : null;
   let result;
 
   if (columns.hasIsCustom && columns.hasIsDeleted && columns.hasIconImage) {
+    const cols = columns.hasUserId
+      ? "name, icon, color, icon_image, is_custom, is_deleted, user_id"
+      : "name, icon, color, icon_image, is_custom, is_deleted";
+    const vals = columns.hasUserId
+      ? "?, ?, ?, ?, 1, 0, ?"
+      : "?, ?, ?, ?, 1, 0";
+    const params = columns.hasUserId
+      ? [trimmed, icon, color, iconImage, userId]
+      : [trimmed, icon, color, iconImage];
     [result] = await db.query(
-      `INSERT INTO categories (name, icon, color, icon_image, is_custom, is_deleted)
-      VALUES (?, ?, ?, ?, 1, 0)`,
-      [trimmed, icon, color, iconImage]
+      `INSERT INTO categories (${cols}) VALUES (${vals})`,
+      params
     );
   } else if (columns.hasIsCustom && columns.hasIsDeleted) {
+    const cols = columns.hasUserId
+      ? "name, icon, color, is_custom, is_deleted, user_id"
+      : "name, icon, color, is_custom, is_deleted";
+    const vals = columns.hasUserId ? "?, ?, ?, 1, 0, ?" : "?, ?, ?, 1, 0";
+    const params = columns.hasUserId
+      ? [trimmed, icon, color, userId]
+      : [trimmed, icon, color];
     [result] = await db.query(
-      `INSERT INTO categories (name, icon, color, is_custom, is_deleted)
-      VALUES (?, ?, ?, 1, 0)`,
-      [trimmed, icon, color]
+      `INSERT INTO categories (${cols}) VALUES (${vals})`,
+      params
     );
   } else if (columns.hasIconImage) {
+    if (columns.hasIsCustom && columns.hasUserId) {
+      [result] = await db.query(
+        "INSERT INTO categories (name, icon, color, icon_image, is_custom, user_id) VALUES (?, ?, ?, ?, 1, ?)",
+        [trimmed, icon, color, iconImage, userId]
+      );
+    } else if (columns.hasUserId) {
+      [result] = await db.query(
+        "INSERT INTO categories (name, icon, color, icon_image, user_id) VALUES (?, ?, ?, ?, ?)",
+        [trimmed, icon, color, iconImage, userId]
+      );
+    } else {
+      [result] = await db.query(
+        "INSERT INTO categories (name, icon, color, icon_image) VALUES (?, ?, ?, ?)",
+        [trimmed, icon, color, iconImage]
+      );
+    }
+  } else if (columns.hasIsCustom && columns.hasUserId) {
     [result] = await db.query(
-      "INSERT INTO categories (name, icon, color, icon_image) VALUES (?, ?, ?, ?)",
-      [trimmed, icon, color, iconImage]
+      "INSERT INTO categories (name, icon, color, is_custom, user_id) VALUES (?, ?, ?, 1, ?)",
+      [trimmed, icon, color, userId]
+    );
+  } else if (columns.hasUserId) {
+    [result] = await db.query(
+      "INSERT INTO categories (name, icon, color, user_id) VALUES (?, ?, ?, ?)",
+      [trimmed, icon, color, userId]
     );
   } else {
     [result] = await db.query(
@@ -269,7 +352,13 @@ async function createCategory(name, options = {}) {
   if (existingAny && columns.hasIsDeleted && existingAny.is_deleted) {
     const inUse = await categoryHasExpensesOrBudgets(existingAny.id);
     if (!inUse) {
-      await db.query("DELETE FROM categories WHERE id = ?", [Number(existingAny.id)]);
+      const deleteParams = [Number(existingAny.id)];
+      let deleteSql = "DELETE FROM categories WHERE id = ?";
+      if (columns.hasUserId) {
+        deleteSql += " AND user_id = ?";
+        deleteParams.push(requireUserId());
+      }
+      await db.query(deleteSql, deleteParams);
     } else {
       await restoreSoftDeletedCategory(existingAny.id, trimmed, visual);
       return getCategoryById(existingAny.id);
@@ -352,17 +441,23 @@ async function updateCustomCategory(categoryId, payload = {}) {
   const { color, iconImage } = visual;
 
   try {
+    const userId = columns.hasUserId ? requireUserId() : null;
     if (columns.hasIconImage) {
-      await db.query(
-        "UPDATE categories SET name = ?, color = ?, icon_image = ? WHERE id = ?",
-        [trimmed, color, iconImage, Number(categoryId)]
-      );
+      let sql = "UPDATE categories SET name = ?, color = ?, icon_image = ? WHERE id = ?";
+      const params = [trimmed, color, iconImage, Number(categoryId)];
+      if (columns.hasUserId) {
+        sql += " AND user_id = ?";
+        params.push(userId);
+      }
+      await db.query(sql, params);
     } else {
-      await db.query("UPDATE categories SET name = ?, color = ? WHERE id = ?", [
-        trimmed,
-        color,
-        Number(categoryId),
-      ]);
+      let sql = "UPDATE categories SET name = ?, color = ? WHERE id = ?";
+      const params = [trimmed, color, Number(categoryId)];
+      if (columns.hasUserId) {
+        sql += " AND user_id = ?";
+        params.push(userId);
+      }
+      await db.query(sql, params);
     }
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
@@ -394,15 +489,16 @@ async function deleteCustomCategory(categoryId) {
     throw err;
   }
 
+  const userId = requireUserId();
   const [expenseRows] = await db.query(
-    "SELECT COUNT(*) AS count FROM expenses WHERE category_id = ?",
-    [Number(categoryId)]
+    "SELECT COUNT(*) AS count FROM expenses WHERE category_id = ? AND user_id = ?",
+    [Number(categoryId), userId]
   );
   const expenseCount = Number(expenseRows[0].count) || 0;
 
   const [budgetRows] = await db.query(
-    "SELECT COUNT(*) AS count FROM category_budgets WHERE category_id = ?",
-    [Number(categoryId)]
+    "SELECT COUNT(*) AS count FROM category_budgets WHERE category_id = ? AND user_id = ?",
+    [Number(categoryId), userId]
   );
   const hasBudget = Number(budgetRows[0].count) > 0;
 
@@ -410,12 +506,22 @@ async function deleteCustomCategory(categoryId) {
     const columns = await getCategoryColumns();
     let sql = "DELETE FROM categories WHERE id = ?";
     const params = [Number(categoryId)];
+    if (columns.hasUserId) {
+      sql += " AND user_id = ?";
+      params.push(userId);
+    }
     if (columns.hasIsCustom) {
       sql += " AND is_custom = 1";
     }
     const [result] = await db.query(sql, params);
     if (result.affectedRows === 0 && columns.hasIsCustom) {
-      await db.query("DELETE FROM categories WHERE id = ?", [Number(categoryId)]);
+      let fallbackSql = "DELETE FROM categories WHERE id = ?";
+      const fallbackParams = [Number(categoryId)];
+      if (columns.hasUserId) {
+        fallbackSql += " AND user_id = ?";
+        fallbackParams.push(userId);
+      }
+      await db.query(fallbackSql, fallbackParams);
     }
     return { deleted: true, softDeleted: false };
   }
@@ -425,8 +531,13 @@ async function deleteCustomCategory(categoryId) {
     let sql = "UPDATE categories SET is_deleted = 1";
     if (columns.hasDeletedAt) sql += ", deleted_at = NOW()";
     sql += " WHERE id = ?";
+    const softParams = [Number(categoryId)];
+    if (columns.hasUserId) {
+      sql += " AND user_id = ?";
+      softParams.push(userId);
+    }
     if (columns.hasIsCustom) sql += " AND is_custom = 1";
-    await db.query(sql, [Number(categoryId)]);
+    await db.query(sql, softParams);
     return { deleted: true, softDeleted: true };
   }
 
@@ -441,12 +552,25 @@ async function getCategories() {
     if (columns.hasIsDeleted) query += `, is_deleted`;
     if (columns.hasIconImage) query += `, icon_image`;
     query += ` FROM categories`;
+    const params = [];
+    const where = [];
+    if (columns.hasIsCustom && columns.hasUserId) {
+      const accessible = accessibleCategoryClause();
+      where.push(accessible.clause);
+      params.push(...accessible.params);
+    } else if (columns.hasUserId) {
+      where.push("(user_id IS NULL OR user_id = ?)");
+      params.push(requireUserId());
+    }
     if (columns.hasIsDeleted) {
-      query += ` WHERE (is_deleted IS NULL OR is_deleted = 0)`;
+      where.push(`(is_deleted IS NULL OR is_deleted = 0)`);
+    }
+    if (where.length) {
+      query += ` WHERE ${where.join(" AND ")}`;
     }
     query += ` ORDER BY name ASC`;
 
-    const [rows] = await db.query(query);
+    const [rows] = await db.query(query, params);
 
     return enrichCategories(rows.map((row) => mapCategoryRow(row))).sort(
       compareCategoriesForSort
@@ -462,7 +586,7 @@ function toPickerCategory(cat, isCustom) {
   return {
     id: enriched.id,
     name: enriched.name,
-    displayName: enriched.displayName || enriched.name,
+    displayName: enriched.name,
     icon: enriched.icon,
     iconImage: enriched.iconImage || null,
     color: enriched.color,
@@ -481,13 +605,22 @@ async function queryPickerCategories(isCustom) {
   if (columns.hasIsDeleted) query += `, is_deleted`;
   if (columns.hasIconImage) query += `, icon_image`;
   query += ` FROM categories WHERE `;
+  const params = [];
 
   if (columns.hasIsCustom) {
     query += `is_custom = ${isCustom ? 1 : 0}`;
+    if (isCustom && columns.hasUserId) {
+      query += ` AND user_id = ?`;
+      params.push(requireUserId());
+    }
   } else {
     query += isCustom
       ? `icon = '${DEFAULT_CUSTOM_ICON_KEY}'`
       : `(icon IS NULL OR icon != '${DEFAULT_CUSTOM_ICON_KEY}')`;
+    if (isCustom && columns.hasUserId) {
+      query += ` AND user_id = ?`;
+      params.push(requireUserId());
+    }
   }
 
   if (columns.hasIsDeleted) {
@@ -495,7 +628,7 @@ async function queryPickerCategories(isCustom) {
   }
   query += ` ORDER BY name ASC`;
 
-  const [rows] = await db.query(query);
+  const [rows] = await db.query(query, params);
   return rows.map((row) => mapCategoryRow(row));
 }
 
@@ -523,7 +656,10 @@ async function getCategoriesForPicker() {
 }
 
 async function getExpenseCount() {
-  const [rows] = await db.query("SELECT COUNT(*) AS count FROM expenses");
+  const [rows] = await db.query(
+    "SELECT COUNT(*) AS count FROM expenses WHERE user_id = ?",
+    [requireUserId()]
+  );
   return Number(rows[0].count) || 0;
 }
 
@@ -538,6 +674,10 @@ async function getAllExpenses(filters = {}) {
   const where = [];
   const params = [];
 
+  const userFilter = expenseUserClause("e");
+  where.push(userFilter.clause);
+  params.push(...userFilter.params);
+
   if (filters.category) {
     where.push("e.category_id = ?");
     params.push(Number(filters.category));
@@ -551,7 +691,7 @@ async function getAllExpenses(filters = {}) {
     params.push(q, q, q);
   }
 
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const whereSql = `WHERE ${where.join(" AND ")}`;
   const orderBy = sortMap[filters.sort] || sortMap["date-desc"];
   const columns = await getCategoryColumns();
   const categorySelect = buildJoinedCategorySelect(columns, "c");
@@ -592,6 +732,7 @@ async function getAllExpenses(filters = {}) {
 async function getExpenseById(id) {
   const columns = await getCategoryColumns();
   const categorySelect = buildJoinedCategorySelect(columns, "c");
+  const userFilter = expenseUserClause("e");
 
   const [rows] = await db.query(
     `SELECT
@@ -607,9 +748,9 @@ async function getExpenseById(id) {
       ${categorySelect}
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    WHERE e.id = ?
+    WHERE e.id = ? AND ${userFilter.clause}
     LIMIT 1`,
-    [Number(id)]
+    [Number(id), ...userFilter.params]
   );
 
   if (!rows.length) return null;
@@ -636,15 +777,17 @@ async function addExpense(expense) {
       amount,
       merchant_name,
       category_id,
+      user_id,
       expense_date,
       notes,
       image_path
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       expense.title,
       expense.amount,
       expense.merchantName || null,
       Number(expense.categoryId),
+      requireUserId(),
       expense.date,
       expense.notes || "",
       expense.imagePath || null,
@@ -655,6 +798,7 @@ async function addExpense(expense) {
 }
 
 async function updateExpense(id, expense) {
+  const userId = requireUserId();
   const [result] = await db.query(
     `UPDATE expenses
     SET
@@ -665,7 +809,7 @@ async function updateExpense(id, expense) {
       expense_date = ?,
       notes = ?,
       image_path = ?
-    WHERE id = ?`,
+    WHERE id = ? AND user_id = ?`,
     [
       expense.title,
       expense.amount,
@@ -675,6 +819,7 @@ async function updateExpense(id, expense) {
       expense.notes || "",
       expense.imagePath || null,
       Number(id),
+      userId,
     ]
   );
 
@@ -683,8 +828,8 @@ async function updateExpense(id, expense) {
 
 async function updateExpenseNotes(id, notes) {
   const [result] = await db.query(
-    `UPDATE expenses SET notes = ? WHERE id = ?`,
-    [notes || "", Number(id)]
+    `UPDATE expenses SET notes = ? WHERE id = ? AND user_id = ?`,
+    [notes || "", Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
@@ -692,8 +837,8 @@ async function updateExpenseNotes(id, notes) {
 
 async function updateExpenseDate(id, date) {
   const [result] = await db.query(
-    `UPDATE expenses SET expense_date = ? WHERE id = ?`,
-    [date, Number(id)]
+    `UPDATE expenses SET expense_date = ? WHERE id = ? AND user_id = ?`,
+    [date, Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
@@ -701,8 +846,8 @@ async function updateExpenseDate(id, date) {
 
 async function updateExpenseAmount(id, amount) {
   const [result] = await db.query(
-    `UPDATE expenses SET amount = ? WHERE id = ?`,
-    [amount, Number(id)]
+    `UPDATE expenses SET amount = ? WHERE id = ? AND user_id = ?`,
+    [amount, Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
@@ -710,8 +855,8 @@ async function updateExpenseAmount(id, amount) {
 
 async function updateExpenseMerchant(id, merchantName) {
   const [result] = await db.query(
-    `UPDATE expenses SET merchant_name = ? WHERE id = ?`,
-    [merchantName, Number(id)]
+    `UPDATE expenses SET merchant_name = ? WHERE id = ? AND user_id = ?`,
+    [merchantName, Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
@@ -719,8 +864,8 @@ async function updateExpenseMerchant(id, merchantName) {
 
 async function updateExpenseTitle(id, title) {
   const [result] = await db.query(
-    `UPDATE expenses SET title = ? WHERE id = ?`,
-    [title, Number(id)]
+    `UPDATE expenses SET title = ? WHERE id = ? AND user_id = ?`,
+    [title, Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
@@ -728,8 +873,8 @@ async function updateExpenseTitle(id, title) {
 
 async function updateExpenseCategory(id, categoryId) {
   const [result] = await db.query(
-    `UPDATE expenses SET category_id = ? WHERE id = ?`,
-    [Number(categoryId), Number(id)]
+    `UPDATE expenses SET category_id = ? WHERE id = ? AND user_id = ?`,
+    [Number(categoryId), Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
@@ -737,8 +882,8 @@ async function updateExpenseCategory(id, categoryId) {
 
 async function updateExpenseExcludedFromBudget(id, excluded) {
   const [result] = await db.query(
-    `UPDATE expenses SET is_excluded_from_budget = ? WHERE id = ?`,
-    [excluded ? 1 : 0, Number(id)]
+    `UPDATE expenses SET is_excluded_from_budget = ? WHERE id = ? AND user_id = ?`,
+    [excluded ? 1 : 0, Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
@@ -746,15 +891,18 @@ async function updateExpenseExcludedFromBudget(id, excluded) {
 
 async function updateExpenseReceipt(id, imagePath) {
   const [result] = await db.query(
-    `UPDATE expenses SET image_path = ? WHERE id = ?`,
-    [imagePath, Number(id)]
+    `UPDATE expenses SET image_path = ? WHERE id = ? AND user_id = ?`,
+    [imagePath, Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
 }
 
 async function deleteExpense(id) {
-  const [result] = await db.query("DELETE FROM expenses WHERE id = ?", [Number(id)]);
+  const [result] = await db.query(
+    "DELETE FROM expenses WHERE id = ? AND user_id = ?",
+    [Number(id), requireUserId()]
+  );
   return result.affectedRows > 0;
 }
 
@@ -786,6 +934,7 @@ async function getExpensesInMonth(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(budgetMonth);
   const { startDate, endExclusive } = budgetStore.getBudgetMonthDateRange(month);
 
+  const userFilter = expenseUserClause("e");
   const [rows] = await db.query(
     `SELECT
       e.id,
@@ -799,9 +948,9 @@ async function getExpensesInMonth(budgetMonth) {
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    WHERE e.expense_date >= ? AND e.expense_date < ?
+    WHERE e.expense_date >= ? AND e.expense_date < ? AND ${userFilter.clause}
     ORDER BY e.expense_date DESC, e.id DESC`,
-    [startDate, endExclusive]
+    [startDate, endExclusive, ...userFilter.params]
   );
 
   return rows.map((row) => ({

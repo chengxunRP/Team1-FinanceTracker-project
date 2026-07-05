@@ -77,6 +77,10 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 * 24 }, // 1 day
 }));
 
+const { userContextMiddleware } = require("./requestUserContext");
+const { requireLogin, getCurrentUserId } = require("./authHelpers");
+app.use(userContextMiddleware);
+
 // --- expense-nav script middleware ---
 app.use(function(req, res, next) {
   var _render = res.render.bind(res);
@@ -100,6 +104,9 @@ app.use(function(req, res, next) {
   next();
 });
 // --- End expense-nav script middleware ---
+
+app.use("/budget", requireLogin);
+app.use("/chatbot", requireLogin);
 
 async function getBudgetPageData(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(
@@ -241,12 +248,17 @@ async function renderOverviewPage(req, res) {
   }
 }
 
-app.get("/", renderOverviewPage);
-app.get("/dashboard", renderOverviewPage);
+app.get("/", requireLogin, renderOverviewPage);
+app.get("/dashboard", requireLogin, renderOverviewPage);
 
 app.get("/home", async (req, res) => {
   try {
-    const { summary } = await getBudgetPageData();
+    const currentUserId = getCurrentUserId(req);
+    let summary = buildBudgetSummary(0, [], 0);
+    if (currentUserId) {
+      const pageData = await getBudgetPageData();
+      summary = pageData.summary;
+    }
     res.render("home", {
       pageTitle: "Home",
       activePage: "landing",
@@ -263,6 +275,9 @@ app.get("/home", async (req, res) => {
 });
 
 app.get("/budget", async (req, res) => {
+  const currentUserId = getCurrentUserId(req);
+  console.log("Current user:", req.session);
+  console.log("Current user id:", currentUserId);
   try {
     const selectedMonth = budgetStore.normalizeBudgetMonth(
       req.query.month || budgetStore.getCurrentBudgetMonth()
