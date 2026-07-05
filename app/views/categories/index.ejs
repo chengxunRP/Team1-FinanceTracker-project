@@ -34,7 +34,7 @@
       <% } else { %>
         <div style="display:flex;flex-direction:column;gap:0.5rem;">
           <% categories.forEach(function(cat) { %>
-            <div class="card-panel" style="padding:1rem 1.25rem;border-left:4px solid <%= cat.color %>;display:flex;align-items:center;gap:1rem;margin-bottom:0;">
+            <div class="card-panel js-category-card" data-category-color="<%= cat.color || '' %>" style="padding:1rem 1.25rem;border-left:4px solid var(--border-soft);display:flex;align-items:center;gap:1rem;margin-bottom:0;">
 
               <!-- Icon -->
               <%- include('../partials/category-icon', { catName: cat.name, catIcon: cat.icon, catSize: 'md' }) %>
@@ -46,7 +46,7 @@
                   <span><%= cat.count %> expense<%= cat.count !== 1 ? 's' : '' %></span>
                   <% if (cat.count > 0) { %>
                     <span style="margin:0 0.35rem;opacity:0.4;">·</span>
-                    <span style="color:<%= cat.color %>;font-weight:600;">$<%= cat.total.toFixed(2) %> total</span>
+                    <span class="js-category-total" data-category-color="<%= cat.color || '' %>" style="font-weight:600;">$<%= cat.total.toFixed(2) %> total</span>
                   <% } %>
                 </div>
               </div>
@@ -115,8 +115,7 @@
             %>
               <label style="cursor:pointer;">
                 <input type="radio" name="icon" value="<%= icon %>" <%= selectedIcon === icon ? 'checked' : '' %> style="display:none;">
-                <span class="icon-picker-pill" data-icon="<%= icon %>"
-                  style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius-sm);border:1.5px solid <%= selectedIcon === icon ? 'var(--blue-mid)' : 'var(--border-soft)' %>;background:<%= selectedIcon === icon ? 'var(--blue-light)' : 'var(--white)' %>;font-size:0.75rem;font-weight:700;color:var(--text-muted);cursor:pointer;transition:all 0.15s;text-transform:capitalize;">
+                <span class="icon-picker-pill" data-icon="<%= icon %>" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius-sm);border:1.5px solid var(--border-soft);background:var(--white);font-size:0.75rem;font-weight:700;color:var(--text-muted);cursor:pointer;transition:all 0.15s;text-transform:capitalize;">
                   <%= icon.substring(0,3) %>
                 </span>
               </label>
@@ -133,9 +132,7 @@
             %>
               <label style="cursor:pointer;">
                 <input type="radio" name="color" value="<%= col.value %>" <%= selectedColor === col.value ? 'checked' : '' %> style="display:none;">
-                <span class="color-picker-swatch"
-                  style="display:block;width:28px;height:28px;border-radius:50%;background:<%= col.value %>;border:2.5px solid <%= selectedColor === col.value ? 'var(--text)' : 'transparent' %>;cursor:pointer;transition:all 0.15s;transform:<%= selectedColor === col.value ? 'scale(1.2)' : 'scale(1)' %>;"
-                  title="<%= col.label %>">
+                <span class="color-picker-swatch" data-color="<%= col.value %>" style="display:block;width:28px;height:28px;border-radius:50%;background:transparent;border:2.5px solid transparent;cursor:pointer;transition:all 0.15s;transform:scale(1);" title="<%= col.label %>">
                 </span>
               </label>
             <% }) %>
@@ -153,30 +150,56 @@
 </div>
 
 <script>
+document.querySelectorAll('.js-category-card').forEach(function(card) {
+  var color = card.getAttribute('data-category-color');
+  if (color) {
+    card.style.borderLeftColor = color;
+  }
+});
+
+document.querySelectorAll('.js-category-total').forEach(function(total) {
+  var color = total.getAttribute('data-category-color');
+  if (color) {
+    total.style.color = color;
+  }
+});
+
+function applyIconPickerState() {
+  document.querySelectorAll('input[name="icon"]').forEach(function(r) {
+    var pill = r.nextElementSibling;
+    if (!pill) return;
+    pill.style.borderColor = r.checked ? 'var(--blue-mid)' : 'var(--border-soft)';
+    pill.style.background = r.checked ? 'var(--blue-light)' : 'var(--white)';
+  });
+}
+
 // Icon picker highlight
 document.querySelectorAll('input[name="icon"]').forEach(function(r) {
   r.addEventListener('change', function() {
-    document.querySelectorAll('.icon-picker-pill').forEach(function(p) {
-      p.style.borderColor = 'var(--border-soft)';
-      p.style.background = 'var(--white)';
-    });
-    var pill = this.nextElementSibling;
-    pill.style.borderColor = 'var(--blue-mid)';
-    pill.style.background = 'var(--blue-light)';
+    applyIconPickerState();
   });
 });
+
+function applyColorPickerState() {
+  document.querySelectorAll('input[name="color"]').forEach(function(r) {
+    var swatch = r.nextElementSibling;
+    if (!swatch) return;
+    var color = swatch.getAttribute('data-color') || 'transparent';
+    swatch.style.background = color;
+    swatch.style.border = r.checked ? '2.5px solid var(--text)' : '2.5px solid transparent';
+    swatch.style.transform = r.checked ? 'scale(1.2)' : 'scale(1)';
+  });
+}
+
 // Color picker highlight
 document.querySelectorAll('input[name="color"]').forEach(function(r) {
   r.addEventListener('change', function() {
-    document.querySelectorAll('.color-picker-swatch').forEach(function(s) {
-      s.style.border = '2.5px solid transparent';
-      s.style.transform = 'scale(1)';
-    });
-    var swatch = this.nextElementSibling;
-    swatch.style.border = '2.5px solid var(--text)';
-    swatch.style.transform = 'scale(1.2)';
+    applyColorPickerState();
   });
 });
+
+applyIconPickerState();
+applyColorPickerState();
 </script>
 
 <script src="/js/expense-nav.js"></script>

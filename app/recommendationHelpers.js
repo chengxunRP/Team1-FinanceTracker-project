@@ -278,7 +278,6 @@ function getSpendingRecommendation(summary, expenses, item) {
     alreadyAtWarning ||
     pushesToWarning ||
     usesLargeShareOfRemaining ||
-    isHighSpendCategory ||
     leavesLittleRemaining
   ) {
     result = "Risky";

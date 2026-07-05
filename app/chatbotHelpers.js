@@ -9,6 +9,7 @@ const {
   isSpendingAdviceQuestion,
   isSavingTipsQuestion,
 } = require("./purchaseCheckHelpers");
+const recommendationHelpers = require("./recommendationHelpers");
 const { roundMoney } = require("./financeSummaryService");
 
 const SUGGESTED_QUESTIONS = [
@@ -339,7 +340,7 @@ function isBudgetedCategorySpendQuestion(text) {
   );
 }
 
-function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, liveSummary) {
+function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, liveSummary, expenses) {
   const text = (message || "").trim().toLowerCase();
   const highestCategory = financeSnapshot.highestCategory || "—";
   const highestCategoryAmount = financeSnapshot.highestCategoryAmount || 0;
@@ -356,7 +357,35 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
         "Add a category budget or All Categories Budget on Spending & Budgets first.",
       ].join("\n");
     }
-    return buildPurchaseCheckReply(summary, itemPrice);
+    // Prefer the richer recommendation helper which includes reasons and insight.
+    try {
+      const item = { itemName: 'Item', itemPrice, category: 'Everything else' };
+      const rec = recommendationHelpers.getSpendingRecommendation(summary, Array.isArray(expenses) ? expenses : [], item);
+      // Format a readable reply similar to the purchase check helper.
+      const lines = [];
+      lines.push(`Status: ${rec.result}`);
+      lines.push("");
+      lines.push("Current situation:");
+      lines.push(`- Monthly budget: $${summary.monthlyBudget}`);
+      lines.push(`- Current spent: $${summary.totalSpent}`);
+      lines.push(`- Current remaining: $${summary.remainingBudget}`);
+      lines.push("");
+      lines.push("After purchase:");
+      lines.push(`- Item price: $${rec.itemPrice}`);
+      lines.push(`- New total spent: $${rec.analysis.newTotalSpent}`);
+      lines.push(`- Remaining after purchase: $${rec.analysis.newRemainingBudget}`);
+      lines.push(`- Budget used after purchase: ${rec.analysis.newPercentageUsed}%`);
+      lines.push("");
+      lines.push("Advice:");
+      if (rec.reasons && rec.reasons.length) {
+        lines.push(`- ${rec.reasons.join('\n- ')}`);
+      } else {
+        lines.push("- Consider whether this purchase is necessary based on your remaining budget.");
+      }
+      return lines.join("\n");
+    } catch (e) {
+      return buildPurchaseCheckReply(summary, itemPrice);
+    }
   }
 
   if (isSavingTipsQuestion(message)) {
@@ -487,7 +516,8 @@ async function getFinBotReply(
     summary,
     financeSnapshot,
     budgetMonthLabel,
-    liveSummary
+    liveSummary,
+    expenses
   );
 
   if (!process.env.GROQ_API_KEY || !hasGroqApiKey()) {

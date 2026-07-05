@@ -45,6 +45,11 @@
       <input type="search" id="expenseCategorySearch" placeholder="Search category" autocomplete="off">
     </div>
 
+    <div style="padding:0 1.25rem 0.5rem; font-size:0.82rem; color:var(--text-muted);">
+      Can't find a category?
+      <a href="/categories" target="_blank" rel="noopener" style="font-weight:600;">Manage categories</a>
+    </div>
+
     <div class="spb-modal__body pocketguard-style-modal-body">
       <%- include('shared-category-picker-lists', {
         pickerMode: 'expense',

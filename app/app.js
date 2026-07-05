@@ -1189,7 +1189,8 @@ app.post("/chatbot", async (req, res) => {
           summary,
           financeSnapshot,
           budgetMonthLabel,
-          liveSummary
+          liveSummary,
+          expensesInMonth
         );
         await addChatMessage(sessionId, "bot", replyText, welcomeText);
         groqAiMode = false;
