@@ -16,6 +16,7 @@ const {
   getFinBotReply,
   getWelcomeMessage,
 } = require("./chatbotHelpers");
+const { getLiveFinanceSummary } = require("./financeSummaryService");
 const { getSessionId } = require("./sessionCookie");
 const {
   getChatHistory,
@@ -1058,23 +1059,15 @@ function ensureFinanceSnapshot(summary, financeSnapshotOrExpenses, categories, s
   return snapshot;
 }
 
-function renderChatbotPage(
-  res,
-  summary,
-  financeSnapshot,
-  messages,
-  groqAiMode,
-  inputText,
-  budgetMonthLabel,
-  monthExpenseCount
-) {
+function renderChatbotPage(res, liveSummary, messages, groqAiMode, inputText) {
   res.render("chatbot", {
     pageTitle: "FinBot",
     activePage: "chatbot",
-    summary,
-    financeSnapshot,
-    budgetMonthLabel: budgetMonthLabel || "",
-    monthExpenseCount: monthExpenseCount || 0,
+    liveSummary,
+    summary: liveSummary.summary,
+    financeSnapshot: liveSummary.financeSnapshot,
+    budgetMonthLabel: liveSummary.budgetMonthLabel || "",
+    monthExpenseCount: liveSummary.expenseCountThisMonth || 0,
     messages,
     suggestedQuestions: SUGGESTED_QUESTIONS,
     inputText: inputText || "",
@@ -1082,30 +1075,47 @@ function renderChatbotPage(
   });
 }
 
+/** Same MySQL load as GET /budget, mapped for FinBot snapshot + answers. */
+async function loadFinBotLiveSummary(budgetMonth) {
+  return getLiveFinanceSummary(budgetMonth, getBudgetPageData);
+}
+
 app.get("/chatbot", async (req, res) => {
   try {
-    const pageData = await getBudgetPageData();
-    const { summary, financeSnapshot, budgetMonthLabel, monthExpenseCount } = pageData;
+    const liveSummary = await loadFinBotLiveSummary();
     const sessionId = getSessionId(req, res);
     const welcomeText = getWelcomeMessage();
     const messages = await getChatHistory(sessionId, welcomeText);
 
-    renderChatbotPage(
-      res,
-      summary,
-      financeSnapshot,
-      messages,
-      false,
-      "",
-      budgetMonthLabel,
-      monthExpenseCount
-    );
+    renderChatbotPage(res, liveSummary, messages, false, "");
   } catch (error) {
     console.error("Database error loading chatbot:", error);
     const emptySummary = buildBudgetSummary(0, []);
     res.status(500).render("chatbot", {
       pageTitle: "FinBot",
       activePage: "chatbot",
+      liveSummary: {
+        hasBudget: false,
+        hasCategoryBudgets: false,
+        hasAllTransactionsBudget: false,
+        categoryBudgetTotal: 0,
+        categoryBudgetSpent: 0,
+        categoryBudgetRemaining: 0,
+        categoryBudgetPctUsed: 0,
+        topBudgetedCategoryName: "—",
+        topBudgetedCategorySpent: 0,
+        allTransactionsBudget: 0,
+        allTransactionsSpent: 0,
+        allTransactionsRemaining: 0,
+        allTransactionsPctUsed: 0,
+        monthlyBudgetTotal: 0,
+        spentThisMonth: 0,
+        remainingThisMonth: 0,
+        expenseCountThisMonth: 0,
+        topCategoryName: "—",
+        topCategorySpent: 0,
+        everythingElseTotal: 0,
+      },
       summary: emptySummary,
       financeSnapshot: financeHelpers.buildFinanceSnapshot(emptySummary, {}, [], "month"),
       budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
@@ -1132,21 +1142,30 @@ app.post("/chatbot/clear", async (req, res) => {
 });
 
 app.post("/chatbot", async (req, res) => {
-  const rawMessage = (req.body.message || req.body.question || "").trim();
+  const wantsJson =
+    req.is("application/json") ||
+    String(req.get("Accept") || "").includes("application/json");
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const rawMessage = String(body.message || body.question || "").trim();
+
+  if (wantsJson && !rawMessage) {
+    return res.status(400).json({ error: "Message is required" });
+  }
 
   try {
-    const pageData = await getBudgetPageData();
+    // Always reload latest MySQL totals for every question (same source as /budget).
+    const liveSummary = await loadFinBotLiveSummary();
     const {
       summary,
       financeSnapshot,
-      expensesInMonth,
       budgetMonthLabel,
-      monthExpenseCount,
-    } = pageData;
+    } = liveSummary;
+    const expensesInMonth = await expenseStore.getExpensesInMonth(liveSummary.month);
     const sessionId = getSessionId(req, res);
     const welcomeText = getWelcomeMessage();
 
     let groqAiMode = false;
+    let replyText = "";
 
     if (rawMessage.length > 0) {
       await addChatMessage(sessionId, "user", rawMessage, welcomeText);
@@ -1157,39 +1176,63 @@ app.post("/chatbot", async (req, res) => {
           summary,
           financeSnapshot,
           expensesInMonth,
-          budgetMonthLabel
+          budgetMonthLabel,
+          liveSummary
         );
-        await addChatMessage(sessionId, "bot", reply.text, welcomeText);
+        replyText = reply.text;
+        await addChatMessage(sessionId, "bot", replyText, welcomeText);
         groqAiMode = reply.usedGroq;
       } catch (error) {
         console.log("Groq API failed, using fallback");
-        await addChatMessage(
-          sessionId,
-          "bot",
-          buildFinBotReply(rawMessage, summary, financeSnapshot, budgetMonthLabel),
-          welcomeText
+        replyText = buildFinBotReply(
+          rawMessage,
+          summary,
+          financeSnapshot,
+          budgetMonthLabel,
+          liveSummary
         );
+        await addChatMessage(sessionId, "bot", replyText, welcomeText);
         groqAiMode = false;
       }
     }
 
+    if (wantsJson) {
+      return res.json({ reply: replyText, usedGroq: groqAiMode });
+    }
+
     const messages = await getChatHistory(sessionId, welcomeText);
-    renderChatbotPage(
-      res,
-      summary,
-      financeSnapshot,
-      messages,
-      groqAiMode,
-      rawMessage,
-      budgetMonthLabel,
-      monthExpenseCount
-    );
+    renderChatbotPage(res, liveSummary, messages, groqAiMode, rawMessage);
   } catch (error) {
-    console.error("Database error processing chatbot message:", error);
+    console.error("FinBot message error:", error);
+    if (wantsJson) {
+      return res.status(500).json({ error: "Failed to process message" });
+    }
     const emptySummary = buildBudgetSummary(0, []);
     res.status(500).render("chatbot", {
       pageTitle: "FinBot",
       activePage: "chatbot",
+      liveSummary: {
+        hasBudget: false,
+        hasCategoryBudgets: false,
+        hasAllTransactionsBudget: false,
+        categoryBudgetTotal: 0,
+        categoryBudgetSpent: 0,
+        categoryBudgetRemaining: 0,
+        categoryBudgetPctUsed: 0,
+        topBudgetedCategoryName: "—",
+        topBudgetedCategorySpent: 0,
+        allTransactionsBudget: 0,
+        allTransactionsSpent: 0,
+        allTransactionsRemaining: 0,
+        allTransactionsPctUsed: 0,
+        monthlyBudgetTotal: 0,
+        spentThisMonth: 0,
+        remainingThisMonth: 0,
+        expenseCountThisMonth: 0,
+        topCategoryName: "—",
+        topCategorySpent: 0,
+        everythingElseTotal: 0,
+      },
       summary: emptySummary,
       financeSnapshot: financeHelpers.buildFinanceSnapshot(emptySummary, {}, [], "month"),
       budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
