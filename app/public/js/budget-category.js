@@ -32,7 +32,8 @@
   }
 
   function isTxExcluded(tx) {
-    return tx && tx.isExcludedFromBudget === true;
+    if (!tx) return false;
+    return tx.isExcludedFromBudget === true || tx.isExcludedFromAllBudget === true;
   }
 
   function computeStats(transactions) {

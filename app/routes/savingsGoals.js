@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 const budgetStore = require("../budgetStore");
 const savingsGoalStore = require("../savingsGoalStore");
+const { requireLogin } = require("../authHelpers");
+
+router.use(requireLogin);
 
 function getMonthFromRequest(req) {
   return budgetStore.normalizeBudgetMonth(
@@ -90,6 +93,13 @@ router.get("/", async (req, res) => {
       goal: null,
       budgetMonth: month,
       budgetMonthLabel: budgetStore.formatBudgetMonthLabel(month),
+      estimatedSavings: {
+        amount: 0,
+        monthlyIncome: 0,
+        monthExpenses: 0,
+        hasIncome: false,
+        isNegative: false,
+      },
       errors: ["Unable to load savings goals right now. Please try again."],
       successMessage: "",
       isEditingGoal: false,
@@ -125,8 +135,21 @@ router.post("/", async (req, res) => {
 });
 
 router.post("/:id/progress", async (req, res) => {
-  const validation = savingsGoalStore.validateSavingsProgressInput(req.body);
   const month = getMonthFromRequest(req);
+
+  let goal;
+  try {
+    goal = await savingsGoalStore.getGoalById(req.params.id);
+  } catch (error) {
+    console.error("Database error loading savings goal for progress:", error);
+    return res.redirect(`/savings-goals?month=${encodeURIComponent(month)}`);
+  }
+
+  if (!goal) {
+    return res.redirect(`/savings-goals?month=${encodeURIComponent(month)}`);
+  }
+
+  const validation = savingsGoalStore.validateSavingsProgressInput(req.body, goal);
 
   if (!validation.valid) {
     return renderSavingsPage(res, month, {
@@ -136,11 +159,11 @@ router.post("/:id/progress", async (req, res) => {
   }
 
   try {
-    const goal = await savingsGoalStore.addSavingsGoalProgress(
+    const updatedGoal = await savingsGoalStore.addSavingsGoalProgress(
       req.params.id,
       validation.amountToAdd
     );
-    res.redirect(buildSavingsPageRedirect(goal.goalMonth, "progress"));
+    res.redirect(buildSavingsPageRedirect(updatedGoal.goalMonth, "progress"));
   } catch (error) {
     console.error("Database error updating savings goal progress:", error);
     if (error.code === "NOT_FOUND") {

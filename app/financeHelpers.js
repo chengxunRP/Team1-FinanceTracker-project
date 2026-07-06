@@ -29,8 +29,7 @@ async function getMonthlyExpenseTotal(budgetMonth) {
     `SELECT CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
      FROM expenses
      WHERE expense_date >= ? AND expense_date < ?
-       AND user_id = ?
-       AND COALESCE(is_excluded_from_budget, 0) = 0`,
+       AND user_id = ?`,
     [startDate, endExclusive, userId]
   );
 

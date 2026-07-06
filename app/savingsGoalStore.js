@@ -1,5 +1,7 @@
 const db = require("./config/db");
 const budgetStore = require("./budgetStore");
+const financeHelpers = require("./financeHelpers");
+const { requireUserId } = require("./userScope");
 
 const DEFAULT_GOAL_NAME = "Savings goal";
 const MAX_GOAL_NAME_LENGTH = 120;
@@ -13,16 +15,39 @@ async function ensureSavingsGoalsTable() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS savings_goals (
       id             INT AUTO_INCREMENT PRIMARY KEY,
+      user_id        INT UNSIGNED  NOT NULL,
       goal_name      VARCHAR(120)  NOT NULL DEFAULT 'Savings goal',
       target_amount  DECIMAL(10,2) NOT NULL,
       current_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
       goal_month     CHAR(7)       NOT NULL COMMENT 'YYYY-MM',
       created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY uq_savings_goals_month (goal_month),
+      UNIQUE KEY uq_savings_goals_user_month (user_id, goal_month),
+      INDEX idx_savings_goals_user_id (user_id),
       INDEX idx_savings_goals_goal_month (goal_month)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  const [userIdColumn] = await db.query(
+    "SHOW COLUMNS FROM savings_goals LIKE 'user_id'"
+  );
+
+  if (!userIdColumn.length) {
+    await db.query(
+      "ALTER TABLE savings_goals ADD COLUMN user_id INT UNSIGNED NULL AFTER id"
+    );
+    try {
+      await db.query("ALTER TABLE savings_goals DROP INDEX uq_savings_goals_month");
+    } catch (error) {
+      if (error.code !== "ER_CANT_DROP_FIELD_OR_KEY") throw error;
+    }
+    await db.query(
+      "ALTER TABLE savings_goals ADD UNIQUE KEY uq_savings_goals_user_month (user_id, goal_month)"
+    );
+    await db.query(
+      "ALTER TABLE savings_goals ADD INDEX idx_savings_goals_user_id (user_id)"
+    );
+  }
 
   savingsGoalTableReady = true;
 }
@@ -141,6 +166,13 @@ function validateSavingsGoalInput(body) {
     errors.push("Current saved amount cannot be negative.");
   } else if (currentAmount > MAX_AMOUNT) {
     errors.push("Current saved amount is too large.");
+  } else if (
+    !Number.isNaN(targetAmount) &&
+    targetAmount > 0 &&
+    !Number.isNaN(currentAmount) &&
+    currentAmount > targetAmount
+  ) {
+    errors.push("Saved amount cannot be greater than the target amount.");
   }
 
   return {
@@ -155,18 +187,31 @@ function validateSavingsGoalInput(body) {
   };
 }
 
-function validateSavingsProgressInput(body) {
+function validateSavingsProgressInput(body, goal) {
   const errors = [];
   const amountToAdd = parseMoneyInput(
     body.amountToAdd ?? body.amount_to_add ?? body.currentAmount ?? body.current_amount
   );
 
+  if (goal && goal.isComplete) {
+    errors.push("You have already reached your savings target.");
+  }
+
   if (Number.isNaN(amountToAdd)) {
-    errors.push("Amount saved must be a valid number.");
+    errors.push("Add saved amount must be a valid number.");
   } else if (amountToAdd <= 0) {
-    errors.push("Amount saved must be greater than zero.");
+    errors.push("Add saved amount must be greater than zero.");
   } else if (amountToAdd > MAX_AMOUNT) {
-    errors.push("Amount saved is too large.");
+    errors.push("Add saved amount is too large.");
+  } else if (
+    goal &&
+    !Number.isNaN(amountToAdd) &&
+    roundMoney(goal.currentAmount + amountToAdd) > goal.targetAmount
+  ) {
+    const remaining = roundMoney(goal.targetAmount - goal.currentAmount);
+    errors.push(
+      `Add saved amount cannot exceed the remaining target (${remaining.toFixed(2)}).`
+    );
   }
 
   return {
@@ -179,6 +224,7 @@ function validateSavingsProgressInput(body) {
 async function getGoalForMonth(goalMonth) {
   await ensureSavingsGoalsTable();
   const month = budgetStore.normalizeBudgetMonth(goalMonth);
+  const userId = requireUserId();
 
   const [rows] = await db.query(
     `SELECT
@@ -190,9 +236,9 @@ async function getGoalForMonth(goalMonth) {
       created_at AS createdAt,
       updated_at AS updatedAt
     FROM savings_goals
-    WHERE goal_month = ?
+    WHERE goal_month = ? AND user_id = ?
     LIMIT 1`,
-    [month]
+    [month, userId]
   );
 
   return mapGoalRow(rows[0]);
@@ -200,6 +246,7 @@ async function getGoalForMonth(goalMonth) {
 
 async function getGoalById(id) {
   await ensureSavingsGoalsTable();
+  const userId = requireUserId();
 
   const [rows] = await db.query(
     `SELECT
@@ -211,9 +258,9 @@ async function getGoalById(id) {
       created_at AS createdAt,
       updated_at AS updatedAt
     FROM savings_goals
-    WHERE id = ?
+    WHERE id = ? AND user_id = ?
     LIMIT 1`,
-    [Number(id)]
+    [Number(id), userId]
   );
 
   return mapGoalRow(rows[0]);
@@ -222,19 +269,22 @@ async function getGoalById(id) {
 async function saveSavingsGoal(values) {
   await ensureSavingsGoalsTable();
   const goalMonth = budgetStore.normalizeBudgetMonth(values.goalMonth);
+  const userId = requireUserId();
 
   await db.query(
     `INSERT INTO savings_goals (
+      user_id,
       goal_name,
       target_amount,
       current_amount,
       goal_month
-    ) VALUES (?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       goal_name = VALUES(goal_name),
       target_amount = VALUES(target_amount),
       current_amount = VALUES(current_amount)`,
     [
+      userId,
       values.goalName || DEFAULT_GOAL_NAME,
       roundMoney(values.targetAmount),
       roundMoney(values.currentAmount),
@@ -247,12 +297,13 @@ async function saveSavingsGoal(values) {
 
 async function updateSavingsGoalProgress(id, currentAmount) {
   await ensureSavingsGoalsTable();
+  const userId = requireUserId();
 
   const [result] = await db.query(
     `UPDATE savings_goals
     SET current_amount = ?
-    WHERE id = ?`,
-    [roundMoney(currentAmount), Number(id)]
+    WHERE id = ? AND user_id = ?`,
+    [roundMoney(currentAmount), Number(id), userId]
   );
 
   if (result.affectedRows === 0) {
@@ -273,7 +324,9 @@ async function addSavingsGoalProgress(id, amountToAdd) {
     throw err;
   }
 
-  const nextAmount = roundMoney(goal.currentAmount + amountToAdd);
+  const remaining = roundMoney(goal.targetAmount - goal.currentAmount);
+  const effectiveAdd = Math.min(amountToAdd, remaining);
+  const nextAmount = roundMoney(goal.currentAmount + effectiveAdd);
 
   if (nextAmount > MAX_AMOUNT) {
     const err = new Error("Saved amount is too large.");
@@ -286,22 +339,63 @@ async function addSavingsGoalProgress(id, amountToAdd) {
 
 async function deleteSavingsGoal(id) {
   await ensureSavingsGoalsTable();
+  const userId = requireUserId();
 
-  const [result] = await db.query("DELETE FROM savings_goals WHERE id = ?", [
-    Number(id),
-  ]);
+  const [result] = await db.query(
+    "DELETE FROM savings_goals WHERE id = ? AND user_id = ?",
+    [Number(id), userId]
+  );
 
   return result.affectedRows > 0;
 }
 
+async function getUserMonthlyIncome() {
+  const userId = requireUserId();
+  const [rows] = await db.query(
+    "SELECT monthly_income FROM users WHERE id = ?",
+    [userId]
+  );
+
+  if (!rows.length || rows[0].monthly_income == null) {
+    return 0;
+  }
+
+  return Number(rows[0].monthly_income) || 0;
+}
+
+/** Profile income minus counted month expenses for the logged-in user. */
+async function getEstimatedAvailableToSave(goalMonth) {
+  const month = budgetStore.normalizeBudgetMonth(goalMonth);
+  const [monthlyIncome, monthExpenses] = await Promise.all([
+    getUserMonthlyIncome(),
+    financeHelpers.getMonthlyExpenseTotal(month),
+  ]);
+
+  const rawEstimate = roundMoney(monthlyIncome - monthExpenses);
+  const amount = Math.max(rawEstimate, 0);
+
+  return {
+    monthlyIncome,
+    monthExpenses,
+    rawEstimate,
+    amount,
+    hasIncome: monthlyIncome > 0,
+    isNegative: rawEstimate < 0,
+  };
+}
+
 async function getSavingsPageData(goalMonth) {
   const month = budgetStore.normalizeBudgetMonth(goalMonth);
-  const goal = await getGoalForMonth(month);
+  const [goal, estimatedSavings] = await Promise.all([
+    getGoalForMonth(month),
+    getEstimatedAvailableToSave(month),
+  ]);
 
   return {
     goal,
     budgetMonth: month,
     budgetMonthLabel: budgetStore.formatBudgetMonthLabel(month),
+    estimatedSavings,
   };
 }
 
@@ -310,6 +404,8 @@ module.exports = {
   validateSavingsGoalInput,
   validateSavingsProgressInput,
   getGoalForMonth,
+  getGoalById,
+  getEstimatedAvailableToSave,
   saveSavingsGoal,
   updateSavingsGoalProgress,
   addSavingsGoalProgress,

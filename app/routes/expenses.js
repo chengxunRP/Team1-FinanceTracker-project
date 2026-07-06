@@ -568,13 +568,17 @@ router.post('/:id/update-excluded-from-budget', async (req, res) => {
     }
 
     triggerBudgetAlerts(req);
-    res.json({ success: true, isExcludedFromBudget: excluded });
+    res.json({
+      success: true,
+      isExcludedFromBudget: excluded,
+      isExcludedFromAllBudget: excluded,
+    });
   } catch (error) {
-    console.error('Database error updating expense exclusion flag:', error);
+    console.error('Database error updating expense exclusion flags:', error);
     if (error && error.code === 'ER_BAD_FIELD_ERROR') {
       return res.status(500).json({
         success: false,
-        error: 'Database update required. Run db/expense_excluded_from_budget_update.sql',
+        error: 'Database update required. Run db/all_categories_exclusion_update.sql',
       });
     }
     res.status(500).json({ success: false, error: 'Unable to save preference.' });

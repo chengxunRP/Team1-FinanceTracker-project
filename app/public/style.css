@@ -704,6 +704,7 @@ a.btn:hover { text-decoration: none; }
 .savings-goal-form input,
 .savings-progress-form input {
   width: 100%;
+  min-width: 0;
   min-height: 42px;
   padding: 0.65rem 0.8rem;
   border: 1px solid var(--grey-300);
@@ -711,6 +712,8 @@ a.btn:hover { text-decoration: none; }
   background: var(--white);
   color: var(--text);
   font: inherit;
+  box-sizing: border-box;
+  pointer-events: auto;
 }
 
 .savings-month-form input[type="month"] {
@@ -739,14 +742,33 @@ a.btn:hover { text-decoration: none; }
   margin-bottom: 0;
 }
 
+.savings-stats--5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.stat-card--estimate .savings-estimate-detail,
+.stat-card--estimate .savings-estimate-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 .savings-progress-card,
 .savings-form-card {
   margin-bottom: 0;
 }
 
+.savings-progress-card {
+  position: relative;
+  z-index: 2;
+}
+
 .savings-form-card {
   position: sticky;
   top: calc(var(--topbar-height) + 1rem);
+  z-index: 1;
 }
 
 .savings-goal-title-row {
@@ -810,17 +832,34 @@ a.btn:hover { text-decoration: none; }
 }
 
 .savings-progress-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.8rem;
-  flex-wrap: wrap;
   margin-top: 1.25rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--border-soft);
+  position: relative;
+  z-index: 2;
 }
 
 .savings-progress-form .form-group {
-  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.savings-progress-form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.savings-progress-form-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.savings-progress-form-row .btn {
+  flex-shrink: 0;
+  min-height: 42px;
+  height: 42px;
+  padding: 0 1rem;
+  white-space: nowrap;
 }
 
 .savings-goal-summary {
@@ -855,6 +894,13 @@ a.btn:hover { text-decoration: none; }
 .savings-goal-form {
   display: grid;
   gap: 1rem;
+}
+
+.savings-field-hint {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .savings-delete-btn {
@@ -917,6 +963,10 @@ a.btn:hover { text-decoration: none; }
   .savings-form-card {
     position: static;
   }
+
+  .savings-stats--5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 640px) {
@@ -938,9 +988,17 @@ a.btn:hover { text-decoration: none; }
     width: 100%;
   }
 
-  .savings-goal-title-row,
-  .savings-progress-form {
+  .savings-goal-title-row {
     display: grid;
+  }
+
+  .savings-progress-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .savings-progress-form-row .btn {
+    width: 100%;
   }
 
   .savings-mini-grid {
@@ -5319,14 +5377,6 @@ a.dash-card--clickable {
   background: var(--grey-50);
 }
 
-.dash-txn-item.is-not-counted {
-  background: #f3f4f6;
-}
-
-.dash-txn-item.is-not-counted:hover {
-  background: #eceef1;
-}
-
 .dash-txn-item.is-not-counted .dash-txn-cat,
 .dash-txn-item.is-not-counted .dash-txn-meta,
 .dash-txn-item.is-not-counted .dash-txn-amt {
@@ -5335,6 +5385,7 @@ a.dash-card--clickable {
 
 .dash-txn-item.is-not-counted .sw-category-icon,
 .dash-txn-item.is-not-counted .dash-txn-icon {
+  filter: grayscale(1);
   opacity: 0.55;
 }
 
@@ -5641,10 +5692,6 @@ a.dash-card--clickable {
   vertical-align: middle;
 }
 
-.expense-table-row.is-not-counted {
-  background: #f3f4f6;
-}
-
 .expense-table-row.is-not-counted .expense-row-details__title,
 .expense-table-row.is-not-counted .expense-row-details__merchant,
 .expense-table-row.is-not-counted .expense-row-details__notes,
@@ -5653,8 +5700,10 @@ a.dash-card--clickable {
   color: #9ca3af;
 }
 
-.expense-table-row.is-not-counted .expense-cat-pill {
-  opacity: 0.65;
+.expense-table-row.is-not-counted .expense-cat-pill,
+.expense-table-row.is-not-counted .sw-category-icon {
+  filter: grayscale(1);
+  opacity: 0.55;
 }
 
 .expense-row-details {

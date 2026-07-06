@@ -107,6 +107,7 @@ app.use(function(req, res, next) {
 
 app.use("/budget", requireLogin);
 app.use("/chatbot", requireLogin);
+app.use("/savings-goals", requireLogin);
 
 async function getBudgetPageData(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(
@@ -116,6 +117,7 @@ async function getBudgetPageData(budgetMonth) {
   let expenses;
   let categories;
   let spendingByCategoryId;
+  let actualSpendingByCategoryId;
   let monthTotalSpent;
   let monthExpenseCount;
 
@@ -125,6 +127,7 @@ async function getBudgetPageData(budgetMonth) {
       expenses,
       categories,
       spendingByCategoryId,
+      actualSpendingByCategoryId,
       monthTotalSpent,
       monthExpenseCount,
     ] = await Promise.all([
@@ -132,6 +135,7 @@ async function getBudgetPageData(budgetMonth) {
       expenseStore.getExpensesForAnalytics(),
       expenseStore.getCategories(),
       budgetStore.getSpendingTotalsByCategoryId(month),
+      budgetStore.getActualSpendingTotalsByCategoryId(month),
       financeHelpers.getMonthlyExpenseTotal(month),
       financeHelpers.getExpenseCountForMonth(month),
     ]);
@@ -168,7 +172,7 @@ async function getBudgetPageData(budgetMonth) {
   const everythingElse = budgetStore.getEverythingElseData(
     categories,
     budgetedCategoryIds,
-    spendingByCategoryId
+    actualSpendingByCategoryId
   );
   const budgetTotals = budgetStore.getBudgetTotals(categoryRows);
   const availableCategories = await budgetStore.getAvailableCategoriesForBudget(

@@ -3,6 +3,7 @@ const {
   getCategoryBudgetStatus,
   getCategoryStatusMessage,
   isExpenseCountedForBudget,
+  isExpenseCountedForAllBudget,
 } = require("./budgetHelpers");
 const {
   getDisplayCategoryName,
@@ -14,8 +15,10 @@ const { getCategoryImageUrl } = require("./categoryImageHelpers");
 const { requireUserId } = require("./userScope");
 
 const DEFAULT_BUDGET = 500;
-const BUDGET_COUNTED_EXPENSE_WHERE =
+const CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE =
   "AND COALESCE(is_excluded_from_budget, 0) = 0";
+const ALL_BUDGET_COUNTED_EXPENSE_WHERE =
+  "AND COALESCE(is_excluded_from_all_budget, 0) = 0";
 
 function getCurrentBudgetMonth(date = new Date()) {
   const year = date.getFullYear();
@@ -779,7 +782,32 @@ async function getSpendingTotalsByCategoryId(budgetMonth) {
     FROM expenses
     WHERE expense_date >= ? AND expense_date < ?
       AND user_id = ?
-      ${BUDGET_COUNTED_EXPENSE_WHERE}
+      ${CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE}
+    GROUP BY category_id`,
+    [startDate, endExclusive, userId]
+  );
+
+  const totals = {};
+  rows.forEach((row) => {
+    totals[String(row.categoryId)] = Number(row.total);
+  });
+  return totals;
+}
+
+/** All expense amounts by category — ignores is_excluded_from_budget (for Everything Else). */
+async function getActualSpendingTotalsByCategoryId(budgetMonth) {
+  if (!budgetMonth) return {};
+
+  const userId = requireUserId();
+  const { startDate, endExclusive } = getBudgetMonthDateRange(budgetMonth);
+
+  const [rows] = await db.query(
+    `SELECT
+      category_id AS categoryId,
+      CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
+    FROM expenses
+    WHERE expense_date >= ? AND expense_date < ?
+      AND user_id = ?
     GROUP BY category_id`,
     [startDate, endExclusive, userId]
   );
@@ -811,6 +839,7 @@ async function getCategoryExpensesForMonthFromDb(categoryId, budgetMonth) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
@@ -832,6 +861,7 @@ async function getCategoryExpensesForMonthFromDb(categoryId, budgetMonth) {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
   }));
 }
@@ -849,6 +879,7 @@ async function getCategoryExpensesAllFromDb(categoryId) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
@@ -867,6 +898,7 @@ async function getCategoryExpensesAllFromDb(categoryId) {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
   }));
 }
@@ -879,7 +911,7 @@ async function getCategoryMonthlyTotalsFromDb(categoryId) {
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
     WHERE category_id = ? AND user_id = ?
-      ${BUDGET_COUNTED_EXPENSE_WHERE}
+      ${CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY DATE_FORMAT(expense_date, '%Y-%m')
     ORDER BY budgetMonth ASC`,
     [Number(categoryId), userId]
@@ -1015,7 +1047,7 @@ async function hasActiveCategoryBudgets() {
 function getEverythingElseData(
   categories,
   budgetedCategoryIds,
-  spendingByCategoryId
+  actualSpendingByCategoryId
 ) {
   const budgetedIds = new Set(budgetedCategoryIds.map(String));
 
@@ -1024,7 +1056,7 @@ function getEverythingElseData(
 
   categories.forEach((cat) => {
     if (budgetedIds.has(String(cat.id))) return;
-    const amount = getCategoryActualSpent(spendingByCategoryId, cat);
+    const amount = getCategoryActualSpent(actualSpendingByCategoryId, cat);
     if (amount > 0) {
       totalAmount += amount;
       categoryCount += 1;
@@ -1189,7 +1221,7 @@ async function getAllMonthlyTotalsFromDb() {
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
     WHERE user_id = ?
-      ${BUDGET_COUNTED_EXPENSE_WHERE}
+      ${ALL_BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY DATE_FORMAT(expense_date, '%Y-%m')
     ORDER BY budgetMonth ASC`,
     [userId]
@@ -1268,6 +1300,7 @@ async function getAllExpensesFromDb() {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
@@ -1286,6 +1319,7 @@ async function getAllExpensesFromDb() {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
     categoryDisplayName: getDisplayCategoryName(row.category_name),
   }));
@@ -1307,6 +1341,7 @@ async function getAllExpensesForMonthFromDb(budgetMonth) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
@@ -1325,6 +1360,7 @@ async function getAllExpensesForMonthFromDb(budgetMonth) {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
     categoryDisplayName: getDisplayCategoryName(row.category_name),
   }));
@@ -1348,6 +1384,7 @@ async function getUnbudgetedExpensesFromDb(budgetMonth, budgetedCategoryIds) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name,
       c.icon AS category_icon,
       c.color AS category_color,
@@ -1377,6 +1414,7 @@ async function getUnbudgetedExpensesFromDb(budgetMonth, budgetedCategoryIds) {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
     categoryIcon: row.category_icon,
     categoryColor: row.category_color,
@@ -1408,9 +1446,7 @@ function groupTransactionsByDate(transactions) {
       groups.push(groupMap[dateKey]);
     }
 
-    groupMap[dateKey].dayTotal += isExpenseCountedForBudget(tx)
-      ? Number(tx.amount) || 0
-      : 0;
+    groupMap[dateKey].dayTotal += Number(tx.amount) || 0;
     groupMap[dateKey].transactions.push(tx);
   });
 
@@ -1514,9 +1550,7 @@ async function getEverythingElseDetailData(budgetMonth, categories) {
   let totalAmount = 0;
   const unbudgetedCategoryIds = new Set();
   transactions.forEach((tx) => {
-    if (isExpenseCountedForBudget(tx)) {
-      totalAmount += Number(tx.amount) || 0;
-    }
+    totalAmount += Number(tx.amount) || 0;
     if (tx.categoryId) unbudgetedCategoryIds.add(String(tx.categoryId));
   });
 
@@ -1877,7 +1911,7 @@ async function getOverallBudgetDetailData(budgetMonth) {
   let countedCount = 0;
   let largestTransaction = 0;
   allExpenses.forEach((exp) => {
-    if (!isExpenseCountedForBudget(exp)) return;
+    if (!isExpenseCountedForAllBudget(exp)) return;
     const amount = Number(exp.amount) || 0;
     totalAmount += amount;
     countedCount += 1;
@@ -1933,7 +1967,7 @@ async function getTotalMonthSpending(budgetMonth) {
     FROM expenses
     WHERE expense_date >= ? AND expense_date < ?
       AND user_id = ?
-      ${BUDGET_COUNTED_EXPENSE_WHERE}`,
+      ${ALL_BUDGET_COUNTED_EXPENSE_WHERE}`,
     [startDate, endExclusive, userId]
   );
 
@@ -2018,6 +2052,7 @@ module.exports = {
   getEverythingElseDetailData,
   getEverythingElseMonthOptions,
   getSpendingTotalsByCategoryId,
+  getActualSpendingTotalsByCategoryId,
   buildBudgetAmounts,
   isBudgetActiveForMonth,
   computeRolloverAmount,

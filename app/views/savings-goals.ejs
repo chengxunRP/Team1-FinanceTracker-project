@@ -21,6 +21,17 @@
   var editGoalUrl = '/savings-goals?month=' + encodeURIComponent(budgetMonth) + '&edit=1#savings-goal-edit';
   var viewGoalUrl = '/savings-goals?month=' + encodeURIComponent(budgetMonth) + '#savings-goal-view';
   var showGoalForm = !goal || isEditingGoal;
+  var estimated = typeof estimatedSavings !== 'undefined' ? estimatedSavings : { amount: 0, monthlyIncome: 0, monthExpenses: 0, hasIncome: false, isNegative: false };
+  var estimatedDisplay = estimated.isNegative ? 0 : estimated.amount;
+  var estimatedDetail = '';
+  var estimatedHint = 'This is an estimate based on your income minus expenses. It is not automatically counted as saved.';
+  if (!estimated.hasIncome) {
+    estimatedDetail = 'Set monthly income in Profile Settings to see an estimate.';
+  } else if (estimated.isNegative) {
+    estimatedDetail = 'No estimated savings available this month.';
+  } else {
+    estimatedDetail = formatMoney(estimated.monthlyIncome) + ' income minus ' + formatMoney(estimated.monthExpenses) + ' counted expenses.';
+  }
 %>
 
 <div class="savings-page">
@@ -48,7 +59,7 @@
     <div class="form-success"><%= successMessage %></div>
   <% } %>
 
-  <section class="stat-grid savings-stats">
+  <section class="stat-grid savings-stats savings-stats--5">
     <article class="stat-card">
       <span class="stat-card__label">Target</span>
       <span class="stat-card__value stat-card__value--blue"><%= formatMoney(targetAmount) %></span>
@@ -67,6 +78,14 @@
       <% if (goal) { %>
         <span class="pill pill--<%= goal.statusBadge %>"><%= goal.statusLabel %></span>
       <% } %>
+    </article>
+    <article class="stat-card stat-card--estimate">
+      <span class="stat-card__label">Estimated Available to Save</span>
+      <span class="stat-card__value stat-card__value--blue"><%= formatMoney(estimatedDisplay) %></span>
+      <% if (estimatedDetail) { %>
+        <p class="savings-estimate-detail"><%= estimatedDetail %></p>
+      <% } %>
+      <p class="savings-estimate-hint"><%= estimatedHint %></p>
     </article>
   </section>
 
@@ -93,17 +112,26 @@
           <input type="hidden" name="goalMonth" value="<%= budgetMonth %>">
           <div class="form-group">
             <label for="amountToAddQuick">Add saved amount</label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              id="amountToAddQuick"
-              name="amountToAdd"
-              placeholder="50.00"
-              required
-            >
+            <div class="savings-progress-form-row">
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                id="amountToAddQuick"
+                name="amountToAdd"
+                placeholder="50.00"
+                autocomplete="off"
+                inputmode="decimal"
+                <%= goal.isComplete ? 'disabled aria-disabled="true"' : 'required' %>
+              >
+              <button type="submit" class="btn btn--success btn--sm" <%= goal.isComplete ? 'disabled' : '' %>>Add Progress</button>
+            </div>
+            <% if (goal.isComplete) { %>
+              <p class="savings-field-hint">You reached this goal. Edit the goal to raise the target.</p>
+            <% } else { %>
+              <p class="savings-field-hint">Enter how much you saved manually, then click Add Progress.</p>
+            <% } %>
           </div>
-          <button type="submit" class="btn btn--success btn--sm">Add Progress</button>
         </form>
 
         <form method="POST" action="/savings-goals/<%= goal.id %>" data-confirm data-confirm-title="Delete savings goal?" data-confirm-message="This removes the goal for <%= budgetMonthLabel %>." data-confirm-action-text="Delete" data-confirm-type="danger">
@@ -158,8 +186,9 @@
             name="goalName"
             maxlength="120"
             value="<%= formValues.goalName || (goal ? goal.goalName : '') %>"
-            placeholder="Save $300 this month"
+            placeholder="Emergency Fund"
           >
+          <p class="savings-field-hint">A short name for this goal, not the dollar amount.</p>
         </div>
 
         <div class="form-group">
@@ -174,6 +203,7 @@
             placeholder="300.00"
             required
           >
+          <p class="savings-field-hint">How much you want to save this month.</p>
         </div>
 
         <div class="form-group">
@@ -187,6 +217,7 @@
             value="<%= formValues.currentAmount || (goal ? goal.currentAmount : 0) %>"
             placeholder="0.00"
           >
+          <p class="savings-field-hint">Optional starting amount when creating the goal.</p>
         </div>
 
         <button type="submit" class="btn btn--primary btn--block">

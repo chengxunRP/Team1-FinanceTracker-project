@@ -229,13 +229,26 @@
       categoryId: readData(trigger, "category-id"),
       categoryName: readData(trigger, "category"),
       isExcludedFromBudget: readExcludedFromTrigger(trigger),
+      isExcludedFromAllBudget: readExcludedFromTrigger(trigger),
     };
   }
 
   function readExcludedFromTrigger(trigger) {
     if (!trigger) return false;
-    var val = readData(trigger, "excluded-from-budget");
-    return val === "1" || val === "true";
+    var categoryVal = readData(trigger, "excluded-from-budget");
+    var allVal = readData(trigger, "excluded-from-all-budget");
+    return (
+      categoryVal === "1" ||
+      categoryVal === "true" ||
+      allVal === "1" ||
+      allVal === "true"
+    );
+  }
+
+  function shouldGreyBudgetRow(excluded) {
+    if (!excluded) return false;
+    var page = getTransactionPageContext();
+    return page.type === "category" || page.type === "overall";
   }
 
   function setDontCountToggle(excluded) {
@@ -247,24 +260,22 @@
   function syncDontCountToTrigger(excluded) {
     if (!currentTrigger) return;
     var flag = excluded ? "1" : "0";
-    currentTrigger.setAttribute("data-excluded-from-budget", flag);
-    var listItem = currentTrigger.closest(
-      ".spb-transaction-item, .everything-transaction-row"
-    );
-    if (listItem) {
-      listItem.setAttribute("data-excluded-from-budget", flag);
-      listItem.classList.toggle("is-not-counted", excluded);
-    }
-    var expenseRow = currentTrigger.closest("tr.expense-table-row");
-    if (expenseRow) {
-      expenseRow.classList.toggle("is-not-counted", excluded);
-    }
-    var staleLabels = currentTrigger.querySelectorAll(
-      ".spb-transaction-item__excluded-label, .everything-transaction-excluded-label"
-    );
-    for (var i = 0; i < staleLabels.length; i++) {
-      staleLabels[i].remove();
-    }
+    var expenseId = currentExpenseId || readData(currentTrigger, "expense-id");
+
+    document
+      .querySelectorAll(
+        '.js-transaction-detail-trigger[data-expense-id="' + expenseId + '"]'
+      )
+      .forEach(function (trigger) {
+        trigger.setAttribute("data-excluded-from-budget", flag);
+        trigger.setAttribute("data-excluded-from-all-budget", flag);
+        var listItem = trigger.closest(".spb-transaction-item");
+        if (listItem) {
+          listItem.setAttribute("data-excluded-from-budget", flag);
+          listItem.setAttribute("data-excluded-from-all-budget", flag);
+          listItem.classList.toggle("is-not-counted", shouldGreyBudgetRow(excluded));
+        }
+      });
   }
 
   function saveDontCount(excluded) {
@@ -295,13 +306,15 @@
         syncDontCountToTrigger(saved);
         if (currentExpenseSnapshot) {
           currentExpenseSnapshot.isExcludedFromBudget = saved;
+          currentExpenseSnapshot.isExcludedFromAllBudget = saved;
         }
         document.dispatchEvent(
           new CustomEvent("sw-expense-updated", {
             detail: {
               expense: { id: currentExpenseId },
               isExcludedFromBudget: saved,
-              fieldsChanged: ["isExcludedFromBudget"],
+              isExcludedFromAllBudget: saved,
+              fieldsChanged: ["isExcludedFromBudget", "isExcludedFromAllBudget"],
             },
           })
         );
