@@ -14,7 +14,6 @@ const {
 const { getCategoryImageUrl } = require("./categoryImageHelpers");
 const { requireUserId } = require("./userScope");
 
-const DEFAULT_BUDGET = 500;
 const CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE =
   "AND COALESCE(is_excluded_from_budget, 0) = 0";
 const ALL_BUDGET_COUNTED_EXPENSE_WHERE =
@@ -89,7 +88,8 @@ function filterExpensesForMonth(expenses, budgetMonth) {
   return expenses.filter((expense) => isExpenseInBudgetMonth(expense.date, budgetMonth));
 }
 
-async function getMonthlyBudget() {
+/** Raw monthly_budget table amount for the logged-in user (0 when unset). */
+async function getMonthlyBudgetTableAmount() {
   const userId = requireUserId();
   const [rows] = await db.query(
     "SELECT amount FROM monthly_budget WHERE user_id = ? ORDER BY id ASC LIMIT 1",
@@ -97,10 +97,15 @@ async function getMonthlyBudget() {
   );
 
   if (!rows.length) {
-    return DEFAULT_BUDGET;
+    return 0;
   }
 
-  return Number(rows[0].amount);
+  return Number(rows[0].amount) || 0;
+}
+
+/** @deprecated Prefer financeHelpers.resolvePrimaryMonthlyBudgetAmount for UI totals. */
+async function getMonthlyBudget() {
+  return getMonthlyBudgetTableAmount();
 }
 
 async function setMonthlyBudget(amount) {
@@ -783,6 +788,32 @@ async function getSpendingTotalsByCategoryId(budgetMonth) {
     WHERE expense_date >= ? AND expense_date < ?
       AND user_id = ?
       ${CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE}
+    GROUP BY category_id`,
+    [startDate, endExclusive, userId]
+  );
+
+  const totals = {};
+  rows.forEach((row) => {
+    totals[String(row.categoryId)] = Number(row.total);
+  });
+  return totals;
+}
+
+/** Per-category totals for All Categories Budget (excludes is_excluded_from_all_budget). */
+async function getAllBudgetSpendingTotalsByCategoryId(budgetMonth) {
+  if (!budgetMonth) return {};
+
+  const userId = requireUserId();
+  const { startDate, endExclusive } = getBudgetMonthDateRange(budgetMonth);
+
+  const [rows] = await db.query(
+    `SELECT
+      category_id AS categoryId,
+      CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
+    FROM expenses
+    WHERE expense_date >= ? AND expense_date < ?
+      AND user_id = ?
+      ${ALL_BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY category_id`,
     [startDate, endExclusive, userId]
   );
@@ -2025,6 +2056,7 @@ module.exports = {
   getBudgetMonthDateRange,
   filterExpensesForMonth,
   getMonthlyBudget,
+  getMonthlyBudgetTableAmount,
   setMonthlyBudget,
   getCategoryBudgets,
   getActiveCategoryBudgets,
@@ -2052,6 +2084,7 @@ module.exports = {
   getEverythingElseDetailData,
   getEverythingElseMonthOptions,
   getSpendingTotalsByCategoryId,
+  getAllBudgetSpendingTotalsByCategoryId,
   getActualSpendingTotalsByCategoryId,
   buildBudgetAmounts,
   isBudgetActiveForMonth,

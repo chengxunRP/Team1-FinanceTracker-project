@@ -93,8 +93,8 @@ router.post('/purchase-check', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid item price' });
     }
 
-    const live = await financeHelpers.getBudgetSummary(budgetMonth);
-    const summary = live.summary;
+    const live = await financeHelpers.getPurchaseCheckerFinanceSummary(budgetMonth);
+    const summary = live.recommendationSummary;
     const expenses = await store.getExpensesInMonth(live.budgetMonth);
 
     const item = {
@@ -106,7 +106,8 @@ router.post('/purchase-check', async (req, res) => {
     const recommendation = recommendationHelpers.getSpendingRecommendation(
       summary,
       expenses,
-      item
+      item,
+      financeHelpers.buildPurchaseCheckOptions(live)
     );
 
     return res.json({ success: true, recommendation });
