@@ -89,9 +89,7 @@
         setRowVisible(item, match);
         if (match) {
           groupVisible += 1;
-          if (item.getAttribute("data-excluded-from-budget") !== "1") {
-            groupFilteredTotal += Number(item.getAttribute("data-amount")) || 0;
-          }
+          groupFilteredTotal += Number(item.getAttribute("data-amount")) || 0;
         }
       }
 
@@ -172,7 +170,6 @@
       var groupTotal = 0;
 
       for (var r = 0; r < rows.length; r++) {
-        if (rows[r].getAttribute("data-excluded-from-budget") === "1") continue;
         groupTotal += Number(rows[r].getAttribute("data-amount")) || 0;
       }
 
@@ -200,8 +197,6 @@
     var pageMonth = monthInput ? monthInput.value : "";
 
     if (fieldsChanged.indexOf("isExcludedFromBudget") !== -1) {
-      recalculateEverythingElseTotals();
-      applySearch();
       return;
     }
 

@@ -707,6 +707,7 @@ async function getAllExpenses(filters = {}) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       ${categorySelect}
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
@@ -725,6 +726,7 @@ async function getAllExpenses(filters = {}) {
     notes: row.notes || "",
     imagePath: row.imagePath || "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: mapJoinedCategoryRow(row),
   }));
 }
@@ -745,6 +747,7 @@ async function getExpenseById(id) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       ${categorySelect}
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
@@ -766,6 +769,7 @@ async function getExpenseById(id) {
     notes: row.notes || "",
     imagePath: row.imagePath || "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: mapJoinedCategoryRow(row),
   };
 }
@@ -881,9 +885,12 @@ async function updateExpenseCategory(id, categoryId) {
 }
 
 async function updateExpenseExcludedFromBudget(id, excluded) {
+  const val = excluded ? 1 : 0;
   const [result] = await db.query(
-    `UPDATE expenses SET is_excluded_from_budget = ? WHERE id = ? AND user_id = ?`,
-    [excluded ? 1 : 0, Number(id), requireUserId()]
+    `UPDATE expenses
+     SET is_excluded_from_budget = ?, is_excluded_from_all_budget = ?
+     WHERE id = ? AND user_id = ?`,
+    [val, val, Number(id), requireUserId()]
   );
 
   return result.affectedRows > 0;
@@ -920,6 +927,7 @@ function toLegacyExpense(expense) {
     amount: expense.amount,
     date: expense.date,
     isExcludedFromBudget: Boolean(expense.isExcludedFromBudget),
+    isExcludedFromAllBudget: Boolean(expense.isExcludedFromAllBudget),
   };
 }
 
@@ -945,6 +953,7 @@ async function getExpensesInMonth(budgetMonth) {
       DATE_FORMAT(e.expense_date, '%Y-%m-%d') AS date,
       COALESCE(e.notes, '') AS notes,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
@@ -963,6 +972,7 @@ async function getExpensesInMonth(budgetMonth) {
     amount: Number(row.amount),
     date: row.date,
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
   }));
 }
 

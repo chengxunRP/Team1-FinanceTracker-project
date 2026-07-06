@@ -278,7 +278,7 @@
       <ul class="spb-transaction-list" id="transactionList">
         <% var headerCatMeta = categories.find(function(c) { return String(c.id) === String(cat.id); }) || cat; %>
         <% (detail.transactions || []).forEach(function(tx) { %>
-        <li class="spb-transaction-item<%= tx.isExcludedFromBudget ? ' is-not-counted' : '' %>"
+        <li class="spb-transaction-item<%= (tx.isExcludedFromBudget || tx.isExcludedFromAllBudget) ? ' is-not-counted' : '' %>"
             data-budget-month="<%= tx.date.slice(0, 7) %>"
             data-title="<%= tx.description %>"
             data-merchant-name="<%= tx.merchantName || '' %>"
@@ -300,7 +300,8 @@
                   data-category-color="<%= headerCatMeta.color || '' %>"
                   data-category-is-custom="<%= (headerCatMeta.isCustom || Number(headerCatMeta.is_custom) === 1) ? '1' : '0' %>"
                   data-notes="<%= tx.notes || '' %>"
-                  data-excluded-from-budget="<%= tx.isExcludedFromBudget ? '1' : '0' %>"
+                  data-excluded-from-budget="<%= (tx.isExcludedFromBudget || tx.isExcludedFromAllBudget) ? '1' : '0' %>"
+                  data-excluded-from-all-budget="<%= (tx.isExcludedFromBudget || tx.isExcludedFromAllBudget) ? '1' : '0' %>"
                   data-has-receipt="<%= (tx.imagePath && String(tx.imagePath).trim()) ? '1' : '0' %>"
                   data-image-path="<%= (tx.imagePath && String(tx.imagePath).trim()) ? String(tx.imagePath).trim() : '' %>">
             <span class="spb-transaction-item__date"><%= formatDateShort(tx.date) %></span>
@@ -385,7 +386,8 @@
       id: tx.id,
       budgetMonth: tx.date.slice(0, 7),
       amount: tx.amount,
-      isExcludedFromBudget: !!tx.isExcludedFromBudget
+      isExcludedFromBudget: !!tx.isExcludedFromBudget,
+      isExcludedFromAllBudget: !!tx.isExcludedFromAllBudget
     };
   }),
   chartData: (detail.chartData || []).map(function(bar) {

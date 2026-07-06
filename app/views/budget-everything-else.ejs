@@ -90,7 +90,7 @@
           </header>
           <% group.transactions.forEach(function(tx) { %>
           <button type="button"
-                  class="everything-transaction-row js-transaction-detail-trigger<%= tx.isExcludedFromBudget ? ' is-not-counted' : '' %>"
+                  class="everything-transaction-row js-transaction-detail-trigger"
                   data-expense-id="<%= tx.id %>"
                   data-expense-date="<%= tx.date %>"
                   data-amount="<%= tx.amount %>"
@@ -103,7 +103,8 @@
                   data-category-color="<%= tx.categoryColor || '' %>"
                   data-category-is-custom="<%= tx.categoryIsCustom ? '1' : '0' %>"
                   data-notes="<%= tx.notes || '' %>"
-                  data-excluded-from-budget="<%= tx.isExcludedFromBudget ? '1' : '0' %>"
+                  data-excluded-from-budget="<%= (tx.isExcludedFromBudget || tx.isExcludedFromAllBudget) ? '1' : '0' %>"
+                  data-excluded-from-all-budget="<%= (tx.isExcludedFromBudget || tx.isExcludedFromAllBudget) ? '1' : '0' %>"
                   data-has-receipt="<%= (tx.imagePath && String(tx.imagePath).trim()) ? '1' : '0' %>"
                   data-image-path="<%= (tx.imagePath && String(tx.imagePath).trim()) ? String(tx.imagePath).trim() : '' %>">
             <span class="everything-transaction-icon">

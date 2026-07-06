@@ -5,11 +5,20 @@ function isExpenseCountedForBudget(expense) {
   return !expense.isExcludedFromBudget;
 }
 
-function calculateTotalSpent(expenses) {
+function isExpenseCountedForAllBudget(expense) {
+  if (!expense) return true;
+  return !expense.isExcludedFromAllBudget;
+}
+
+function calculateTotalSpent(expenses, options = {}) {
+  const isCounted =
+    options.allBudget === true
+      ? isExpenseCountedForAllBudget
+      : isExpenseCountedForBudget;
   let total = 0;
 
   for (let i = 0; i < expenses.length; i++) {
-    if (isExpenseCountedForBudget(expenses[i])) {
+    if (isCounted(expenses[i])) {
       total += expenses[i].amount;
     }
   }
@@ -202,6 +211,7 @@ const {
 
 module.exports = {
   isExpenseCountedForBudget,
+  isExpenseCountedForAllBudget,
   calculateTotalSpent,
   validateMonthlyBudget,
   validateCategoryBudgetAmount,
