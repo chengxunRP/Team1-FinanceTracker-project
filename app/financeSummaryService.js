@@ -21,6 +21,11 @@ function buildLiveFinanceSummaryFromBudgetPage(pageData, overallBudgetSection) {
   const everythingElse = pageData.everythingElse || { amount: 0 };
   const categories = pageData.categories || [];
   const spendingByCategoryId = pageData.spendingByCategoryId || {};
+  const actualSpendingByCategoryId =
+    pageData.actualSpendingByCategoryId || spendingByCategoryId;
+  const allExpensesSpent = roundMoney(
+    pageData.summary ? pageData.summary.totalSpent : 0
+  );
 
   // --- Section 1: Normal category budgets (same totals as budget page header) ---
   const categoryBudgetTotal = roundMoney(budgetTotals.totalBudgeted || 0);
@@ -53,7 +58,7 @@ function buildLiveFinanceSummaryFromBudgetPage(pageData, overallBudgetSection) {
     : 0;
   const allTransactionsSpent = hasAllTransactionsBudget
     ? roundMoney(overallBudgetSection.spent)
-    : roundMoney(pageData.summary ? pageData.summary.totalSpent : 0);
+    : allExpensesSpent;
   const allTransactionsRemaining = hasAllTransactionsBudget
     ? roundMoney(allTransactionsBudget - allTransactionsSpent)
     : 0;
@@ -64,15 +69,19 @@ function buildLiveFinanceSummaryFromBudgetPage(pageData, overallBudgetSection) {
   const everythingElseTotal = roundMoney(everythingElse.amount || 0);
 
   const financeSnapshotAll = financeHelpers.buildFinanceSnapshot(
-    buildBudgetSummary(allTransactionsBudget, [], allTransactionsSpent),
-    spendingByCategoryId,
+    buildBudgetSummary(allTransactionsBudget, [], allExpensesSpent),
+    actualSpendingByCategoryId,
     categories,
     "month"
   );
 
+  const pageMonthlyBudget = roundMoney(
+    pageData.summary ? pageData.summary.monthlyBudget : 0
+  );
+
   // Purchase checks default to All Transactions budget when present.
   let primaryBudget = 0;
-  let primarySpent = allTransactionsSpent;
+  let primarySpent = allExpensesSpent;
   let primaryRemaining = 0;
   let primaryPct = 0;
   let primarySource = "none";
@@ -89,12 +98,21 @@ function buildLiveFinanceSummaryFromBudgetPage(pageData, overallBudgetSection) {
     primaryRemaining = categoryBudgetRemaining;
     primaryPct = categoryBudgetPctUsed;
     primarySource = "category";
+  } else if (pageMonthlyBudget > 0) {
+    primaryBudget = pageMonthlyBudget;
+    primarySpent = allExpensesSpent;
+    primaryRemaining = roundMoney(pageMonthlyBudget - allExpensesSpent);
+    primaryPct =
+      pageMonthlyBudget > 0
+        ? Math.round((allExpensesSpent / pageMonthlyBudget) * 100)
+        : 0;
+    primarySource = "monthly";
   }
 
   const summary = buildBudgetSummary(primaryBudget, [], primarySpent);
   const financeSnapshot = financeHelpers.buildFinanceSnapshot(
     summary,
-    spendingByCategoryId,
+    actualSpendingByCategoryId,
     categories,
     "month"
   );
@@ -118,6 +136,7 @@ function buildLiveFinanceSummaryFromBudgetPage(pageData, overallBudgetSection) {
     allTransactionsSpent,
     allTransactionsRemaining,
     allTransactionsPctUsed,
+    allExpensesSpent,
     everythingElseTotal,
     expenseCountThisMonth: Number(pageData.monthExpenseCount) || 0,
     topCategoryName: financeSnapshotAll.highestCategory || "—",
@@ -186,10 +205,7 @@ async function getLiveFinanceSummary(budgetMonth, loadBudgetPageData) {
     );
     const budgetTotals = budgetStore.getBudgetTotals(categoryRows);
     overallBudgetSection = await budgetStore.getOverallBudgetSectionData(month);
-
-    const allSpent = overallBudgetSection
-      ? Number(overallBudgetSection.spent) || 0
-      : monthTotalSpent;
+    const primaryBudget = await financeHelpers.resolvePrimaryMonthlyBudgetAmount(month);
 
     pageData = {
       budgetMonth: month,
@@ -200,12 +216,9 @@ async function getLiveFinanceSummary(budgetMonth, loadBudgetPageData) {
       everythingElse,
       categories,
       spendingByCategoryId,
+      actualSpendingByCategoryId,
       monthExpenseCount,
-      summary: buildBudgetSummary(
-        overallBudgetSection ? Number(overallBudgetSection.budgeted) || 0 : 0,
-        [],
-        allSpent
-      ),
+      summary: buildBudgetSummary(primaryBudget, [], monthTotalSpent),
     };
   }
 

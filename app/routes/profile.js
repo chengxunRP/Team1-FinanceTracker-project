@@ -29,14 +29,14 @@ function parseEmailAlertsEnabled(value) {
 }
 
 async function buildSummary() {
-  const monthSummary = await financeHelpers.getCategoryBudgetTotalsSummary();
+  const monthFinance = await financeHelpers.getDisplayMonthFinanceSummary();
 
   return {
-    budgetMonth: monthSummary.budgetMonth,
-    budget: monthSummary.budget,
-    spent: monthSummary.spent,
-    remaining: monthSummary.remaining,
-    percentUsed: monthSummary.percentUsed,
+    budgetMonth: monthFinance.budgetMonth,
+    budget: monthFinance.summary.monthlyBudget,
+    spent: monthFinance.summary.totalSpent,
+    remaining: monthFinance.summary.remainingBudget,
+    percentUsed: monthFinance.summary.percentageUsed,
   };
 }
 

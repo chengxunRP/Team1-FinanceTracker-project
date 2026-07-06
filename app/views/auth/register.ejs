@@ -35,9 +35,15 @@
 
       <div class="form-group">
         <label for="password">Password</label>
-        <input type="password" id="password" name="password" placeholder="At least 6 characters"
-          required minlength="6"
+        <input type="password" id="password" name="password" placeholder="At least 8 characters"
+          required minlength="8" autocomplete="new-password"
           style="padding:0.7rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+        <p class="form-hint" style="margin:0.4rem 0 0;font-size:0.8rem;color:var(--text-muted);line-height:1.4;">
+          Password must be at least 8 characters and include at least 1 letter and 1 number.
+        </p>
+        <p id="passwordError" class="form-errors" hidden style="margin-top:0.5rem;">
+          Password must be at least 8 characters and include at least 1 letter and 1 number.
+        </p>
       </div>
 
       <button type="submit" class="btn btn--primary btn--sm btn--block" style="margin-top:0.25rem;">
@@ -51,5 +57,42 @@
 
   </div>
 </div>
+
+<script>
+(function () {
+  var form = document.querySelector('form[action="/register"]');
+  if (!form) return;
+
+  var passwordInput = document.getElementById("password");
+  var passwordError = document.getElementById("passwordError");
+  var message =
+    "Password must be at least 8 characters and include at least 1 letter and 1 number.";
+
+  function isValidPassword(value) {
+    if (!value || value.length < 8) return false;
+    if (!/[A-Za-z]/.test(value)) return false;
+    if (!/\d/.test(value)) return false;
+    return true;
+  }
+
+  form.addEventListener("submit", function (event) {
+    if (!passwordInput || isValidPassword(passwordInput.value)) return;
+    event.preventDefault();
+    if (passwordError) {
+      passwordError.hidden = false;
+      passwordError.textContent = message;
+    }
+    passwordInput.focus();
+  });
+
+  if (passwordInput) {
+    passwordInput.addEventListener("input", function () {
+      if (passwordError && isValidPassword(passwordInput.value)) {
+        passwordError.hidden = true;
+      }
+    });
+  }
+})();
+</script>
 
 <%- include('../partials/footer') %>

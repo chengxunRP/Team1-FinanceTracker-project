@@ -117,7 +117,7 @@ async function getBudgetPageData(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()
   );
-  let monthlyBudget;
+  let primaryBudget;
   let expenses;
   let categories;
   let spendingByCategoryId;
@@ -127,7 +127,7 @@ async function getBudgetPageData(budgetMonth) {
 
   try {
     [
-      monthlyBudget,
+      primaryBudget,
       expenses,
       categories,
       spendingByCategoryId,
@@ -135,7 +135,7 @@ async function getBudgetPageData(budgetMonth) {
       monthTotalSpent,
       monthExpenseCount,
     ] = await Promise.all([
-      budgetStore.getMonthlyBudget(),
+      financeHelpers.resolvePrimaryMonthlyBudgetAmount(month),
       expenseStore.getExpensesForAnalytics(),
       expenseStore.getCategories(),
       budgetStore.getSpendingTotalsByCategoryId(month),
@@ -156,10 +156,10 @@ async function getBudgetPageData(budgetMonth) {
 
   // Month-scoped list for detail views; summary totals use SQL aggregates as source of truth.
   const expensesInMonth = await expenseStore.getExpensesInMonth(month);
-  const summary = buildBudgetSummary(monthlyBudget, expensesInMonth, monthTotalSpent);
+  const summary = buildBudgetSummary(primaryBudget, expensesInMonth, monthTotalSpent);
   const financeSnapshot = financeHelpers.buildFinanceSnapshot(
     summary,
-    spendingByCategoryId,
+    actualSpendingByCategoryId,
     categories,
     "month"
   );
@@ -203,6 +203,7 @@ async function getBudgetPageData(budgetMonth) {
     availableCategories,
     categories,
     spendingByCategoryId,
+    actualSpendingByCategoryId,
   };
 }
 
@@ -216,30 +217,54 @@ function renderDbError(res, view, locals) {
 async function renderOverviewPage(req, res) {
   try {
     const budgetMonth = budgetStore.normalizeBudgetMonth(req.query.month || undefined);
-    const pageData = await getBudgetPageData(budgetMonth);
-    const {
-      summary,
-      expenses,
-      financeSnapshot,
-      categoryRows,
-      budgetMonth: month,
-      monthExpenseCount,
-      budgetMonthLabel,
-    } = pageData;
+    const [pageData, dashboardPayload] = await Promise.all([
+      getBudgetPageData(budgetMonth),
+      financeHelpers.buildDashboardClientPayload(budgetMonth),
+    ]);
+    const selectedMonthData =
+      dashboardPayload.months[dashboardPayload.selectedMonth] || null;
+    const summary = selectedMonthData
+      ? {
+          ...pageData.summary,
+          monthlyBudget: selectedMonthData.summary.monthlyBudget,
+          totalSpent: selectedMonthData.summary.totalSpent,
+          remainingBudget: selectedMonthData.summary.remainingBudget,
+          percentageUsed: selectedMonthData.summary.percentageUsed,
+          statusLabel: selectedMonthData.summary.statusLabel,
+          statusBadge: selectedMonthData.summary.statusBadge,
+        }
+      : pageData.summary;
+    const financeSnapshot = selectedMonthData
+      ? {
+          ...pageData.financeSnapshot,
+          monthlyBudget: selectedMonthData.summary.monthlyBudget,
+          totalSpent: selectedMonthData.summary.totalSpent,
+          remainingBudget: selectedMonthData.summary.remainingBudget,
+          percentageUsed: selectedMonthData.summary.percentageUsed,
+          highestCategory: selectedMonthData.topCategory.name,
+          highestCategoryAmount: selectedMonthData.topCategory.amount,
+        }
+      : pageData.financeSnapshot;
 
     res.render("index", {
       pageTitle: "Overview",
       activePage: "overview",
       summary,
-      expenses,
+      expenses: pageData.expenses,
       financeSnapshot,
-      categoryRows,
-      budgetMonth: month,
-      budgetMonthLabel,
-      monthExpenseCount,
+      categoryRows: pageData.categoryRows,
+      budgetMonth: dashboardPayload.selectedMonth,
+      budgetMonthLabel: selectedMonthData
+        ? selectedMonthData.label
+        : pageData.budgetMonthLabel,
+      monthExpenseCount: selectedMonthData
+        ? selectedMonthData.expenseCount
+        : pageData.monthExpenseCount,
+      dashboardPayload,
     });
   } catch (error) {
     console.error("Database error loading overview/dashboard:", error);
+    const fallbackMonth = budgetStore.getCurrentBudgetMonth();
     renderDbError(res, "index", {
       pageTitle: "Overview",
       activePage: "overview",
@@ -247,11 +272,15 @@ async function renderOverviewPage(req, res) {
       expenses: [],
       financeSnapshot: getFinanceSnapshot(buildBudgetSummary(0, []), []),
       categoryRows: [],
-      budgetMonth: budgetStore.getCurrentBudgetMonth(),
-      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
-        budgetStore.getCurrentBudgetMonth()
-      ),
+      budgetMonth: fallbackMonth,
+      budgetMonthLabel: budgetStore.formatBudgetMonthLabel(fallbackMonth),
       monthExpenseCount: 0,
+      dashboardPayload: {
+        selectedMonth: fallbackMonth,
+        monthOrder: [fallbackMonth],
+        months: {},
+        categoryMeta: {},
+      },
     });
   }
 }
@@ -282,20 +311,37 @@ app.get("/home", async (req, res) => {
   }
 });
 
-async function loadPurchaseCheckerData() {
-  const live = await financeHelpers.getBudgetSummary();
-  const expenses = await expenseStore.getExpensesInMonth(live.budgetMonth);
-  const categories = await expenseStore.getCategories();
-  const categoryNames = categories
-    .map((cat) => cat.displayName || cat.name)
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+async function loadPurchaseCheckerData(formValues) {
+  const live = await financeHelpers.getPurchaseCheckerFinanceSummary();
+  const pickerData = await expenseStore.getCategoriesForPicker();
+  const allCategories = pickerData.all || [];
+
+  const values = formValues && typeof formValues === "object" ? formValues : {};
+  let selectedCategoryId = values.categoryId ? String(values.categoryId) : "";
+  const selectedCategoryName = values.category ? String(values.category).trim() : "";
+
+  if (!selectedCategoryId && selectedCategoryName) {
+    const match = allCategories.find(
+      (cat) =>
+        (cat.displayName || cat.name) === selectedCategoryName ||
+        cat.name === selectedCategoryName
+    );
+    if (match) selectedCategoryId = String(match.id);
+  }
 
   return {
     summary: live.summary,
-    financeSnapshot: getFinanceSnapshot(live.summary, expenses),
-    expenses,
-    categories: categoryNames,
+    recommendationSummary: live.recommendationSummary,
+    financeSnapshot: live.financeSnapshot,
+    categoryRows: live.categoryRows,
+    hasOverallBudget: live.hasOverallBudget,
+    categoryBudgetTotal: live.categoryBudgetTotal,
+    expenses: await expenseStore.getExpensesInMonth(live.budgetMonth),
+    pickerCategories: allCategories,
+    customCategories: pickerData.customCategories || [],
+    generalCategories: pickerData.generalCategories || [],
+    selectedCategoryId,
+    formValues: values,
     budgetMonthLabel: live.budgetMonthLabel,
   };
 }
@@ -321,7 +367,10 @@ app.get("/recommendation", requireLogin, async (req, res) => {
     renderRecommendationPage(res, {
       summary: emptySummary,
       financeSnapshot: getFinanceSnapshot(emptySummary, []),
-      categories: [],
+      pickerCategories: [],
+      customCategories: [],
+      generalCategories: [],
+      selectedCategoryId: "",
       budgetMonthLabel: "",
       errors: ["Unable to load your budget data. Please try again."],
     });
@@ -332,22 +381,36 @@ app.post("/recommendation", requireLogin, async (req, res) => {
   const { itemName, itemPrice, category } = req.body;
 
   try {
-    const data = await loadPurchaseCheckerData();
     const validation = validateItemInput(itemName, itemPrice, category);
 
     if (!validation.valid) {
+      const invalidData = await loadPurchaseCheckerData({
+        itemName,
+        itemPrice,
+        category,
+      });
       return renderRecommendationPage(res, {
-        ...data,
+        ...invalidData,
         errors: validation.errors,
         formValues: { itemName, itemPrice, category },
       });
     }
 
-    const recommendation = getSpendingRecommendation(data.summary, data.expenses, {
+    const data = await loadPurchaseCheckerData({
+      itemName,
+      itemPrice,
+      category,
+    });
+    const recommendation = getSpendingRecommendation(
+      data.recommendationSummary || data.summary,
+      data.expenses,
+      {
       itemName: validation.itemName,
       itemPrice: validation.itemPrice,
       category: validation.category,
-    });
+    },
+      financeHelpers.buildPurchaseCheckOptions(data)
+    );
 
     renderRecommendationPage(res, {
       ...data,
@@ -360,7 +423,10 @@ app.post("/recommendation", requireLogin, async (req, res) => {
     renderRecommendationPage(res, {
       summary: emptySummary,
       financeSnapshot: getFinanceSnapshot(emptySummary, []),
-      categories: [],
+      pickerCategories: [],
+      customCategories: [],
+      generalCategories: [],
+      selectedCategoryId: "",
       budgetMonthLabel: "",
       errors: ["Unable to check this purchase. Please try again."],
       formValues: { itemName, itemPrice, category },

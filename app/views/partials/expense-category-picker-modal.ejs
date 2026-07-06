@@ -1,62 +1,10 @@
-<%
-  var pickerSelectedId = '';
-
-  if (typeof selectedCategoryId !== 'undefined' && selectedCategoryId) {
-    pickerSelectedId = String(selectedCategoryId);
-  } else {
-    var pickerExpense = (typeof expense !== 'undefined' && expense && typeof expense === 'object') ? expense : {};
-    if (pickerExpense.categoryId) {
-      pickerSelectedId = String(pickerExpense.categoryId);
-    } else if (pickerExpense.category_id) {
-      pickerSelectedId = String(pickerExpense.category_id);
-    } else if (pickerExpense.categoryID) {
-      pickerSelectedId = String(pickerExpense.categoryID);
-    }
-  }
-
-  var pickerCustom = (typeof customCategories !== 'undefined' && Array.isArray(customCategories))
-    ? customCategories
-    : [];
-  var pickerGeneral = (typeof generalCategories !== 'undefined' && Array.isArray(generalCategories))
-    ? generalCategories
-    : [];
-
-  if (!pickerCustom.length && !pickerGeneral.length) {
-    var pickerCategories = (typeof categories !== 'undefined' && Array.isArray(categories)) ? categories : [];
-    pickerCustom = pickerCategories.filter(function(c) {
-      return c.isCustom || Number(c.is_custom) === 1;
-    });
-    pickerGeneral = pickerCategories.filter(function(c) {
-      return !(c.isCustom || Number(c.is_custom) === 1);
-    });
-  }
-%>
-<div class="spb-modal-overlay expense-category-overlay pocketguard-style-overlay" id="expenseCategoryOverlay" hidden>
-  <div class="spb-modal pocketguard-style-modal" role="dialog" aria-labelledby="expenseCategoryTitle" aria-modal="true">
-    <header class="spb-modal__header">
-      <h2 class="spb-modal__title" id="expenseCategoryTitle">Choose category</h2>
-      <button type="button" class="spb-modal__close" id="closeExpenseCategoryPicker" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
-    </header>
-
-    <div class="spb-modal__search">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-      <input type="search" id="expenseCategorySearch" placeholder="Search category" autocomplete="off">
-    </div>
-
-    <div style="padding:0 1.25rem 0.5rem; font-size:0.82rem; color:var(--text-muted);">
-      Can't find a category?
-      <a href="/categories" target="_blank" rel="noopener" style="font-weight:600;">Manage categories</a>
-    </div>
-
-    <div class="spb-modal__body pocketguard-style-modal-body">
-      <%- include('shared-category-picker-lists', {
-        pickerMode: 'expense',
-        customCategories: pickerCustom,
-        generalCategories: pickerGeneral,
-        selectedCategoryId: pickerSelectedId
-      }) %>
-    </div>
-  </div>
-</div>
+<%- include('category-picker-modal', {
+  pickerInstance: 'expense',
+  pickerMode: typeof pickerMode !== 'undefined' ? pickerMode : 'expense',
+  nestedOverlay: false,
+  customCategories: typeof customCategories !== 'undefined' ? customCategories : [],
+  generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : [],
+  categories: typeof categories !== 'undefined' ? categories : [],
+  selectedCategoryId: typeof selectedCategoryId !== 'undefined' ? selectedCategoryId : '',
+  expense: typeof expense !== 'undefined' ? expense : null
+}) %>

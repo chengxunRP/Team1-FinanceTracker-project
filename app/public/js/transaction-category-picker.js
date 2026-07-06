@@ -8,21 +8,27 @@
   var searchInput = document.getElementById("txnCategorySearch");
   var customList = document.getElementById("txnCustomCategoryList");
   var generalList = document.getElementById("txnGeneralCategoryList");
+  var currentList = document.getElementById("txnCurrentCategoryList");
   var yourSection = document.getElementById("txnYourCategoriesSection");
   var generalSection = document.getElementById("txnGeneralCategoriesSection");
   var emptyMsg = document.getElementById("txnCategoryEmpty");
+  var pickSelector = ".sw-cat-pick-item, .txn-cat-pick-item";
+  var pickerConfig = {
+    pickSelector: pickSelector,
+    listIds: ["txnCustomCategoryList", "txnGeneralCategoryList"],
+    currentSectionId: "txnCurrentCategorySection",
+    currentListId: "txnCurrentCategoryList",
+  };
+  var helpers = window.SwCategoryPickerHelpers;
   var saving = false;
   var currentCategoryId = "";
   var currentExpenseId = null;
   var currentBudgetMonth = "";
   var onSavedCallback = null;
 
-  function highlightSelected(categoryId) {
-    var items = overlay.querySelectorAll(".txn-cat-pick-item");
-    for (var i = 0; i < items.length; i++) {
-      var match =
-        String(items[i].getAttribute("data-category-id")) === String(categoryId);
-      items[i].classList.toggle("spb-category-item--selected", match);
+  function applyPickerState(categoryId) {
+    if (helpers) {
+      helpers.applyPickerState(overlay, categoryId, pickerConfig);
     }
   }
 
@@ -34,7 +40,7 @@
     function filterList(listEl) {
       if (!listEl) return 0;
       var count = 0;
-      var items = listEl.querySelectorAll(".txn-cat-pick-item");
+      var items = listEl.querySelectorAll(pickSelector);
       for (var i = 0; i < items.length; i++) {
         var name = (items[i].getAttribute("data-category-name") || "").toLowerCase();
         var show = !q || name.indexOf(q) !== -1;
@@ -48,13 +54,26 @@
     visibleCustom = filterList(customList);
     visibleGeneral = filterList(generalList);
 
+    if (helpers) {
+      helpers.filterPinnedCurrent(query, pickerConfig);
+    }
+
     if (yourSection) yourSection.hidden = visibleCustom === 0 && !!q;
     if (generalSection) generalSection.hidden = visibleGeneral === 0 && !!q;
-    if (emptyMsg) emptyMsg.hidden = visibleCustom + visibleGeneral > 0;
+    if (emptyMsg) {
+      var pinnedVisible =
+        helpers &&
+        document.getElementById(pickerConfig.currentSectionId) &&
+        !document.getElementById(pickerConfig.currentSectionId).hidden;
+      emptyMsg.hidden = visibleCustom + visibleGeneral > 0 || pinnedVisible;
+    }
   }
 
   function closeModal() {
     overlay.hidden = true;
+    if (helpers) {
+      helpers.onPickerClose(overlay, pickerConfig);
+    }
     saving = false;
     currentExpenseId = null;
     onSavedCallback = null;
@@ -84,7 +103,7 @@
       filterCategories("");
       searchInput.focus();
     }
-    highlightSelected(currentCategoryId);
+    applyPickerState(currentCategoryId);
   }
 
   function saveCategory(categoryId) {
@@ -142,7 +161,7 @@
   }
 
   function handleListClick(e) {
-    var btn = e.target.closest(".txn-cat-pick-item");
+    var btn = e.target.closest(pickSelector);
     if (!btn || saving) return;
     e.preventDefault();
     var categoryId = btn.getAttribute("data-category-id");
@@ -164,6 +183,7 @@
 
   if (customList) customList.addEventListener("click", handleListClick);
   if (generalList) generalList.addEventListener("click", handleListClick);
+  if (currentList) currentList.addEventListener("click", handleListClick);
 
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && overlay && !overlay.hidden) {
@@ -171,6 +191,10 @@
       closeModal();
     }
   });
+
+  if (helpers) {
+    helpers.stampPickerOrders(pickerConfig.listIds);
+  }
 
   filterCategories("");
 

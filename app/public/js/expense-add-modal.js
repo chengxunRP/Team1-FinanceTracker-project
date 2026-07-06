@@ -77,12 +77,17 @@
       categoryIconWrap.innerHTML = iconEl ? iconEl.outerHTML : PLACEHOLDER_ICON;
     }
 
+    overlay.querySelectorAll(".spb-category-row").forEach(function (row) {
+      row.classList.remove("spb-category-row--selected");
+    });
     document.querySelectorAll(".expense-cat-pick-item").forEach(function (item) {
       var match =
         String(item.getAttribute("data-category-id")) === String(defaults.categoryId);
       item.classList.toggle("spb-category-item--selected", match);
-      var row = item.closest("li");
-      if (row) row.classList.toggle("spb-category-item-row--selected", match);
+      if (match) {
+        var row = item.closest(".spb-category-row");
+        if (row) row.classList.add("spb-category-row--selected");
+      }
     });
 
     return true;
@@ -101,10 +106,14 @@
     var categoryIconWrap = document.getElementById("expenseCategoryIconWrap");
     if (categoryIconWrap) categoryIconWrap.innerHTML = PLACEHOLDER_ICON;
 
+    var categoryOverlay = document.getElementById("expenseCategoryOverlay");
+    if (categoryOverlay) {
+      categoryOverlay.querySelectorAll(".spb-category-row").forEach(function (row) {
+        row.classList.remove("spb-category-row--selected");
+      });
+    }
     document.querySelectorAll(".expense-cat-pick-item").forEach(function (item) {
       item.classList.remove("spb-category-item--selected");
-      var row = item.closest("li");
-      if (row) row.classList.remove("spb-category-item-row--selected");
     });
   }
 

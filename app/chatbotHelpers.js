@@ -167,9 +167,11 @@ function money(value) {
 
 function liveFields(liveSummary, summary) {
   const ls = liveSummary || {};
-  const allSpent = ls.allTransactionsSpent != null
-    ? ls.allTransactionsSpent
-    : summary.totalSpent;
+  const allSpent = ls.allExpensesSpent != null
+    ? ls.allExpensesSpent
+    : ls.allTransactionsSpent != null
+      ? ls.allTransactionsSpent
+      : summary.totalSpent;
   const allBudget = ls.allTransactionsBudget != null
     ? ls.allTransactionsBudget
     : 0;
@@ -350,17 +352,34 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
   // Purchase checks use All Transactions remaining by default (summary.primary).
   const itemPrice = extractItemPrice(message);
   if (itemPrice != null && isPurchaseQuestion(message)) {
-    if (!fields.hasBudget) {
-      return [
-        `You spent $${fields.allSpent} across all transactions${monthNote}.`,
-        "I could not find a budget for this month yet, so I cannot judge whether that purchase is safe.",
-        "Add a category budget or All Categories Budget on Spending & Budgets first.",
-      ].join("\n");
+    if (!fields.hasAllTransactionsBudget) {
+      const lines = [
+        "Overall Budget Not Set.",
+        "Create an All Categories Budget on Spending & Budgets to check purchases against your overall monthly spending limit.",
+      ];
+      if (fields.hasCategoryBudgets) {
+        lines.push(
+          `You have category budgets totaling $${fields.catBudget}, but that is not the same as an overall monthly budget.`
+        );
+        lines.push(
+          "Select a category with a budget on the Purchase Checker page for a category-specific check."
+        );
+      }
+      return lines.join("\n");
     }
     // Prefer the richer recommendation helper which includes reasons and insight.
     try {
       const item = { itemName: 'Item', itemPrice, category: 'Everything else' };
-      const rec = recommendationHelpers.getSpendingRecommendation(summary, Array.isArray(expenses) ? expenses : [], item);
+      const rec = recommendationHelpers.getSpendingRecommendation(
+        summary,
+        Array.isArray(expenses) ? expenses : [],
+        item,
+        {
+          useAllBudgetCounting: true,
+          hasOverallBudget: true,
+          categoryBudgetRows: liveSummary.budgetBreakdown || [],
+        }
+      );
       // Format a readable reply similar to the purchase check helper.
       const lines = [];
       lines.push(`Status: ${rec.result}`);

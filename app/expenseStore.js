@@ -643,10 +643,12 @@ async function getCategoriesForPicker() {
     (cat) => !customIds.has(String(cat.id))
   );
 
-  const customCategories = customRows.map((cat) => toPickerCategory(cat, true));
-  const generalCategories = generalFiltered.map((cat) =>
-    toPickerCategory(cat, false)
-  );
+  const customCategories = customRows
+    .map((cat) => toPickerCategory(cat, true))
+    .sort(compareCategoriesForSort);
+  const generalCategories = generalFiltered
+    .map((cat) => toPickerCategory(cat, false))
+    .sort(compareCategoriesForSort);
 
   return {
     customCategories,

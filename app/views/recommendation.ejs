@@ -1,5 +1,19 @@
 <%- include('partials/header') %>
 
+<%
+  var spcFormValues = (typeof formValues !== 'undefined' && formValues) ? formValues : {};
+  var spcPickerCategories = (typeof pickerCategories !== 'undefined' && Array.isArray(pickerCategories)) ? pickerCategories : [];
+  var spcSelectedCategoryId = (typeof selectedCategoryId !== 'undefined' && selectedCategoryId) ? String(selectedCategoryId) : '';
+  var spcSelectedCategoryName = spcFormValues.category ? String(spcFormValues.category) : '';
+  if (!spcSelectedCategoryId && spcSelectedCategoryName) {
+    var spcNameMatch = spcPickerCategories.find(function(c) {
+      return (c.displayName || c.name) === spcSelectedCategoryName || c.name === spcSelectedCategoryName;
+    });
+    if (spcNameMatch) spcSelectedCategoryId = String(spcNameMatch.id);
+  }
+  var spcSelectedCat = spcPickerCategories.find(function(c) { return String(c.id) === spcSelectedCategoryId; });
+%>
+
 <div class="spc-page">
   <header class="spc-header">
     <span class="spc-eyebrow">Budget-aware spending insight</span>
@@ -11,6 +25,7 @@
   </header>
 
   <section class="spc-snapshot" aria-label="Finance snapshot">
+    <% if (typeof hasOverallBudget !== 'undefined' && hasOverallBudget) { %>
     <div class="stat-grid stat-grid--spc">
       <article class="stat-card">
         <span class="stat-card__label">Monthly Budget</span>
@@ -34,6 +49,18 @@
         <span class="spc-stat-sub">$<%= financeSnapshot.highestCategoryAmount %> spent so far</span>
       </article>
     </div>
+    <% } else { %>
+    <div class="spc-overall-unset">
+      <article class="stat-card stat-card--wide spc-overall-unset-card">
+        <span class="stat-card__label">Overall Budget</span>
+        <span class="stat-card__value stat-card__value--sm">Not Set</span>
+        <p class="spc-overall-unset-note">Create an All Categories Budget to check purchases against your overall monthly spending limit.</p>
+        <% if (typeof categoryBudgetTotal !== 'undefined' && categoryBudgetTotal > 0) { %>
+        <p class="spc-overall-unset-sub">Budgeted categories total: <strong>$<%= categoryBudgetTotal %></strong> — this is not your overall monthly budget.</p>
+        <% } %>
+      </article>
+    </div>
+    <% } %>
   </section>
 
   <div class="split-layout split-layout--rec spc-main">
@@ -51,29 +78,51 @@
       </div>
       <% } %>
 
-      <form class="form spc-form" method="POST" action="/recommendation">
+      <form class="form spc-form" id="spcPurchaseForm" method="POST" action="/recommendation">
         <div class="form-group">
           <label for="itemName">Item name</label>
-          <input type="text" id="itemName" name="itemName" placeholder="e.g. Running shoes" required value="<%= typeof formValues !== 'undefined' && formValues.itemName ? formValues.itemName : '' %>">
+          <input type="text" id="itemName" name="itemName" placeholder="e.g. Running shoes" required value="<%= spcFormValues.itemName ? spcFormValues.itemName : '' %>">
         </div>
         <div class="form-group">
           <label for="itemPrice">Item price ($)</label>
-          <input type="number" id="itemPrice" name="itemPrice" min="0" step="0.01" placeholder="e.g. 89.00" required value="<%= typeof formValues !== 'undefined' && formValues.itemPrice !== undefined ? formValues.itemPrice : '' %>">
+          <input type="number" id="itemPrice" name="itemPrice" min="0" step="0.01" placeholder="e.g. 89.00" required value="<%= spcFormValues.itemPrice !== undefined && spcFormValues.itemPrice !== '' ? spcFormValues.itemPrice : '' %>">
         </div>
-        <div class="form-group">
-          <label for="category">Category</label>
-          <select id="category" name="category" required>
-            <option value="">Select a category</option>
-            <% categories.forEach(function(cat) { %>
-            <option value="<%= cat %>" <%= typeof formValues !== 'undefined' && formValues.category === cat ? 'selected' : '' %>><%= cat %></option>
-            <% }); %>
-          </select>
+        <div class="form-group spc-category-field">
+          <input type="hidden" name="category" id="spcCategoryValue" value="<%= spcSelectedCategoryName %>">
+          <input type="hidden" id="categoryId" value="<%= spcSelectedCategoryId %>">
+          <span class="spc-field-label">Category</span>
+          <button type="button" class="expense-txn__category-btn spc-category-btn" id="openExpenseCategoryPicker" aria-haspopup="dialog">
+            <span class="expense-txn__category-icon" id="expenseCategoryIconWrap">
+              <% if (spcSelectedCat) { %>
+                <%- include('partials/category-icon', { catName: spcSelectedCat.displayName || spcSelectedCat.name, catIcon: spcSelectedCat.icon, catIconImage: spcSelectedCat.iconImage, catColor: spcSelectedCat.color, catIsCustom: spcSelectedCat.isCustom || Number(spcSelectedCat.is_custom) === 1, catSize: 'sm' }) %>
+              <% } else { %>
+                <span class="sw-category-icon sw-category-icon--sm">
+                  <span class="sw-category-icon__fallback" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/>
+                      <path d="M8.5 12h7M12 8.5v7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                </span>
+              <% } %>
+            </span>
+            <span class="expense-txn__category-body">
+              <span class="expense-txn__label">Category</span>
+              <span class="expense-txn__category-value<%= spcSelectedCat ? '' : ' expense-txn__category-value--placeholder' %>" id="expenseCategoryLabel">
+                <%= spcSelectedCat ? (spcSelectedCat.displayName || spcSelectedCat.name) : 'Choose category' %>
+              </span>
+            </span>
+            <svg class="expense-txn__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         </div>
-        <button type="submit" class="btn btn--primary btn--block">Check purchase</button>
+        <div class="spc-form-actions">
+          <button type="submit" class="btn btn--primary btn--block">Check purchase</button>
+          <button type="button" class="btn btn--ghost btn--block" id="spcClearFormBtn">Clear form</button>
+        </div>
       </form>
     </section>
 
-    <section class="card-panel card-panel--result spc-result-panel">
+    <section class="card-panel card-panel--result spc-result-panel" id="spcResultPanel">
       <% if (typeof recommendation !== 'undefined' && recommendation) { %>
       <% const progressStep = Math.min(100, Math.round(recommendation.analysis.newPercentageUsed / 5) * 5); %>
       <%
@@ -97,6 +146,10 @@
           <p class="spc-item-price">$<%= recommendation.itemPrice %></p>
           <span class="tag tag--blue"><%= recommendation.category %></span>
         </div>
+
+        <% if (recommendation.budgetNote) { %>
+        <p class="spc-budget-note"><%= recommendation.budgetNote %></p>
+        <% } %>
 
         <div class="spc-metrics result-metrics">
           <div class="result-metric spc-metric">
@@ -170,5 +223,17 @@
     </section>
   </div>
 </div>
+
+<%- include('partials/expense-category-picker-modal', {
+  pickerMode: 'expense',
+  customCategories: typeof customCategories !== 'undefined' ? customCategories : [],
+  generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : [],
+  categories: spcPickerCategories,
+  selectedCategoryId: spcSelectedCategoryId
+}) %>
+
+<script src="/js/category-picker-helpers.js?v=1"></script>
+<script src="/js/expense-category-picker.js?v=12"></script>
+<script src="/js/purchase-checker-form.js?v=1"></script>
 
 <%- include('partials/footer') %>

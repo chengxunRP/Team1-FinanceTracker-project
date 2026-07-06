@@ -15,7 +15,7 @@
   var selectedCat = (categories || []).find(function(c) { return String(c.id) === selectedCategoryId; });
 %>
 
-<link rel="stylesheet" href="/expense-form.css?v=35">
+<link rel="stylesheet" href="/expense-form.css?v=37">
 <link rel="stylesheet" href="/spb.css?v=31">
 
 <div class="expense-txn">
@@ -60,7 +60,8 @@
 
 <script src="/js/expense-date.js"></script>
 <script src="/js/expense-upload.js?v=5"></script>
-<script src="/js/expense-category-picker.js?v=6"></script>
+<script src="/js/category-picker-helpers.js?v=1"></script>
+<script src="/js/expense-category-picker.js?v=12"></script>
 <script src="/js/expense-nav.js"></script>
 <script src="/js/purchase-check.js?v=1"></script>
 <%- include('../partials/footer') %>

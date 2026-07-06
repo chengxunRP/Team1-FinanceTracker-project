@@ -69,6 +69,58 @@ tests.push(function(){
   }
 });
 
+// Category budget can block purchase even when overall budget is fine
+tests.push(function(){
+  const summary = makeSummary(1000, 200);
+  const expenses = [];
+  const categoryRows = [{
+    displayName: 'Groceries',
+    name: 'groceries',
+    availableBudget: 100,
+    actual: 85,
+    remaining: 15,
+    budgeted: 100,
+  }];
+  const item = { itemName: 'Bulk', itemPrice: 50, category: 'Groceries' };
+  const out = rec.getSpendingRecommendation(summary, expenses, item, {
+    hasOverallBudget: true,
+    useAllBudgetCounting: true,
+    categoryBudgetRows: categoryRows,
+  });
+  if (out.result === 'Safe to buy') {
+    throw new Error('Expected Risky or Not recommended when category budget is too low');
+  }
+  if (!out.analysis.categoryWouldOverspend) {
+    throw new Error('Expected categoryWouldOverspend flag');
+  }
+});
+
+// Without All Categories Budget, category total must not become Monthly Budget
+tests.push(function(){
+  const summary = makeSummary(0, 0);
+  const expenses = [];
+  const categoryRows = [{
+    displayName: 'Education',
+    name: 'education',
+    availableBudget: 89,
+    actual: 10,
+    remaining: 79,
+    budgeted: 89,
+  }];
+  const item = { itemName: 'Book', itemPrice: 50, category: 'Education' };
+  const out = rec.getSpendingRecommendation(summary, expenses, item, {
+    hasOverallBudget: false,
+    useAllBudgetCounting: false,
+    categoryBudgetRows: categoryRows,
+  });
+  if (out.budgetMode !== 'category-only') {
+    throw new Error('Expected category-only mode, got ' + out.budgetMode);
+  }
+  if (out.analysis.remainingBudget !== 79) {
+    throw new Error('Expected category remaining 79, got ' + out.analysis.remainingBudget);
+  }
+});
+
 let failed = 0;
 for(let i=0;i<tests.length;i++){
   try{

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
+const { validateRegistrationPassword } = require('../authHelpers');
 
 // GET /register — show the registration form
 router.get('/register', (req, res) => {
@@ -20,7 +21,12 @@ router.post('/register', async (req, res) => {
 
   if (!name || !name.trim()) errors.push('Name is required.');
   if (!email || !email.trim()) errors.push('Email is required.');
-  if (!password || password.length < 6) errors.push('Password must be at least 6 characters.');
+  if (!password) {
+    errors.push('Password is required.');
+  } else {
+    const passwordCheck = validateRegistrationPassword(password);
+    if (!passwordCheck.valid) errors.push(passwordCheck.message);
+  }
 
   try {
     if (email) {
