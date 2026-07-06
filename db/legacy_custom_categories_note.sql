@@ -1,0 +1,15 @@
+-- Legacy custom categories (user_data_isolation)
+--
+-- Before per-user login, custom categories may exist with:
+--   is_custom = 1
+--   user_id = NULL
+--
+-- These rows are NOT deleted. Application code hides them from logged-in users.
+-- Only categories matching:
+--   is_custom = 0                          (shared general categories)
+--   OR (is_custom = 1 AND user_id = ?)     (current user's custom categories)
+-- are shown in pickers, budget modals, and category lists.
+--
+-- Optional inspection (read-only):
+-- SELECT id, name, is_custom, user_id FROM categories
+-- WHERE is_custom = 1 AND user_id IS NULL;

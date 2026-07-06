@@ -11,6 +11,7 @@ const {
   compareCategoriesForSort,
 } = require("./categoryHelpers");
 const { getCategoryImageUrl } = require("./categoryImageHelpers");
+const { requireUserId } = require("./userScope");
 
 const DEFAULT_BUDGET = 500;
 const BUDGET_COUNTED_EXPENSE_WHERE =
@@ -86,8 +87,10 @@ function filterExpensesForMonth(expenses, budgetMonth) {
 }
 
 async function getMonthlyBudget() {
+  const userId = requireUserId();
   const [rows] = await db.query(
-    "SELECT amount FROM monthly_budget ORDER BY id ASC LIMIT 1"
+    "SELECT amount FROM monthly_budget WHERE user_id = ? ORDER BY id ASC LIMIT 1",
+    [userId]
   );
 
   if (!rows.length) {
@@ -98,19 +101,25 @@ async function getMonthlyBudget() {
 }
 
 async function setMonthlyBudget(amount) {
+  const userId = requireUserId();
   const [rows] = await db.query(
-    "SELECT id FROM monthly_budget ORDER BY id ASC LIMIT 1"
+    "SELECT id FROM monthly_budget WHERE user_id = ? ORDER BY id ASC LIMIT 1",
+    [userId]
   );
 
   if (rows.length) {
-    await db.query("UPDATE monthly_budget SET amount = ? WHERE id = ?", [
+    await db.query("UPDATE monthly_budget SET amount = ? WHERE id = ? AND user_id = ?", [
       amount,
       rows[0].id,
+      userId,
     ]);
     return;
   }
 
-  await db.query("INSERT INTO monthly_budget (amount) VALUES (?)", [amount]);
+  await db.query("INSERT INTO monthly_budget (amount, user_id) VALUES (?, ?)", [
+    amount,
+    userId,
+  ]);
 }
 
 let recurringBudgetSchema = null;
@@ -151,14 +160,15 @@ function mapBudgetRow(row) {
 }
 
 async function getCategoryBudgetsLegacy(budgetMonth) {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       category_id AS categoryId,
       CAST(budget_limit AS DECIMAL(10,2)) AS budgetLimit,
       budget_month AS budgetMonth
     FROM category_budgets
-    WHERE budget_month = ?`,
-    [budgetMonth]
+    WHERE budget_month = ? AND user_id = ?`,
+    [budgetMonth, userId]
   );
   return rows.map((row) =>
     mapBudgetRow({
@@ -178,6 +188,7 @@ async function getActiveCategoryBudgets() {
       return getCategoryBudgetsLegacy(getCurrentBudgetMonth());
     }
 
+    const userId = requireUserId();
     const [rows] = await db.query(
       `SELECT
         id AS budgetId,
@@ -188,8 +199,9 @@ async function getActiveCategoryBudgets() {
         is_active AS isActive,
         created_at AS createdAt
       FROM category_budgets
-      WHERE is_active = 1
-      ORDER BY category_id ASC`
+      WHERE is_active = 1 AND user_id = ?
+      ORDER BY category_id ASC`,
+      [userId]
     );
 
     return rows.map((row) => mapBudgetRow(row));
@@ -498,19 +510,22 @@ async function createCategoryBudget(categoryId, amount, rolloverEnabled = false)
   }
 
   try {
+    const userId = requireUserId();
     await db.query(
       `INSERT INTO category_budgets (
         category_id,
         budget_limit,
         budget_month,
         is_active,
-        rollover_enabled
-      ) VALUES (?, ?, ?, 1, ?)`,
+        rollover_enabled,
+        user_id
+      ) VALUES (?, ?, ?, 1, ?, ?)`,
       [
         Number(categoryId),
         amount,
         getCurrentBudgetMonth(),
         rolloverEnabled ? 1 : 0,
+        userId,
       ]
     );
   } catch (error) {
@@ -541,11 +556,12 @@ async function updateCategoryBudget(categoryId, amount, rolloverEnabled) {
   const rolloverValue =
     rolloverEnabled === undefined ? (existing.rolloverEnabled ? 1 : 0) : rolloverEnabled ? 1 : 0;
 
+  const userId = requireUserId();
   await db.query(
     `UPDATE category_budgets
     SET budget_limit = ?, rollover_enabled = ?, is_active = 1
-    WHERE category_id = ? AND is_active = 1`,
-    [amount, rolloverValue, Number(categoryId)]
+    WHERE category_id = ? AND is_active = 1 AND user_id = ?`,
+    [amount, rolloverValue, Number(categoryId), userId]
   );
 }
 
@@ -579,11 +595,12 @@ async function setCategoryBudgetRollover(categoryId, enabled) {
     throw err;
   }
 
+  const userId = requireUserId();
   await db.query(
     `UPDATE category_budgets
     SET rollover_enabled = ?
-    WHERE category_id = ? AND is_active = 1`,
-    [enabled ? 1 : 0, Number(categoryId)]
+    WHERE category_id = ? AND is_active = 1 AND user_id = ?`,
+    [enabled ? 1 : 0, Number(categoryId), userId]
   );
 
   if (!enabled && existing.id != null) {
@@ -717,11 +734,12 @@ async function setCategoryBudget(categoryId, budgetMonth, amount) {
       return createCategoryBudget(categoryId, amount, false);
     }
 
+    const userId = requireUserId();
     await db.query(
-      `INSERT INTO category_budgets (category_id, budget_limit, budget_month)
-      VALUES (?, ?, ?)
+      `INSERT INTO category_budgets (category_id, budget_limit, budget_month, user_id)
+      VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE budget_limit = VALUES(budget_limit)`,
-      [Number(categoryId), amount, budgetMonth]
+      [Number(categoryId), amount, budgetMonth, userId]
     );
   } catch (error) {
     if (error.code === "ER_NO_SUCH_TABLE") {
@@ -751,6 +769,7 @@ async function setCategoryBudgets(budgetMonth, budgetsByCategoryId) {
 async function getSpendingTotalsByCategoryId(budgetMonth) {
   if (!budgetMonth) return {};
 
+  const userId = requireUserId();
   const { startDate, endExclusive } = getBudgetMonthDateRange(budgetMonth);
 
   const [rows] = await db.query(
@@ -759,9 +778,10 @@ async function getSpendingTotalsByCategoryId(budgetMonth) {
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
     WHERE expense_date >= ? AND expense_date < ?
+      AND user_id = ?
       ${BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY category_id`,
-    [startDate, endExclusive]
+    [startDate, endExclusive, userId]
   );
 
   const totals = {};
@@ -777,6 +797,7 @@ function getCategoryActualSpent(spendingByCategoryId, category) {
 }
 
 async function getCategoryExpensesForMonthFromDb(categoryId, budgetMonth) {
+  const userId = requireUserId();
   const { startDate, endExclusive } = getBudgetMonthDateRange(budgetMonth);
 
   const [rows] = await db.query(
@@ -796,8 +817,9 @@ async function getCategoryExpensesForMonthFromDb(categoryId, budgetMonth) {
     WHERE e.category_id = ?
       AND e.expense_date >= ?
       AND e.expense_date < ?
+      AND e.user_id = ?
     ORDER BY e.expense_date DESC, e.id DESC`,
-    [Number(categoryId), startDate, endExclusive]
+    [Number(categoryId), startDate, endExclusive, userId]
   );
 
   return rows.map((row) => ({
@@ -815,6 +837,7 @@ async function getCategoryExpensesForMonthFromDb(categoryId, budgetMonth) {
 }
 
 async function getCategoryExpensesAllFromDb(categoryId) {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       e.id,
@@ -829,9 +852,9 @@ async function getCategoryExpensesAllFromDb(categoryId) {
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    WHERE e.category_id = ?
+    WHERE e.category_id = ? AND e.user_id = ?
     ORDER BY e.expense_date DESC, e.id DESC`,
-    [Number(categoryId)]
+    [Number(categoryId), userId]
   );
 
   return rows.map((row) => ({
@@ -849,16 +872,17 @@ async function getCategoryExpensesAllFromDb(categoryId) {
 }
 
 async function getCategoryMonthlyTotalsFromDb(categoryId) {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       DATE_FORMAT(expense_date, '%Y-%m') AS budgetMonth,
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
-    WHERE category_id = ?
+    WHERE category_id = ? AND user_id = ?
       ${BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY DATE_FORMAT(expense_date, '%Y-%m')
     ORDER BY budgetMonth ASC`,
-    [Number(categoryId)]
+    [Number(categoryId), userId]
   );
 
   const totals = {};
@@ -1063,18 +1087,19 @@ async function getAvailableCategoriesForBudget(budgetMonth, categories, spending
 }
 
 async function deactivateCategoryBudget(categoryId, budgetMonth) {
+  const userId = requireUserId();
   const isRecurring = await usesRecurringBudgetSchema();
   if (isRecurring) {
     await db.query(
-      "UPDATE category_budgets SET is_active = 0 WHERE category_id = ? AND is_active = 1",
-      [Number(categoryId)]
+      "UPDATE category_budgets SET is_active = 0 WHERE category_id = ? AND is_active = 1 AND user_id = ?",
+      [Number(categoryId), userId]
     );
     return;
   }
 
   await db.query(
-    "DELETE FROM category_budgets WHERE category_id = ? AND budget_month = ?",
-    [Number(categoryId), budgetMonth || getCurrentBudgetMonth()]
+    "DELETE FROM category_budgets WHERE category_id = ? AND budget_month = ? AND user_id = ?",
+    [Number(categoryId), budgetMonth || getCurrentBudgetMonth(), userId]
   );
 }
 
@@ -1157,15 +1182,17 @@ async function buildMonthlyChartDataFromDb(categoryId, selectedMonth) {
 }
 
 async function getAllMonthlyTotalsFromDb() {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       DATE_FORMAT(expense_date, '%Y-%m') AS budgetMonth,
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
-    WHERE 1=1
+    WHERE user_id = ?
       ${BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY DATE_FORMAT(expense_date, '%Y-%m')
-    ORDER BY budgetMonth ASC`
+    ORDER BY budgetMonth ASC`,
+    [userId]
   );
 
   const totals = {};
@@ -1229,6 +1256,7 @@ async function buildOverallMonthlyChartDataFromDb(selectedMonth) {
 }
 
 async function getAllExpensesFromDb() {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       e.id,
@@ -1243,7 +1271,9 @@ async function getAllExpensesFromDb() {
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    ORDER BY e.expense_date DESC, e.id DESC`
+    WHERE e.user_id = ?
+    ORDER BY e.expense_date DESC, e.id DESC`,
+    [userId]
   );
 
   return rows.map((row) => ({
@@ -1262,6 +1292,7 @@ async function getAllExpensesFromDb() {
 }
 
 async function getAllExpensesForMonthFromDb(budgetMonth) {
+  const userId = requireUserId();
   const month = normalizeBudgetMonth(budgetMonth);
   const { startDate, endExclusive } = getBudgetMonthDateRange(month);
 
@@ -1279,9 +1310,9 @@ async function getAllExpensesForMonthFromDb(budgetMonth) {
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    WHERE e.expense_date >= ? AND e.expense_date < ?
+    WHERE e.expense_date >= ? AND e.expense_date < ? AND e.user_id = ?
     ORDER BY e.expense_date DESC, e.id DESC`,
-    [startDate, endExclusive]
+    [startDate, endExclusive, userId]
   );
 
   return rows.map((row) => ({
@@ -1300,6 +1331,7 @@ async function getAllExpensesForMonthFromDb(budgetMonth) {
 }
 
 async function getUnbudgetedExpensesFromDb(budgetMonth, budgetedCategoryIds) {
+  const userId = requireUserId();
   const month = normalizeBudgetMonth(budgetMonth);
   const { startDate, endExclusive } = getBudgetMonthDateRange(month);
   const excludedIds = (budgetedCategoryIds || [])
@@ -1323,8 +1355,8 @@ async function getUnbudgetedExpensesFromDb(budgetMonth, budgetedCategoryIds) {
       c.is_custom AS category_is_custom
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    WHERE e.expense_date >= ? AND e.expense_date < ?`;
-  const params = [startDate, endExclusive];
+    WHERE e.expense_date >= ? AND e.expense_date < ? AND e.user_id = ?`;
+  const params = [startDate, endExclusive, userId];
 
   if (excludedIds.length) {
     query += ` AND e.category_id NOT IN (${excludedIds.map(() => "?").join(",")})`;
@@ -1392,12 +1424,15 @@ async function getUnbudgetedTransactionMonths() {
     budgetByCategoryId[String(budget.categoryId)] = budget;
   });
 
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       category_id AS categoryId,
       DATE_FORMAT(expense_date, '%Y-%m') AS budgetMonth
     FROM expenses
-    ORDER BY expense_date ASC`
+    WHERE user_id = ?
+    ORDER BY expense_date ASC`,
+    [userId]
   );
 
   const months = new Set();
@@ -1608,6 +1643,7 @@ async function getCategoryDetailData(categoryId, budgetMonth, spendingByCategory
 }
 
 async function getActiveOverallMonthlyBudget() {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       id,
@@ -1617,9 +1653,10 @@ async function getActiveOverallMonthlyBudget() {
       deleted_at AS deletedAt,
       created_at AS createdAt
     FROM overall_monthly_budgets
-    WHERE is_active = 1 AND deleted_at IS NULL
+    WHERE is_active = 1 AND deleted_at IS NULL AND user_id = ?
     ORDER BY id ASC
-    LIMIT 1`
+    LIMIT 1`,
+    [userId]
   );
 
   if (!rows.length) return null;
@@ -1764,14 +1801,16 @@ async function saveOverallMonthlyBudget(amount, rolloverEnabled = false) {
     return existing.id;
   }
 
+  const userId = requireUserId();
   const [result] = await db.query(
     `INSERT INTO overall_monthly_budgets (
       budget_amount,
       rollover_enabled,
       is_active,
-      deleted_at
-    ) VALUES (?, ?, 1, NULL)`,
-    [amount, rolloverValue]
+      deleted_at,
+      user_id
+    ) VALUES (?, ?, 1, NULL, ?)`,
+    [amount, rolloverValue, userId]
   );
 
   return result.insertId;
@@ -1885,6 +1924,7 @@ async function getOverallBudgetDetailData(budgetMonth) {
 }
 
 async function getTotalMonthSpending(budgetMonth) {
+  const userId = requireUserId();
   const month = normalizeBudgetMonth(budgetMonth);
   const { startDate, endExclusive } = getBudgetMonthDateRange(month);
 
@@ -1892,8 +1932,9 @@ async function getTotalMonthSpending(budgetMonth) {
     `SELECT CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
     WHERE expense_date >= ? AND expense_date < ?
+      AND user_id = ?
       ${BUDGET_COUNTED_EXPENSE_WHERE}`,
-    [startDate, endExclusive]
+    [startDate, endExclusive, userId]
   );
 
   return Number(rows[0].total) || 0;
