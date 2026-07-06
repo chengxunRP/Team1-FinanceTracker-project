@@ -9,7 +9,11 @@ const {
   buildBudgetSummary,
   getMonthlyHealthStatus,
 } = require("./budgetHelpers");
-const { getFinanceSnapshot } = require("./recommendationHelpers");
+const {
+  getFinanceSnapshot,
+  validateItemInput,
+  getSpendingRecommendation,
+} = require("./recommendationHelpers");
 const {
   SUGGESTED_QUESTIONS,
   buildFinBotReply,
@@ -274,6 +278,92 @@ app.get("/home", async (req, res) => {
       pageTitle: "Home",
       activePage: "landing",
       summary: buildBudgetSummary(0, []),
+    });
+  }
+});
+
+async function loadPurchaseCheckerData() {
+  const live = await financeHelpers.getBudgetSummary();
+  const expenses = await expenseStore.getExpensesInMonth(live.budgetMonth);
+  const categories = await expenseStore.getCategories();
+  const categoryNames = categories
+    .map((cat) => cat.displayName || cat.name)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  return {
+    summary: live.summary,
+    financeSnapshot: getFinanceSnapshot(live.summary, expenses),
+    expenses,
+    categories: categoryNames,
+    budgetMonthLabel: live.budgetMonthLabel,
+  };
+}
+
+function renderRecommendationPage(res, locals) {
+  res.render("recommendation", {
+    pageTitle: "Purchase Checker",
+    activePage: "recommendation",
+    errors: [],
+    formValues: {},
+    recommendation: null,
+    ...locals,
+  });
+}
+
+app.get("/recommendation", requireLogin, async (req, res) => {
+  try {
+    const data = await loadPurchaseCheckerData();
+    renderRecommendationPage(res, data);
+  } catch (error) {
+    console.error("Failed to load purchase checker:", error);
+    const emptySummary = buildBudgetSummary(0, [], 0);
+    renderRecommendationPage(res, {
+      summary: emptySummary,
+      financeSnapshot: getFinanceSnapshot(emptySummary, []),
+      categories: [],
+      budgetMonthLabel: "",
+      errors: ["Unable to load your budget data. Please try again."],
+    });
+  }
+});
+
+app.post("/recommendation", requireLogin, async (req, res) => {
+  const { itemName, itemPrice, category } = req.body;
+
+  try {
+    const data = await loadPurchaseCheckerData();
+    const validation = validateItemInput(itemName, itemPrice, category);
+
+    if (!validation.valid) {
+      return renderRecommendationPage(res, {
+        ...data,
+        errors: validation.errors,
+        formValues: { itemName, itemPrice, category },
+      });
+    }
+
+    const recommendation = getSpendingRecommendation(data.summary, data.expenses, {
+      itemName: validation.itemName,
+      itemPrice: validation.itemPrice,
+      category: validation.category,
+    });
+
+    renderRecommendationPage(res, {
+      ...data,
+      recommendation,
+      formValues: { itemName, itemPrice, category },
+    });
+  } catch (error) {
+    console.error("Purchase checker error:", error);
+    const emptySummary = buildBudgetSummary(0, [], 0);
+    renderRecommendationPage(res, {
+      summary: emptySummary,
+      financeSnapshot: getFinanceSnapshot(emptySummary, []),
+      categories: [],
+      budgetMonthLabel: "",
+      errors: ["Unable to check this purchase. Please try again."],
+      formValues: { itemName, itemPrice, category },
     });
   }
 });
