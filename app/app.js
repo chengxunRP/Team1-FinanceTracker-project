@@ -69,6 +69,18 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+const session = require("express-session");
+app.use(session({
+  secret: "spendwise-dev-secret-change-me",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 24 }, // 1 day
+}));
+
+const { userContextMiddleware } = require("./requestUserContext");
+const { requireLogin, getCurrentUserId } = require("./authHelpers");
+app.use(userContextMiddleware);
+
 // --- expense-nav script middleware ---
 app.use(function(req, res, next) {
   var _render = res.render.bind(res);
@@ -78,6 +90,7 @@ app.use(function(req, res, next) {
     locals.getCategoryImageUrl = getCategoryImageUrl;
     locals.getCategoryVisual = getCategoryVisual;
     locals.getCustomCategoryIconMarkup = getCustomCategoryIconMarkup;
+    locals.currentUser = (req.session && req.session.userId) ? { id: req.session.userId, name: req.session.userName } : null;
     var _cb = cb || function(err, str) {
       if (err) return next(err);
       res.send(str);
@@ -92,6 +105,10 @@ app.use(function(req, res, next) {
 });
 // --- End expense-nav script middleware ---
 
+app.use("/budget", requireLogin);
+app.use("/chatbot", requireLogin);
+app.use("/savings-goals", requireLogin);
+
 async function getBudgetPageData(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()
@@ -100,6 +117,7 @@ async function getBudgetPageData(budgetMonth) {
   let expenses;
   let categories;
   let spendingByCategoryId;
+  let actualSpendingByCategoryId;
   let monthTotalSpent;
   let monthExpenseCount;
 
@@ -109,6 +127,7 @@ async function getBudgetPageData(budgetMonth) {
       expenses,
       categories,
       spendingByCategoryId,
+      actualSpendingByCategoryId,
       monthTotalSpent,
       monthExpenseCount,
     ] = await Promise.all([
@@ -116,6 +135,7 @@ async function getBudgetPageData(budgetMonth) {
       expenseStore.getExpensesForAnalytics(),
       expenseStore.getCategories(),
       budgetStore.getSpendingTotalsByCategoryId(month),
+      budgetStore.getActualSpendingTotalsByCategoryId(month),
       financeHelpers.getMonthlyExpenseTotal(month),
       financeHelpers.getExpenseCountForMonth(month),
     ]);
@@ -152,7 +172,7 @@ async function getBudgetPageData(budgetMonth) {
   const everythingElse = budgetStore.getEverythingElseData(
     categories,
     budgetedCategoryIds,
-    spendingByCategoryId
+    actualSpendingByCategoryId
   );
   const budgetTotals = budgetStore.getBudgetTotals(categoryRows);
   const availableCategories = await budgetStore.getAvailableCategoriesForBudget(
@@ -232,12 +252,17 @@ async function renderOverviewPage(req, res) {
   }
 }
 
-app.get("/", renderOverviewPage);
-app.get("/dashboard", renderOverviewPage);
+app.get("/", requireLogin, renderOverviewPage);
+app.get("/dashboard", requireLogin, renderOverviewPage);
 
 app.get("/home", async (req, res) => {
   try {
-    const { summary } = await getBudgetPageData();
+    const currentUserId = getCurrentUserId(req);
+    let summary = buildBudgetSummary(0, [], 0);
+    if (currentUserId) {
+      const pageData = await getBudgetPageData();
+      summary = pageData.summary;
+    }
     res.render("home", {
       pageTitle: "Home",
       activePage: "landing",
@@ -254,6 +279,9 @@ app.get("/home", async (req, res) => {
 });
 
 app.get("/budget", async (req, res) => {
+  const currentUserId = getCurrentUserId(req);
+  console.log("Current user:", req.session);
+  console.log("Current user id:", currentUserId);
   try {
     const selectedMonth = budgetStore.normalizeBudgetMonth(
       req.query.month || budgetStore.getCurrentBudgetMonth()
@@ -1259,8 +1287,16 @@ app.use((req, res, next) => {
 });
 const expenseRoutes  = require('./routes/expenses');
 const categoryRoutes = require('./routes/categories');
+const savingsGoalRoutes = require('./routes/savingsGoals');
 app.use('/expenses',   expenseRoutes);
 app.use('/categories', categoryRoutes);
+app.use('/savings-goals', savingsGoalRoutes);
+app.get('/savings-goal', (req, res) => res.redirect('/savings-goals'));
+
+const authRoutes = require('./routes/auth');
+app.use('/', authRoutes);
+const profileRoutes = require('./routes/profile');
+app.use('/profile', profileRoutes);
 // --- End Expense CRUD routes ---
 
 const server = app.listen(PORT);

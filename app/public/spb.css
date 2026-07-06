@@ -1112,14 +1112,6 @@ button.everything-transaction-row:focus-visible {
   text-overflow: ellipsis;
 }
 
-.everything-transaction-row.is-not-counted {
-  background: #f3f4f6;
-}
-
-.everything-transaction-row.is-not-counted:hover {
-  background: #eceef1;
-}
-
 .everything-transaction-row.is-not-counted .everything-transaction-title,
 .everything-transaction-row.is-not-counted .everything-transaction-merchant,
 .everything-transaction-row.is-not-counted .everything-transaction-amount,
@@ -1132,16 +1124,12 @@ button.everything-transaction-row:focus-visible {
   font-weight: 700;
 }
 
-.everything-transaction-row.is-not-counted .everything-cash-badge {
-  border-color: #e5e7eb;
-  background: #f9fafb;
-}
-
 .everything-transaction-row.is-not-counted .everything-transaction-receipt {
   color: #9ca3af;
 }
 
 .everything-transaction-row.is-not-counted .sw-category-icon {
+  filter: grayscale(1);
   opacity: 0.55;
 }
 
@@ -2561,8 +2549,14 @@ button.spb-modal__create {
 .spb-page--detail .spb-transaction-item.is-not-counted .spb-transaction-item__merchant-name,
 .spb-page--detail .spb-transaction-item.is-not-counted .spb-transaction-item__amount,
 .spb-page--detail .spb-transaction-item.is-not-counted .spb-transaction-item__tag,
+.spb-page--detail .spb-transaction-item.is-not-counted .spb-transaction-item__receipt,
 .spb-page--detail .spb-transaction-item.is-not-counted .spb-transaction-item__chevron {
   color: #9ca3af;
+}
+
+.spb-page--detail .spb-transaction-item.is-not-counted .sw-category-icon {
+  filter: grayscale(1);
+  opacity: 0.55;
 }
 
 .spb-page--detail .spb-transaction-empty {
@@ -3065,16 +3059,7 @@ button.spb-transaction-item__link:focus-visible {
   line-height: 1.25;
 }
 
-/* Don't count — muted row (PocketGuard-style) */
-.spb-transaction-item.is-not-counted .spb-transaction-item__link {
-  background: #f3f4f6;
-}
-
-.spb-transaction-item.is-not-counted .spb-transaction-item__link:hover,
-.spb-transaction-item.is-not-counted .spb-transaction-item__link:focus-visible {
-  background: #eceef1;
-}
-
+/* Don't count — muted content only (row background stays normal) */
 .spb-transaction-item.is-not-counted .spb-transaction-item__date,
 .spb-transaction-item.is-not-counted .spb-transaction-item__title,
 .spb-transaction-item.is-not-counted .spb-transaction-item__merchant-name,
@@ -3089,9 +3074,9 @@ button.spb-transaction-item__link:focus-visible {
   font-weight: 600;
 }
 
-.spb-transaction-item.is-not-counted .spb-transaction-item__tag {
-  border-color: #e5e7eb;
-  background: #f9fafb;
+.spb-transaction-item.is-not-counted .sw-category-icon {
+  filter: grayscale(1);
+  opacity: 0.55;
 }
 
 .spb-transaction-item__meta {

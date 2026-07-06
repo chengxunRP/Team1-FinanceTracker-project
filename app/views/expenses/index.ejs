@@ -160,7 +160,7 @@
           </thead>
           <tbody>
             <% expenses.forEach(function(expense) { %>
-              <tr class="expense-table-row<%= expense.isExcludedFromBudget ? ' is-not-counted' : '' %>" data-expense-id="<%= expense.id %>">
+              <tr class="expense-table-row" data-expense-id="<%= expense.id %>">
                 <td class="data-table__image-col">
                   <%- include('../partials/expense-thumb', {
                     expenseTitle: expense.title,
@@ -213,7 +213,8 @@
                             data-category-color="<%= expense.category.color || '' %>"
                             data-category-is-custom="<%= (expense.category.isCustom || Number(expense.category.is_custom) === 1) ? '1' : '0' %>"
                             data-notes="<%= expense.notes || '' %>"
-                            data-excluded-from-budget="<%= expense.isExcludedFromBudget ? '1' : '0' %>"
+                            data-excluded-from-budget="<%= (expense.isExcludedFromBudget || expense.isExcludedFromAllBudget) ? '1' : '0' %>"
+                            data-excluded-from-all-budget="<%= (expense.isExcludedFromBudget || expense.isExcludedFromAllBudget) ? '1' : '0' %>"
                             data-has-receipt="<%= (expense.imagePath && String(expense.imagePath).trim()) ? '1' : '0' %>"
                             data-image-path="<%= (expense.imagePath && String(expense.imagePath).trim()) ? String(expense.imagePath).trim() : '' %>">
                       <svg viewBox="0 0 24 24" fill="none" width="12" height="12" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>

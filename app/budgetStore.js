@@ -3,6 +3,7 @@ const {
   getCategoryBudgetStatus,
   getCategoryStatusMessage,
   isExpenseCountedForBudget,
+  isExpenseCountedForAllBudget,
 } = require("./budgetHelpers");
 const {
   getDisplayCategoryName,
@@ -11,10 +12,13 @@ const {
   compareCategoriesForSort,
 } = require("./categoryHelpers");
 const { getCategoryImageUrl } = require("./categoryImageHelpers");
+const { requireUserId } = require("./userScope");
 
 const DEFAULT_BUDGET = 500;
-const BUDGET_COUNTED_EXPENSE_WHERE =
+const CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE =
   "AND COALESCE(is_excluded_from_budget, 0) = 0";
+const ALL_BUDGET_COUNTED_EXPENSE_WHERE =
+  "AND COALESCE(is_excluded_from_all_budget, 0) = 0";
 
 function getCurrentBudgetMonth(date = new Date()) {
   const year = date.getFullYear();
@@ -86,8 +90,10 @@ function filterExpensesForMonth(expenses, budgetMonth) {
 }
 
 async function getMonthlyBudget() {
+  const userId = requireUserId();
   const [rows] = await db.query(
-    "SELECT amount FROM monthly_budget ORDER BY id ASC LIMIT 1"
+    "SELECT amount FROM monthly_budget WHERE user_id = ? ORDER BY id ASC LIMIT 1",
+    [userId]
   );
 
   if (!rows.length) {
@@ -98,19 +104,25 @@ async function getMonthlyBudget() {
 }
 
 async function setMonthlyBudget(amount) {
+  const userId = requireUserId();
   const [rows] = await db.query(
-    "SELECT id FROM monthly_budget ORDER BY id ASC LIMIT 1"
+    "SELECT id FROM monthly_budget WHERE user_id = ? ORDER BY id ASC LIMIT 1",
+    [userId]
   );
 
   if (rows.length) {
-    await db.query("UPDATE monthly_budget SET amount = ? WHERE id = ?", [
+    await db.query("UPDATE monthly_budget SET amount = ? WHERE id = ? AND user_id = ?", [
       amount,
       rows[0].id,
+      userId,
     ]);
     return;
   }
 
-  await db.query("INSERT INTO monthly_budget (amount) VALUES (?)", [amount]);
+  await db.query("INSERT INTO monthly_budget (amount, user_id) VALUES (?, ?)", [
+    amount,
+    userId,
+  ]);
 }
 
 let recurringBudgetSchema = null;
@@ -151,14 +163,15 @@ function mapBudgetRow(row) {
 }
 
 async function getCategoryBudgetsLegacy(budgetMonth) {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       category_id AS categoryId,
       CAST(budget_limit AS DECIMAL(10,2)) AS budgetLimit,
       budget_month AS budgetMonth
     FROM category_budgets
-    WHERE budget_month = ?`,
-    [budgetMonth]
+    WHERE budget_month = ? AND user_id = ?`,
+    [budgetMonth, userId]
   );
   return rows.map((row) =>
     mapBudgetRow({
@@ -178,6 +191,7 @@ async function getActiveCategoryBudgets() {
       return getCategoryBudgetsLegacy(getCurrentBudgetMonth());
     }
 
+    const userId = requireUserId();
     const [rows] = await db.query(
       `SELECT
         id AS budgetId,
@@ -188,8 +202,9 @@ async function getActiveCategoryBudgets() {
         is_active AS isActive,
         created_at AS createdAt
       FROM category_budgets
-      WHERE is_active = 1
-      ORDER BY category_id ASC`
+      WHERE is_active = 1 AND user_id = ?
+      ORDER BY category_id ASC`,
+      [userId]
     );
 
     return rows.map((row) => mapBudgetRow(row));
@@ -498,19 +513,22 @@ async function createCategoryBudget(categoryId, amount, rolloverEnabled = false)
   }
 
   try {
+    const userId = requireUserId();
     await db.query(
       `INSERT INTO category_budgets (
         category_id,
         budget_limit,
         budget_month,
         is_active,
-        rollover_enabled
-      ) VALUES (?, ?, ?, 1, ?)`,
+        rollover_enabled,
+        user_id
+      ) VALUES (?, ?, ?, 1, ?, ?)`,
       [
         Number(categoryId),
         amount,
         getCurrentBudgetMonth(),
         rolloverEnabled ? 1 : 0,
+        userId,
       ]
     );
   } catch (error) {
@@ -541,11 +559,12 @@ async function updateCategoryBudget(categoryId, amount, rolloverEnabled) {
   const rolloverValue =
     rolloverEnabled === undefined ? (existing.rolloverEnabled ? 1 : 0) : rolloverEnabled ? 1 : 0;
 
+  const userId = requireUserId();
   await db.query(
     `UPDATE category_budgets
     SET budget_limit = ?, rollover_enabled = ?, is_active = 1
-    WHERE category_id = ? AND is_active = 1`,
-    [amount, rolloverValue, Number(categoryId)]
+    WHERE category_id = ? AND is_active = 1 AND user_id = ?`,
+    [amount, rolloverValue, Number(categoryId), userId]
   );
 }
 
@@ -579,11 +598,12 @@ async function setCategoryBudgetRollover(categoryId, enabled) {
     throw err;
   }
 
+  const userId = requireUserId();
   await db.query(
     `UPDATE category_budgets
     SET rollover_enabled = ?
-    WHERE category_id = ? AND is_active = 1`,
-    [enabled ? 1 : 0, Number(categoryId)]
+    WHERE category_id = ? AND is_active = 1 AND user_id = ?`,
+    [enabled ? 1 : 0, Number(categoryId), userId]
   );
 
   if (!enabled && existing.id != null) {
@@ -717,11 +737,12 @@ async function setCategoryBudget(categoryId, budgetMonth, amount) {
       return createCategoryBudget(categoryId, amount, false);
     }
 
+    const userId = requireUserId();
     await db.query(
-      `INSERT INTO category_budgets (category_id, budget_limit, budget_month)
-      VALUES (?, ?, ?)
+      `INSERT INTO category_budgets (category_id, budget_limit, budget_month, user_id)
+      VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE budget_limit = VALUES(budget_limit)`,
-      [Number(categoryId), amount, budgetMonth]
+      [Number(categoryId), amount, budgetMonth, userId]
     );
   } catch (error) {
     if (error.code === "ER_NO_SUCH_TABLE") {
@@ -751,6 +772,7 @@ async function setCategoryBudgets(budgetMonth, budgetsByCategoryId) {
 async function getSpendingTotalsByCategoryId(budgetMonth) {
   if (!budgetMonth) return {};
 
+  const userId = requireUserId();
   const { startDate, endExclusive } = getBudgetMonthDateRange(budgetMonth);
 
   const [rows] = await db.query(
@@ -759,9 +781,35 @@ async function getSpendingTotalsByCategoryId(budgetMonth) {
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
     WHERE expense_date >= ? AND expense_date < ?
-      ${BUDGET_COUNTED_EXPENSE_WHERE}
+      AND user_id = ?
+      ${CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY category_id`,
-    [startDate, endExclusive]
+    [startDate, endExclusive, userId]
+  );
+
+  const totals = {};
+  rows.forEach((row) => {
+    totals[String(row.categoryId)] = Number(row.total);
+  });
+  return totals;
+}
+
+/** All expense amounts by category — ignores is_excluded_from_budget (for Everything Else). */
+async function getActualSpendingTotalsByCategoryId(budgetMonth) {
+  if (!budgetMonth) return {};
+
+  const userId = requireUserId();
+  const { startDate, endExclusive } = getBudgetMonthDateRange(budgetMonth);
+
+  const [rows] = await db.query(
+    `SELECT
+      category_id AS categoryId,
+      CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
+    FROM expenses
+    WHERE expense_date >= ? AND expense_date < ?
+      AND user_id = ?
+    GROUP BY category_id`,
+    [startDate, endExclusive, userId]
   );
 
   const totals = {};
@@ -777,6 +825,7 @@ function getCategoryActualSpent(spendingByCategoryId, category) {
 }
 
 async function getCategoryExpensesForMonthFromDb(categoryId, budgetMonth) {
+  const userId = requireUserId();
   const { startDate, endExclusive } = getBudgetMonthDateRange(budgetMonth);
 
   const [rows] = await db.query(
@@ -790,14 +839,16 @@ async function getCategoryExpensesForMonthFromDb(categoryId, budgetMonth) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
     WHERE e.category_id = ?
       AND e.expense_date >= ?
       AND e.expense_date < ?
+      AND e.user_id = ?
     ORDER BY e.expense_date DESC, e.id DESC`,
-    [Number(categoryId), startDate, endExclusive]
+    [Number(categoryId), startDate, endExclusive, userId]
   );
 
   return rows.map((row) => ({
@@ -810,11 +861,13 @@ async function getCategoryExpensesForMonthFromDb(categoryId, budgetMonth) {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
   }));
 }
 
 async function getCategoryExpensesAllFromDb(categoryId) {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       e.id,
@@ -826,12 +879,13 @@ async function getCategoryExpensesAllFromDb(categoryId) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    WHERE e.category_id = ?
+    WHERE e.category_id = ? AND e.user_id = ?
     ORDER BY e.expense_date DESC, e.id DESC`,
-    [Number(categoryId)]
+    [Number(categoryId), userId]
   );
 
   return rows.map((row) => ({
@@ -844,21 +898,23 @@ async function getCategoryExpensesAllFromDb(categoryId) {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
   }));
 }
 
 async function getCategoryMonthlyTotalsFromDb(categoryId) {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       DATE_FORMAT(expense_date, '%Y-%m') AS budgetMonth,
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
-    WHERE category_id = ?
-      ${BUDGET_COUNTED_EXPENSE_WHERE}
+    WHERE category_id = ? AND user_id = ?
+      ${CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY DATE_FORMAT(expense_date, '%Y-%m')
     ORDER BY budgetMonth ASC`,
-    [Number(categoryId)]
+    [Number(categoryId), userId]
   );
 
   const totals = {};
@@ -991,7 +1047,7 @@ async function hasActiveCategoryBudgets() {
 function getEverythingElseData(
   categories,
   budgetedCategoryIds,
-  spendingByCategoryId
+  actualSpendingByCategoryId
 ) {
   const budgetedIds = new Set(budgetedCategoryIds.map(String));
 
@@ -1000,7 +1056,7 @@ function getEverythingElseData(
 
   categories.forEach((cat) => {
     if (budgetedIds.has(String(cat.id))) return;
-    const amount = getCategoryActualSpent(spendingByCategoryId, cat);
+    const amount = getCategoryActualSpent(actualSpendingByCategoryId, cat);
     if (amount > 0) {
       totalAmount += amount;
       categoryCount += 1;
@@ -1063,18 +1119,19 @@ async function getAvailableCategoriesForBudget(budgetMonth, categories, spending
 }
 
 async function deactivateCategoryBudget(categoryId, budgetMonth) {
+  const userId = requireUserId();
   const isRecurring = await usesRecurringBudgetSchema();
   if (isRecurring) {
     await db.query(
-      "UPDATE category_budgets SET is_active = 0 WHERE category_id = ? AND is_active = 1",
-      [Number(categoryId)]
+      "UPDATE category_budgets SET is_active = 0 WHERE category_id = ? AND is_active = 1 AND user_id = ?",
+      [Number(categoryId), userId]
     );
     return;
   }
 
   await db.query(
-    "DELETE FROM category_budgets WHERE category_id = ? AND budget_month = ?",
-    [Number(categoryId), budgetMonth || getCurrentBudgetMonth()]
+    "DELETE FROM category_budgets WHERE category_id = ? AND budget_month = ? AND user_id = ?",
+    [Number(categoryId), budgetMonth || getCurrentBudgetMonth(), userId]
   );
 }
 
@@ -1157,15 +1214,17 @@ async function buildMonthlyChartDataFromDb(categoryId, selectedMonth) {
 }
 
 async function getAllMonthlyTotalsFromDb() {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       DATE_FORMAT(expense_date, '%Y-%m') AS budgetMonth,
       CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
-    WHERE 1=1
-      ${BUDGET_COUNTED_EXPENSE_WHERE}
+    WHERE user_id = ?
+      ${ALL_BUDGET_COUNTED_EXPENSE_WHERE}
     GROUP BY DATE_FORMAT(expense_date, '%Y-%m')
-    ORDER BY budgetMonth ASC`
+    ORDER BY budgetMonth ASC`,
+    [userId]
   );
 
   const totals = {};
@@ -1229,6 +1288,7 @@ async function buildOverallMonthlyChartDataFromDb(selectedMonth) {
 }
 
 async function getAllExpensesFromDb() {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       e.id,
@@ -1240,10 +1300,13 @@ async function getAllExpensesFromDb() {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    ORDER BY e.expense_date DESC, e.id DESC`
+    WHERE e.user_id = ?
+    ORDER BY e.expense_date DESC, e.id DESC`,
+    [userId]
   );
 
   return rows.map((row) => ({
@@ -1256,12 +1319,14 @@ async function getAllExpensesFromDb() {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
     categoryDisplayName: getDisplayCategoryName(row.category_name),
   }));
 }
 
 async function getAllExpensesForMonthFromDb(budgetMonth) {
+  const userId = requireUserId();
   const month = normalizeBudgetMonth(budgetMonth);
   const { startDate, endExclusive } = getBudgetMonthDateRange(month);
 
@@ -1276,12 +1341,13 @@ async function getAllExpensesForMonthFromDb(budgetMonth) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    WHERE e.expense_date >= ? AND e.expense_date < ?
+    WHERE e.expense_date >= ? AND e.expense_date < ? AND e.user_id = ?
     ORDER BY e.expense_date DESC, e.id DESC`,
-    [startDate, endExclusive]
+    [startDate, endExclusive, userId]
   );
 
   return rows.map((row) => ({
@@ -1294,12 +1360,14 @@ async function getAllExpensesForMonthFromDb(budgetMonth) {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
     categoryDisplayName: getDisplayCategoryName(row.category_name),
   }));
 }
 
 async function getUnbudgetedExpensesFromDb(budgetMonth, budgetedCategoryIds) {
+  const userId = requireUserId();
   const month = normalizeBudgetMonth(budgetMonth);
   const { startDate, endExclusive } = getBudgetMonthDateRange(month);
   const excludedIds = (budgetedCategoryIds || [])
@@ -1316,6 +1384,7 @@ async function getUnbudgetedExpensesFromDb(budgetMonth, budgetedCategoryIds) {
       COALESCE(e.notes, '') AS notes,
       e.image_path AS imagePath,
       COALESCE(e.is_excluded_from_budget, 0) AS isExcludedFromBudget,
+      COALESCE(e.is_excluded_from_all_budget, 0) AS isExcludedFromAllBudget,
       c.name AS category_name,
       c.icon AS category_icon,
       c.color AS category_color,
@@ -1323,8 +1392,8 @@ async function getUnbudgetedExpensesFromDb(budgetMonth, budgetedCategoryIds) {
       c.is_custom AS category_is_custom
     FROM expenses e
     INNER JOIN categories c ON c.id = e.category_id
-    WHERE e.expense_date >= ? AND e.expense_date < ?`;
-  const params = [startDate, endExclusive];
+    WHERE e.expense_date >= ? AND e.expense_date < ? AND e.user_id = ?`;
+  const params = [startDate, endExclusive, userId];
 
   if (excludedIds.length) {
     query += ` AND e.category_id NOT IN (${excludedIds.map(() => "?").join(",")})`;
@@ -1345,6 +1414,7 @@ async function getUnbudgetedExpensesFromDb(budgetMonth, budgetedCategoryIds) {
     notes: row.notes || "",
     imagePath: row.imagePath ? String(row.imagePath) : "",
     isExcludedFromBudget: Number(row.isExcludedFromBudget) === 1,
+    isExcludedFromAllBudget: Number(row.isExcludedFromAllBudget) === 1,
     category: row.category_name,
     categoryIcon: row.category_icon,
     categoryColor: row.category_color,
@@ -1376,9 +1446,7 @@ function groupTransactionsByDate(transactions) {
       groups.push(groupMap[dateKey]);
     }
 
-    groupMap[dateKey].dayTotal += isExpenseCountedForBudget(tx)
-      ? Number(tx.amount) || 0
-      : 0;
+    groupMap[dateKey].dayTotal += Number(tx.amount) || 0;
     groupMap[dateKey].transactions.push(tx);
   });
 
@@ -1392,12 +1460,15 @@ async function getUnbudgetedTransactionMonths() {
     budgetByCategoryId[String(budget.categoryId)] = budget;
   });
 
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       category_id AS categoryId,
       DATE_FORMAT(expense_date, '%Y-%m') AS budgetMonth
     FROM expenses
-    ORDER BY expense_date ASC`
+    WHERE user_id = ?
+    ORDER BY expense_date ASC`,
+    [userId]
   );
 
   const months = new Set();
@@ -1479,9 +1550,7 @@ async function getEverythingElseDetailData(budgetMonth, categories) {
   let totalAmount = 0;
   const unbudgetedCategoryIds = new Set();
   transactions.forEach((tx) => {
-    if (isExpenseCountedForBudget(tx)) {
-      totalAmount += Number(tx.amount) || 0;
-    }
+    totalAmount += Number(tx.amount) || 0;
     if (tx.categoryId) unbudgetedCategoryIds.add(String(tx.categoryId));
   });
 
@@ -1608,6 +1677,7 @@ async function getCategoryDetailData(categoryId, budgetMonth, spendingByCategory
 }
 
 async function getActiveOverallMonthlyBudget() {
+  const userId = requireUserId();
   const [rows] = await db.query(
     `SELECT
       id,
@@ -1617,9 +1687,10 @@ async function getActiveOverallMonthlyBudget() {
       deleted_at AS deletedAt,
       created_at AS createdAt
     FROM overall_monthly_budgets
-    WHERE is_active = 1 AND deleted_at IS NULL
+    WHERE is_active = 1 AND deleted_at IS NULL AND user_id = ?
     ORDER BY id ASC
-    LIMIT 1`
+    LIMIT 1`,
+    [userId]
   );
 
   if (!rows.length) return null;
@@ -1764,14 +1835,16 @@ async function saveOverallMonthlyBudget(amount, rolloverEnabled = false) {
     return existing.id;
   }
 
+  const userId = requireUserId();
   const [result] = await db.query(
     `INSERT INTO overall_monthly_budgets (
       budget_amount,
       rollover_enabled,
       is_active,
-      deleted_at
-    ) VALUES (?, ?, 1, NULL)`,
-    [amount, rolloverValue]
+      deleted_at,
+      user_id
+    ) VALUES (?, ?, 1, NULL, ?)`,
+    [amount, rolloverValue, userId]
   );
 
   return result.insertId;
@@ -1838,7 +1911,7 @@ async function getOverallBudgetDetailData(budgetMonth) {
   let countedCount = 0;
   let largestTransaction = 0;
   allExpenses.forEach((exp) => {
-    if (!isExpenseCountedForBudget(exp)) return;
+    if (!isExpenseCountedForAllBudget(exp)) return;
     const amount = Number(exp.amount) || 0;
     totalAmount += amount;
     countedCount += 1;
@@ -1885,6 +1958,7 @@ async function getOverallBudgetDetailData(budgetMonth) {
 }
 
 async function getTotalMonthSpending(budgetMonth) {
+  const userId = requireUserId();
   const month = normalizeBudgetMonth(budgetMonth);
   const { startDate, endExclusive } = getBudgetMonthDateRange(month);
 
@@ -1892,8 +1966,9 @@ async function getTotalMonthSpending(budgetMonth) {
     `SELECT CAST(COALESCE(SUM(amount), 0) AS DECIMAL(10,2)) AS total
     FROM expenses
     WHERE expense_date >= ? AND expense_date < ?
-      ${BUDGET_COUNTED_EXPENSE_WHERE}`,
-    [startDate, endExclusive]
+      AND user_id = ?
+      ${ALL_BUDGET_COUNTED_EXPENSE_WHERE}`,
+    [startDate, endExclusive, userId]
   );
 
   return Number(rows[0].total) || 0;
@@ -1977,6 +2052,7 @@ module.exports = {
   getEverythingElseDetailData,
   getEverythingElseMonthOptions,
   getSpendingTotalsByCategoryId,
+  getActualSpendingTotalsByCategoryId,
   buildBudgetAmounts,
   isBudgetActiveForMonth,
   computeRolloverAmount,

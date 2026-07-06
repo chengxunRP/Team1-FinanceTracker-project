@@ -95,7 +95,6 @@
     var total = 0;
 
     for (var i = 0; i < expenses.length; i++) {
-      if (expenses[i] && expenses[i].isExcludedFromBudget) continue;
       total += Number(expenses[i].amount) || 0;
     }
 
@@ -214,7 +213,6 @@
     var totals = {};
 
     for (var i = 0; i < expenses.length; i++) {
-      if (expenses[i] && expenses[i].isExcludedFromBudget) continue;
       var cat = expenses[i].category || "Other";
       totals[cat] = (totals[cat] || 0) + (Number(expenses[i].amount) || 0);
     }
@@ -377,7 +375,6 @@
         var dayIndex = (day.getDay() + 6) % 7;
 
         for (var i = 0; i < expenses.length; i++) {
-          if (expenses[i] && expenses[i].isExcludedFromBudget) continue;
           var expenseDate = getExpenseDate(expenses[i]);
 
           if (
@@ -392,7 +389,6 @@
       }
     } else {
       for (var j = 0; j < expenses.length; j++) {
-        if (expenses[j] && expenses[j].isExcludedFromBudget) continue;
         amounts[j % 7] += Number(expenses[j].amount) || 0;
       }
     }
@@ -607,7 +603,7 @@
 
     for (var i = 0; i < transactions.length; i++) {
       var row = transactions[i];
-      html += '<li class="dash-txn-item' + (row.isExcludedFromBudget ? " is-not-counted" : "") + '">';
+      html += '<li class="dash-txn-item">';
       html += renderCategoryIcon(row.category, "sm");
       html += '<div class="dash-txn-main">';
       html += '<span class="dash-txn-cat">' + row.description + "</span>";

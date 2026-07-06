@@ -160,11 +160,13 @@ async function getLiveFinanceSummary(budgetMonth, loadBudgetPageData) {
     const [
       categories,
       spendingByCategoryId,
+      actualSpendingByCategoryId,
       monthTotalSpent,
       monthExpenseCount,
     ] = await Promise.all([
       expenseStore.getCategories(),
       budgetStore.getSpendingTotalsByCategoryId(month),
+      budgetStore.getActualSpendingTotalsByCategoryId(month),
       financeHelpers.getMonthlyExpenseTotal(month),
       financeHelpers.getExpenseCountForMonth(month),
     ]);
@@ -180,7 +182,7 @@ async function getLiveFinanceSummary(budgetMonth, loadBudgetPageData) {
     const everythingElse = budgetStore.getEverythingElseData(
       categories,
       budgetedCategoryIds,
-      spendingByCategoryId
+      actualSpendingByCategoryId
     );
     const budgetTotals = budgetStore.getBudgetTotals(categoryRows);
     overallBudgetSection = await budgetStore.getOverallBudgetSectionData(month);

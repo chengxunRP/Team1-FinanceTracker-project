@@ -37,7 +37,7 @@ function getStandardCategoryName(name) {
 }
 
 function getDisplayCategoryName(name) {
-  return getStandardCategoryName(name);
+  return name ? String(name).trim() : "";
 }
 
 function normalizeIconImagePath(path) {
