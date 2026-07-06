@@ -1,6 +1,7 @@
 // Smart Spending Recommendation helpers (Feature 7)
 
 const { getStandardCategoryName } = require("./categoryHelpers");
+const { buildBudgetSummary } = require("./budgetHelpers");
 
 const WARNING_PERCENT = 80;
 const HIGH_CATEGORY_PERCENT = 20;
@@ -41,24 +42,50 @@ function validateItemInput(itemName, itemPrice, category) {
   };
 }
 
-function getCategoryTotal(expenses, category) {
+function isExpenseCountedForPurchaseCheck(expense, useAllBudgetCounting) {
+  if (!expense) return false;
+  if (useAllBudgetCounting) {
+    return !expense.isExcludedFromAllBudget;
+  }
+  return !expense.isExcludedFromBudget;
+}
+
+function findCategoryBudgetRow(categoryBudgetRows, categoryName) {
+  if (!Array.isArray(categoryBudgetRows) || !categoryName) return null;
+  return (
+    categoryBudgetRows.find((row) =>
+      categoryNamesMatch(row.displayName || row.name, categoryName)
+    ) || null
+  );
+}
+
+function getCategoryTotal(expenses, category, options) {
+  const useAllBudgetCounting = Boolean(options && options.useAllBudgetCounting);
+  const forCategoryBudget = Boolean(options && options.forCategoryBudget);
   let total = 0;
 
   for (let i = 0; i < expenses.length; i++) {
-    if (!expenses[i].isExcludedFromBudget &&
-        categoryNamesMatch(expenses[i].category, category)) {
-      total += expenses[i].amount;
+    const expense = expenses[i];
+    const counted = forCategoryBudget
+      ? !expense.isExcludedFromBudget
+      : isExpenseCountedForPurchaseCheck(expense, useAllBudgetCounting);
+    if (!counted) continue;
+    if (categoryNamesMatch(expense.category, category)) {
+      total += expense.amount;
     }
   }
 
   return total;
 }
 
-function getSpendingByCategory(expenses) {
+function getSpendingByCategory(expenses, options) {
+  const useAllBudgetCounting = Boolean(options && options.useAllBudgetCounting);
   const totals = {};
 
   for (let i = 0; i < expenses.length; i++) {
-    if (expenses[i].isExcludedFromBudget) continue;
+    if (!isExpenseCountedForPurchaseCheck(expenses[i], useAllBudgetCounting)) {
+      continue;
+    }
     const cat = expenses[i].category;
     totals[cat] = (totals[cat] || 0) + expenses[i].amount;
   }
@@ -76,8 +103,8 @@ function getSpendingByCategory(expenses) {
   return list;
 }
 
-function getFinanceSnapshot(summary, expenses) {
-  const spendingByCategory = getSpendingByCategory(expenses);
+function getFinanceSnapshot(summary, expenses, options) {
+  const spendingByCategory = getSpendingByCategory(expenses, options);
   const highest = spendingByCategory[0] || {
     category: "—",
     amount: 0,
@@ -131,6 +158,11 @@ function buildReasons(result, analysis, financeSnapshot, item) {
     if (analysis.exceedsBudget) {
       reasons.push("This purchase would push your spending above 100% of your budget.");
     }
+    if (analysis.categoryWouldOverspend) {
+      reasons.push(
+        `This purchase would exceed your ${item.category} category budget (only $${analysis.categoryRemaining} left in that category).`
+      );
+    }
   }
 
   if (result === "Risky") {
@@ -145,6 +177,11 @@ function buildReasons(result, analysis, financeSnapshot, item) {
     if (analysis.usesLargeShareOfRemaining) {
       reasons.push(
         `This item uses a large share of your remaining budget (${analysis.shareOfRemainingPercent}%).`
+      );
+    }
+    if (analysis.categoryWouldOverspend && !analysis.itemExceedsRemaining) {
+      reasons.push(
+        `Your overall budget can afford this, but ${item.category} only has $${analysis.categoryRemaining} left in its category budget.`
       );
     }
     if (analysis.isHighSpendCategory) {
@@ -214,39 +251,143 @@ function buildSpendingInsight(itemCategory, financeSnapshot) {
   };
 }
 
-function getSpendingRecommendation(summary, expenses, item) {
-  const financeSnapshot = getFinanceSnapshot(summary, expenses);
+function buildCategoryBudgetSummary(categoryRow) {
+  const budget =
+    Number(categoryRow.availableBudget ?? categoryRow.budgeted) || 0;
+  const spent = Number(categoryRow.actual) || 0;
+  return buildBudgetSummary(budget, [], spent);
+}
+
+function getSpendingRecommendation(summary, expenses, item, options) {
+  const purchaseOptions = options || {};
+  const hasOverallBudget =
+    purchaseOptions.hasOverallBudget !== undefined
+      ? Boolean(purchaseOptions.hasOverallBudget)
+      : Number(summary.monthlyBudget) > 0;
+  const useAllBudgetCounting = Boolean(purchaseOptions.useAllBudgetCounting);
+  const categoryBudgetRows = purchaseOptions.categoryBudgetRows || [];
+  const categoryRow = findCategoryBudgetRow(categoryBudgetRows, item.category);
+
+  let budgetMode = "none";
+  let budgetNote = null;
+  let effectiveSummary = summary;
+
+  if (hasOverallBudget) {
+    budgetMode = "overall";
+    effectiveSummary = summary;
+  } else if (categoryRow) {
+    budgetMode = "category-only";
+    effectiveSummary = buildCategoryBudgetSummary(categoryRow);
+    budgetNote =
+      "This check is based on your selected category budget because no All Categories Budget is set.";
+  } else {
+    budgetMode = "none";
+    effectiveSummary = buildBudgetSummary(0, [], 0);
+    budgetNote =
+      "No All Categories Budget is set and the selected category has no category budget. Set a budget on Spending & Budgets for a full recommendation.";
+  }
+
+  if (budgetMode === "none") {
+    return {
+      itemName: item.itemName,
+      itemPrice: item.itemPrice,
+      category: item.category,
+      result: "Not recommended",
+      resultBadge: "warning",
+      score: 30,
+      budgetMode,
+      budgetNote,
+      reasons: [
+        budgetNote,
+        "Create an All Categories Budget to check purchases against your overall monthly spending limit.",
+      ],
+      analysis: {
+        totalSpent: 0,
+        remainingBudget: 0,
+        percentageUsed: 0,
+        newTotalSpent: item.itemPrice,
+        newRemainingBudget: 0,
+        newPercentageUsed: 0,
+        categoryBudget: 0,
+        categorySpent: 0,
+        categoryRemaining: null,
+      },
+      spendingInsight: {
+        highestCategory: "—",
+        highestCategoryAmount: 0,
+        itemCategory: item.category,
+        itemCategoryAmount: 0,
+        itemCategoryPercent: 0,
+        isHighestCategory: false,
+        isHighSpendCategory: false,
+        warningMessage: budgetNote,
+      },
+      financeSnapshot: getFinanceSnapshot(effectiveSummary, expenses, {
+        useAllBudgetCounting: false,
+      }),
+    };
+  }
+
+  const financeSnapshot = getFinanceSnapshot(effectiveSummary, expenses, {
+    useAllBudgetCounting,
+  });
   const itemPrice = item.itemPrice;
+  const monthlyBudget = Number(effectiveSummary.monthlyBudget) || 0;
 
-  const newTotalSpent = summary.totalSpent + itemPrice;
-  const newRemainingBudget = summary.monthlyBudget - newTotalSpent;
-  const newPercentageUsed = Math.round(
-    (newTotalSpent / summary.monthlyBudget) * 100
-  );
+  const newTotalSpent = effectiveSummary.totalSpent + itemPrice;
+  const newRemainingBudget = effectiveSummary.monthlyBudget - newTotalSpent;
+  const newPercentageUsed =
+    monthlyBudget > 0
+      ? Math.round((newTotalSpent / monthlyBudget) * 100)
+      : 100;
 
-  const categoryTotal = getCategoryTotal(expenses, item.category);
-  const categoryPercent = Math.round(
-    (categoryTotal / summary.monthlyBudget) * 100
-  );
+  const categoryTotal = getCategoryTotal(expenses, item.category, {
+    useAllBudgetCounting,
+  });
+  const categoryPercent =
+    monthlyBudget > 0
+      ? Math.round((categoryTotal / monthlyBudget) * 100)
+      : 0;
 
-  const alreadyOverspending = summary.percentageUsed >= 100;
-  const itemExceedsRemaining = itemPrice > summary.remainingBudget;
-  const exceedsBudget = newTotalSpent > summary.monthlyBudget;
-  const alreadyAtWarning = summary.percentageUsed >= WARNING_PERCENT;
+  const categoryBudget = categoryRow
+    ? Number(categoryRow.availableBudget ?? categoryRow.budgeted) || 0
+    : 0;
+  const categorySpent = categoryRow ? Number(categoryRow.actual) || 0 : 0;
+  const categoryRemaining = categoryRow
+    ? Number(categoryRow.remaining) || 0
+    : null;
+  const newCategorySpent = categorySpent + itemPrice;
+  const newCategoryRemaining =
+    categoryRow != null ? categoryBudget - newCategorySpent : null;
+  const categoryWouldOverspend =
+    budgetMode === "overall" &&
+    categoryRow != null &&
+    itemPrice > Math.max(categoryRemaining, 0);
+  const categoryExceedsAfterPurchase =
+    budgetMode === "overall" &&
+    categoryRow != null &&
+    newCategorySpent > categoryBudget;
+
+  const alreadyOverspending = effectiveSummary.percentageUsed >= 100;
+  const itemExceedsRemaining = itemPrice > effectiveSummary.remainingBudget;
+  const exceedsBudget =
+    monthlyBudget > 0 && newTotalSpent > monthlyBudget;
+  const alreadyAtWarning = effectiveSummary.percentageUsed >= WARNING_PERCENT;
   const pushesToWarning = newPercentageUsed >= WARNING_PERCENT;
   const usesLargeShareOfRemaining =
-    summary.remainingBudget > 0 &&
-    itemPrice / summary.remainingBudget >= LARGE_SHARE_OF_REMAINING;
+    effectiveSummary.remainingBudget > 0 &&
+    itemPrice / effectiveSummary.remainingBudget >= LARGE_SHARE_OF_REMAINING;
   const shareOfRemainingPercent =
-    summary.remainingBudget > 0
-      ? Math.round((itemPrice / summary.remainingBudget) * 100)
+    effectiveSummary.remainingBudget > 0
+      ? Math.round((itemPrice / effectiveSummary.remainingBudget) * 100)
       : 100;
   const isHighSpendCategory =
     categoryPercent >= HIGH_CATEGORY_PERCENT ||
     categoryNamesMatch(item.category, financeSnapshot.highestCategory);
   const leavesLittleRemaining =
+    monthlyBudget > 0 &&
     newRemainingBudget >= 0 &&
-    (newRemainingBudget / summary.monthlyBudget) * 100 < LITTLE_LEFT_PERCENT;
+    (newRemainingBudget / monthlyBudget) * 100 < LITTLE_LEFT_PERCENT;
 
   const analysisFlags = {
     alreadyOverspending,
@@ -260,9 +401,16 @@ function getSpendingRecommendation(summary, expenses, item) {
     leavesLittleRemaining,
     categoryTotal,
     categoryPercent,
-    totalSpent: summary.totalSpent,
-    remainingBudget: summary.remainingBudget,
-    percentageUsed: summary.percentageUsed,
+    categoryBudget,
+    categorySpent,
+    categoryRemaining,
+    newCategorySpent,
+    newCategoryRemaining,
+    categoryWouldOverspend,
+    categoryExceedsAfterPurchase,
+    totalSpent: effectiveSummary.totalSpent,
+    remainingBudget: effectiveSummary.remainingBudget,
+    percentageUsed: effectiveSummary.percentageUsed,
     newTotalSpent,
     newRemainingBudget,
     newPercentageUsed,
@@ -271,15 +419,21 @@ function getSpendingRecommendation(summary, expenses, item) {
   let result = "Safe to buy";
   let resultBadge = "success";
 
-  if (alreadyOverspending || itemExceedsRemaining || exceedsBudget) {
+  if (
+    monthlyBudget <= 0 ||
+    alreadyOverspending ||
+    itemExceedsRemaining ||
+    exceedsBudget ||
+    categoryExceedsAfterPurchase
+  ) {
     result = "Not recommended";
     resultBadge = "danger";
   } else if (
     alreadyAtWarning ||
     pushesToWarning ||
     usesLargeShareOfRemaining ||
-    isHighSpendCategory ||
-    leavesLittleRemaining
+    leavesLittleRemaining ||
+    categoryWouldOverspend
   ) {
     result = "Risky";
     resultBadge = "warning";
@@ -290,6 +444,19 @@ function getSpendingRecommendation(summary, expenses, item) {
 
   const analysis = analysisFlags;
   const spendingInsight = buildSpendingInsight(item.category, financeSnapshot);
+  const reasons = buildReasons(result, analysis, financeSnapshot, item);
+  if (budgetNote) {
+    reasons.unshift(budgetNote);
+  }
+  if (
+    budgetMode === "overall" &&
+    categoryWouldOverspend &&
+    !analysis.itemExceedsRemaining
+  ) {
+    reasons.unshift(
+      `You have enough overall budget, but this purchase exceeds your ${item.category} category budget.`
+    );
+  }
 
   return {
     itemName: item.itemName,
@@ -298,7 +465,9 @@ function getSpendingRecommendation(summary, expenses, item) {
     result,
     resultBadge,
     score: calculateRecommendationScore(result, analysis),
-    reasons: buildReasons(result, analysis, financeSnapshot, item),
+    budgetMode,
+    budgetNote,
+    reasons: reasons.slice(0, 5),
     analysis,
     spendingInsight,
     financeSnapshot,
@@ -307,6 +476,8 @@ function getSpendingRecommendation(summary, expenses, item) {
 
 module.exports = {
   validateItemInput,
+  isExpenseCountedForPurchaseCheck,
+  findCategoryBudgetRow,
   getCategoryTotal,
   getSpendingByCategory,
   getFinanceSnapshot,

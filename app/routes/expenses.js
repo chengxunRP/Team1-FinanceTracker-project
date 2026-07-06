@@ -3,6 +3,7 @@ const router = express.Router();
 const store = require('../expenseStore');
 const budgetStore = require('../budgetStore');
 const financeHelpers = require('../financeHelpers');
+const recommendationHelpers = require('../recommendationHelpers');
 const uploadExpenseImage = require('../middleware/expenseUpload');
 const {
   getTodayDateString,
@@ -76,6 +77,45 @@ async function loadPickerCategoryData() {
     generalCategories: picker.generalCategories,
   };
 }
+
+// POST /expenses/purchase-check
+// Returns a structured recommendation for a prospective purchase (JSON).
+router.post('/purchase-check', async (req, res) => {
+  try {
+    const itemName = String(req.body.itemName || req.body.name || '').trim();
+    const rawPrice = req.body.itemPrice || req.body.price || req.body.amount || '';
+    const category = String(req.body.category || req.body.categoryName || '').trim();
+    const budgetMonth = String(req.body.budgetMonth || '').slice(0, 7) || budgetStore.getCurrentBudgetMonth();
+
+    const cleaned = String(rawPrice || '').replace(/[$,\s]/g, '');
+    const itemPrice = Number(cleaned);
+    if (!cleaned || Number.isNaN(itemPrice) || itemPrice < 0) {
+      return res.status(400).json({ success: false, error: 'Invalid item price' });
+    }
+
+    const live = await financeHelpers.getPurchaseCheckerFinanceSummary(budgetMonth);
+    const summary = live.recommendationSummary;
+    const expenses = await store.getExpensesInMonth(live.budgetMonth);
+
+    const item = {
+      itemName: itemName || 'Item',
+      itemPrice,
+      category: category || 'Everything else',
+    };
+
+    const recommendation = recommendationHelpers.getSpendingRecommendation(
+      summary,
+      expenses,
+      item,
+      financeHelpers.buildPurchaseCheckOptions(live)
+    );
+
+    return res.json({ success: true, recommendation });
+  } catch (error) {
+    console.error('Purchase check error:', error);
+    return res.status(500).json({ success: false, error: 'Unable to compute recommendation' });
+  }
+});
 
 function renderExpenseDbError(res, message) {
   return res.status(500).render('expenses/form', {

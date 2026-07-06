@@ -368,7 +368,7 @@ async function getEstimatedAvailableToSave(goalMonth) {
   const month = budgetStore.normalizeBudgetMonth(goalMonth);
   const [monthlyIncome, monthExpenses] = await Promise.all([
     getUserMonthlyIncome(),
-    financeHelpers.getMonthlyExpenseTotal(month),
+    financeHelpers.getMonthlyCountedExpenseTotal(month),
   ]);
 
   const rawEstimate = roundMoney(monthlyIncome - monthExpenses);

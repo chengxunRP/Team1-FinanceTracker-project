@@ -1442,7 +1442,77 @@ button.spb-modal__create {
   padding: 0;
 }
 
-.spb-category-item--grow .spb-category-item__name {
+.spb-category-row__main--pick .spb-category-item__radio {
+  flex-shrink: 0;
+}
+
+a.spb-modal__create--link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.spc-category-field .expense-txn__category-btn {
+  width: 100%;
+}
+
+.spc-form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+}
+
+.spc-form-actions .btn--ghost {
+  color: var(--text-muted);
+  border: 1px solid var(--border-soft, var(--grey-200));
+  background: transparent;
+}
+
+.spc-form-actions .btn--ghost:hover {
+  background: var(--surface-muted, #f9fafb);
+}
+
+.spc-category-field {
+  margin: 0;
+}
+
+.spc-field-label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.45rem;
+}
+
+.spc-category-btn {
+  width: 100%;
+  margin: 0;
+}
+
+.spc-budget-note {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.spc-overall-unset-card {
+  border: 1px dashed var(--border-soft, #d1d5db);
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+}
+
+.spc-overall-unset-note,
+.spc-overall-unset-sub {
+  margin: 0.55rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.spc-category-item--grow .spb-category-item__name {
   flex: 1;
 }
 
