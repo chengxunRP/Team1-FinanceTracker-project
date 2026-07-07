@@ -63,14 +63,32 @@ function getDefaultExpenseDateForBudgetMonth(budgetMonth, today = new Date()) {
 
 function getSafeExpenseReturnTo(value) {
   if (!value || typeof value !== "string") return null;
-  const path = value.trim().split("#")[0];
-  if (!path.startsWith("/") || path.startsWith("//") || path.includes("://")) {
+  const cleaned = value.trim().split("#")[0];
+  if (!cleaned.startsWith("/") || cleaned.startsWith("//") || cleaned.includes("://")) {
     return null;
   }
-  if (!/^\/budget\/categories\/\d+(\?month=\d{4}-\d{2})?$/.test(path)) {
-    return null;
+
+  const questionIndex = cleaned.indexOf("?");
+  const path = questionIndex === -1 ? cleaned : cleaned.slice(0, questionIndex);
+  const queryString = questionIndex === -1 ? "" : cleaned.slice(questionIndex + 1);
+
+  const allowed =
+    path === "/expenses" ||
+    path === "/budget/all-categories" ||
+    path === "/budget/everything-else" ||
+    /^\/budget\/categories\/\d+$/.test(path);
+
+  if (!allowed) return null;
+
+  if (queryString) {
+    const params = new URLSearchParams(queryString);
+    for (const [key, val] of params.entries()) {
+      if (!["month", "returnMonth"].includes(key)) return null;
+      if (!/^\d{4}-\d{2}$/.test(String(val))) return null;
+    }
   }
-  return path;
+
+  return cleaned;
 }
 
 function normalizeMerchantName(value) {

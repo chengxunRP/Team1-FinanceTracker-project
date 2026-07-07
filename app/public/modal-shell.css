@@ -115,6 +115,11 @@ body:has(.spb-modal-overlay:not([hidden])) .app-main {
   flex-shrink: 0;
 }
 
+.pocketguard-style-modal .spb-modal__search[hidden],
+.pocketguard-style-modal [id$="CategoryPickerStep"][hidden] {
+  display: none !important;
+}
+
 .pocketguard-style-modal-body,
 .pocketguard-style-modal .pocketguard-style-modal-body,
 .pocketguard-style-modal .spb-modal__body {

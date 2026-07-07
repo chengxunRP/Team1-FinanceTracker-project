@@ -205,6 +205,30 @@ async function categoryHasExpensesOrBudgets(categoryId) {
   return Number(budgetRows[0].count) > 0;
 }
 
+async function findSoftDeletedCategoryByName(name) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return null;
+
+  const columns = await getCategoryColumns();
+  if (!columns.hasIsDeleted) return null;
+
+  let query = "SELECT id, name, icon, color";
+  if (columns.hasIsCustom) query += ", is_custom";
+  if (columns.hasIsDeleted) query += ", is_deleted";
+  if (columns.hasIconImage) query += ", icon_image";
+  if (columns.hasUserId) query += ", user_id";
+  query += " FROM categories WHERE LOWER(name) = LOWER(?) AND is_deleted = 1 LIMIT 1";
+
+  const [rows] = await db.query(query, [trimmed]);
+  if (!rows.length) return null;
+  return mapCategoryRow(rows[0]);
+}
+
+function isCategorySoftDeleted(category, columns) {
+  if (!category || !columns.hasIsDeleted) return false;
+  return Number(category.is_deleted) === 1;
+}
+
 async function restoreSoftDeletedCategory(categoryId, trimmedName, visual) {
   const columns = await getCategoryColumns();
   const icon = DEFAULT_CUSTOM_ICON_KEY;
@@ -215,20 +239,35 @@ async function restoreSoftDeletedCategory(categoryId, trimmedName, visual) {
     sql += ", icon_image = ?";
     params.push(visual.iconImage);
   }
+  if (columns.hasIsCustom) {
+    sql += ", is_custom = 1";
+  }
   if (columns.hasIsDeleted) {
     sql += ", is_deleted = 0";
   }
   if (columns.hasDeletedAt) {
     sql += ", deleted_at = NULL";
   }
-  sql += " WHERE id = ?";
-  params.push(Number(categoryId));
   if (columns.hasUserId) {
-    sql += " AND user_id = ?";
+    sql += ", user_id = ?";
     params.push(requireUserId());
   }
+  sql += " WHERE id = ?";
+  params.push(Number(categoryId));
 
   await db.query(sql, params);
+}
+
+async function returnRestoredCategory(categoryId) {
+  const restored = await getCategoryById(categoryId);
+  if (restored) return restored;
+  const row = await getCategoryByIdIncludingDeleted(categoryId);
+  if (!row) {
+    const err = new Error("Unable to restore category.");
+    err.code = "NOT_FOUND";
+    throw err;
+  }
+  return row;
 }
 
 async function categoryNameExists(name, excludeId) {
@@ -339,36 +378,41 @@ async function createCategory(name, options = {}) {
   }
 
   const visual = resolveCategoryVisual(options);
+  const columns = await getCategoryColumns();
 
-  const duplicate = await categoryNameExists(trimmed);
-  if (duplicate) {
+  const existingAny = await findCategoryByNameIncludingDeleted(trimmed);
+  if (existingAny) {
+    if (isCategorySoftDeleted(existingAny, columns)) {
+      await restoreSoftDeletedCategory(existingAny.id, trimmed, visual);
+      return returnRestoredCategory(existingAny.id);
+    }
     const err = new Error(DUPLICATE_CATEGORY_MESSAGE);
     err.code = "DUPLICATE";
     throw err;
   }
 
-  const columns = await getCategoryColumns();
-  const existingAny = await findCategoryByNameIncludingDeleted(trimmed);
-  if (existingAny && columns.hasIsDeleted && existingAny.is_deleted) {
-    const inUse = await categoryHasExpensesOrBudgets(existingAny.id);
-    if (!inUse) {
-      const deleteParams = [Number(existingAny.id)];
-      let deleteSql = "DELETE FROM categories WHERE id = ?";
-      if (columns.hasUserId) {
-        deleteSql += " AND user_id = ?";
-        deleteParams.push(requireUserId());
-      }
-      await db.query(deleteSql, deleteParams);
-    } else {
-      await restoreSoftDeletedCategory(existingAny.id, trimmed, visual);
-      return getCategoryById(existingAny.id);
-    }
+  const softDeleted = await findSoftDeletedCategoryByName(trimmed);
+  if (softDeleted) {
+    await restoreSoftDeletedCategory(softDeleted.id, trimmed, visual);
+    return returnRestoredCategory(softDeleted.id);
+  }
+
+  const activeDuplicate = await categoryNameExists(trimmed);
+  if (activeDuplicate) {
+    const err = new Error(DUPLICATE_CATEGORY_MESSAGE);
+    err.code = "DUPLICATE";
+    throw err;
   }
 
   try {
     return await insertCategoryRow(trimmed, visual);
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
+      const hiddenDeleted = await findSoftDeletedCategoryByName(trimmed);
+      if (hiddenDeleted) {
+        await restoreSoftDeletedCategory(hiddenDeleted.id, trimmed, visual);
+        return returnRestoredCategory(hiddenDeleted.id);
+      }
       const err = new Error(DUPLICATE_CATEGORY_MESSAGE);
       err.code = "DUPLICATE";
       throw err;
@@ -776,7 +820,15 @@ async function getExpenseById(id) {
   };
 }
 
+function resolveExpenseUserId(explicitUserId) {
+  if (explicitUserId != null && explicitUserId !== "") {
+    return Number(explicitUserId);
+  }
+  return requireUserId();
+}
+
 async function addExpense(expense) {
+  const userId = resolveExpenseUserId(expense.userId);
   const [result] = await db.query(
     `INSERT INTO expenses (
       title,
@@ -793,7 +845,7 @@ async function addExpense(expense) {
       expense.amount,
       expense.merchantName || null,
       Number(expense.categoryId),
-      requireUserId(),
+      userId,
       expense.date,
       expense.notes || "",
       expense.imagePath || null,
@@ -804,7 +856,7 @@ async function addExpense(expense) {
 }
 
 async function updateExpense(id, expense) {
-  const userId = requireUserId();
+  const userId = resolveExpenseUserId(expense.userId);
   const [result] = await db.query(
     `UPDATE expenses
     SET

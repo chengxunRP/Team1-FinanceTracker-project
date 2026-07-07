@@ -24,6 +24,7 @@
     currentListId: "expenseCurrentCategoryList",
   };
   var helpers = window.SwCategoryPickerHelpers;
+  var createCategoryFlow = null;
 
   if (!overlay || !categoryIdInput) return;
 
@@ -148,6 +149,23 @@
     selectCategory(btn);
   }
 
+  if (window.SwPickerCreateCategory) {
+    createCategoryFlow = window.SwPickerCreateCategory.init({
+      prefix: "expense",
+      onCategoryCreated: function (category) {
+        var pickBtn = window.SwPickerCreateCategory.appendCustomCategoryToList(
+          customList,
+          category,
+          pickSelector,
+          "expense-cat-pick-item"
+        );
+        if (yourSection) yourSection.hidden = false;
+        filterCategories(searchInput ? searchInput.value : "");
+        if (pickBtn) selectCategory(pickBtn);
+      },
+    });
+  }
+
   if (openBtn) openBtn.addEventListener("click", openModal);
   if (closeBtn) closeBtn.addEventListener("click", closeModal);
 
@@ -178,7 +196,16 @@
   }
 
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && overlay && !overlay.hidden) closeModal();
+    if (e.key !== "Escape" || !overlay || overlay.hidden) return;
+    if (createCategoryFlow && createCategoryFlow.isColourOpen()) {
+      createCategoryFlow.closeChooseColourModal();
+      return;
+    }
+    if (createCategoryFlow && createCategoryFlow.isCreateStepOpen()) {
+      createCategoryFlow.showPickerStep();
+      return;
+    }
+    closeModal();
   });
 
   if (helpers) {

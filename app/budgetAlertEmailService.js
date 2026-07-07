@@ -1,8 +1,22 @@
+require("./envConfig");
+
 const db = require("./config/db");
-const financeHelpers = require("./financeHelpers");
+const budgetStore = require("./budgetStore");
+const { getBudgetNotifications } = require("./budgetNotificationService");
+const { buildBudgetAlertEmail } = require("./budgetAlertEmailTemplate");
 const { runWithUserId } = require("./requestUserContext");
 
 let transporter = null;
+
+function getSmtpConfigFlags() {
+  return {
+    hasHost: Boolean(process.env.SMTP_HOST),
+    hasPort: Boolean(process.env.SMTP_PORT),
+    hasUser: Boolean(process.env.SMTP_USER),
+    hasPass: Boolean(process.env.SMTP_PASS),
+    hasFrom: Boolean(process.env.SMTP_FROM || process.env.SMTP_USER),
+  };
+}
 
 function getTransporter() {
   if (transporter) return transporter;
@@ -14,7 +28,7 @@ function getTransporter() {
   try {
     nodemailer = require("nodemailer");
   } catch (error) {
-    console.warn("nodemailer is not installed; budget email alerts are disabled.");
+    console.warn("[BudgetEmail] nodemailer is not installed; budget email alerts are disabled.");
     return null;
   }
 
@@ -41,97 +55,235 @@ function resolveAlertEmail(user) {
 
 async function getUserAlertProfile(userId) {
   const [rows] = await db.query(
-    `SELECT id, name, email, alert_email, email_alerts_enabled,
-            budget_alert_warning_month, budget_alert_danger_month
+    `SELECT id, name, email, alert_email, email_alerts_enabled
      FROM users WHERE id = ?`,
     [userId]
   );
   return rows[0] || null;
 }
 
-async function sendBudgetAlertEmail(user, subject, text) {
+/** Stable per-alert key: overall | category-{id} */
+function buildAlertKey(alert) {
+  if (alert.scope === "overall") return "overall";
+  if (alert.categoryId != null && alert.categoryId !== "") {
+    return `category-${alert.categoryId}`;
+  }
+
+  const alertId = String(alert.alertId || "");
+  const match = alertId.match(/^category-budget-(\d+)-/);
+  if (match) return `category-${match[1]}`;
+
+  return alertId.slice(0, 64) || "unknown";
+}
+
+function buildAlertDedupeKey(alert) {
+  return `${buildAlertKey(alert)}:${alert.level}`;
+}
+
+async function getAlreadySentAlertKeys(userId, budgetMonth) {
+  const [rows] = await db.query(
+    `SELECT alert_key, severity
+     FROM budget_email_alert_logs
+     WHERE user_id = ? AND budget_month = ?`,
+    [userId, budgetMonth]
+  );
+
+  return new Set(rows.map((row) => `${row.alert_key}:${row.severity}`));
+}
+
+function filterNewAlerts(alerts, sentKeys) {
+  return alerts.filter((alert) => !sentKeys.has(buildAlertDedupeKey(alert)));
+}
+
+async function recordSentAlerts(userId, budgetMonth, alerts) {
+  if (!alerts.length) return;
+
+  for (const alert of alerts) {
+    await db.query(
+      `INSERT INTO budget_email_alert_logs
+        (user_id, budget_month, alert_key, severity, alert_name, sent_at)
+       VALUES (?, ?, ?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE sent_at = sent_at`,
+      [userId, budgetMonth, buildAlertKey(alert), alert.level, alert.name]
+    );
+  }
+}
+
+async function sendBudgetAlertEmail(user, emailContent) {
   if (!user || !Number(user.email_alerts_enabled)) {
-    return false;
+    return { sent: false, skipReason: "email_alerts_enabled off" };
   }
 
   const to = resolveAlertEmail(user);
-  if (!to) return false;
+  if (!to) {
+    return { sent: false, skipReason: "user email missing" };
+  }
 
   const mailer = getTransporter();
   if (!mailer) {
-    console.log(`[budget-alert] SMTP not configured; would email ${to}: ${subject}`);
-    return false;
+    return { sent: false, skipReason: "SMTP missing" };
   }
 
-  await mailer.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@spendwise.local",
-    to,
-    subject,
-    text,
-  });
-
-  return true;
+  try {
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@spendwise.local",
+      to,
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
+      attachments: emailContent.attachments || [],
+    });
+    return { sent: true, recipient: to, subject: emailContent.subject };
+  } catch (error) {
+    console.error("[BudgetEmail] sendMail failed:", error.message || error);
+    return { sent: false, skipReason: "sendMail failed" };
+  }
 }
 
-async function maybeSendBudgetAlertsForUser(userId) {
-  const user = await getUserAlertProfile(userId);
-  if (!user || !Number(user.email_alerts_enabled)) {
-    return;
-  }
-
-  const summary = await runWithUserId(userId, () =>
-    financeHelpers.getCategoryBudgetTotalsSummary()
+async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {}) {
+  const budgetMonth = budgetStore.normalizeBudgetMonth(
+    budgetMonthInput || budgetStore.getCurrentBudgetMonth()
   );
 
-  if (!summary || summary.budget <= 0) {
+  console.log("[BudgetEmail] maybeSendBudgetAlertsForUser", {
+    route: meta.route || null,
+    userId: userId || null,
+    affectedMonth: budgetMonth,
+    affectedCategoryId: meta.affectedCategoryId || null,
+    smtp: getSmtpConfigFlags(),
+  });
+
+  if (!userId) {
+    console.log("[BudgetEmail] skip: no userId");
     return;
   }
 
-  const budgetMonth = summary.budgetMonth;
-  const pct = summary.percentUsed;
-  const spentLabel = summary.spent.toFixed(2);
-  const budgetLabel = summary.budget.toFixed(2);
-
-  if (pct >= 100 && user.budget_alert_danger_month !== budgetMonth) {
-    const sent = await sendBudgetAlertEmail(
-      user,
-      "SpendWise budget alert: budget exceeded",
-      `Hi ${user.name},\n\nYou have reached or exceeded your monthly budget (${spentLabel} of ${budgetLabel}).\n\n— SpendWise`
-    );
-    if (sent) {
-      await db.query(
-        "UPDATE users SET budget_alert_danger_month = ? WHERE id = ?",
-        [budgetMonth, userId]
-      );
-    }
+  const user = await getUserAlertProfile(userId);
+  if (!user) {
+    console.log("[BudgetEmail] skip: user not found", { userId });
     return;
   }
 
-  if (
-    pct >= 80 &&
-    pct < 100 &&
-    user.budget_alert_warning_month !== budgetMonth
-  ) {
-    const sent = await sendBudgetAlertEmail(
-      user,
-      "SpendWise budget alert: 80% used",
-      `Hi ${user.name},\n\nYou have used ${pct}% of your monthly budget (${spentLabel} of ${budgetLabel}).\n\n— SpendWise`
-    );
-    if (sent) {
-      await db.query(
-        "UPDATE users SET budget_alert_warning_month = ? WHERE id = ?",
-        [budgetMonth, userId]
-      );
-    }
+  console.log("[BudgetEmail] user loaded", {
+    userId: user.id,
+    email: user.email || null,
+    alert_email: user.alert_email || null,
+    email_alerts_enabled: Number(user.email_alerts_enabled) || 0,
+  });
+
+  if (!Number(user.email_alerts_enabled)) {
+    console.log("[BudgetEmail] skip: email_alerts_enabled off");
+    return;
   }
+
+  const recipient = resolveAlertEmail(user);
+  if (!recipient) {
+    console.log("[BudgetEmail] skip: user email missing");
+    return;
+  }
+
+  let notifications;
+  try {
+    notifications = await runWithUserId(userId, () =>
+      getBudgetNotifications(budgetMonth)
+    );
+  } catch (error) {
+    console.error("[BudgetEmail] skip: alert calculation failed:", error.message || error);
+    return;
+  }
+
+  const alerts = notifications && notifications.alerts ? notifications.alerts : [];
+  console.log("[BudgetEmail] active alerts found", {
+    count: alerts.length,
+    names: alerts.map((a) => a.name),
+    severity: alerts.map((a) => a.level),
+    alertKeys: alerts.map((a) => buildAlertDedupeKey(a)),
+  });
+
+  if (!alerts.length) {
+    console.log("[BudgetEmail] skip: no active alerts");
+    return;
+  }
+
+  let sentKeys;
+  try {
+    sentKeys = await getAlreadySentAlertKeys(userId, budgetMonth);
+  } catch (error) {
+    if (error.code === "ER_NO_SUCH_TABLE") {
+      console.error(
+        "[BudgetEmail] skip: budget_email_alert_logs table missing. Run db/budget_email_alert_logs_update.sql"
+      );
+      return;
+    }
+    throw error;
+  }
+
+  const newAlerts = filterNewAlerts(alerts, sentKeys);
+  const otherActiveAlerts = alerts.filter((alert) =>
+    sentKeys.has(buildAlertDedupeKey(alert))
+  );
+  console.log("[BudgetEmail] new unsent alerts", {
+    count: newAlerts.length,
+    names: newAlerts.map((a) => a.name),
+    severity: newAlerts.map((a) => a.level),
+    alertKeys: newAlerts.map((a) => buildAlertDedupeKey(a)),
+    alreadySentCount: otherActiveAlerts.length,
+  });
+
+  if (!newAlerts.length) {
+    console.log("[BudgetEmail] skip: no new email alerts to send");
+    return;
+  }
+
+  const emailContent = buildBudgetAlertEmail(
+    user,
+    budgetMonth,
+    newAlerts,
+    otherActiveAlerts
+  );
+  console.log("[BudgetEmail] action URL:", emailContent.actionUrl);
+  const result = await sendBudgetAlertEmail(user, emailContent);
+
+  if (!result.sent) {
+    console.log("[BudgetEmail] skip:", result.skipReason || "send failed");
+    return;
+  }
+
+  try {
+    await recordSentAlerts(userId, budgetMonth, newAlerts);
+  } catch (error) {
+    console.error("[BudgetEmail] email sent but failed to record alert logs:", error.message || error);
+    return;
+  }
+
+  console.log("[BudgetEmail] email sent", {
+    recipient: result.recipient,
+    subject: result.subject,
+    alertCount: newAlerts.length,
+    alertKeys: newAlerts.map((a) => buildAlertDedupeKey(a)),
+  });
 }
 
-function scheduleBudgetAlertCheck(userId) {
-  if (!userId) return;
+function scheduleBudgetAlertCheck(userId, budgetMonth, meta = {}) {
+  const month = budgetStore.normalizeBudgetMonth(
+    budgetMonth || budgetStore.getCurrentBudgetMonth()
+  );
+
+  console.log("[BudgetEmail] scheduleBudgetAlertCheck", {
+    route: meta.route || null,
+    userId: userId || null,
+    affectedMonth: month,
+    affectedCategoryId: meta.affectedCategoryId || null,
+  });
+
+  if (!userId) {
+    console.log("[BudgetEmail] skip schedule: no userId");
+    return;
+  }
 
   setImmediate(() => {
-    maybeSendBudgetAlertsForUser(userId).catch((error) => {
-      console.error("Budget alert check failed:", error);
+    maybeSendBudgetAlertsForUser(userId, month, meta).catch((error) => {
+      console.error("[BudgetEmail] Budget alert check failed:", error);
     });
   });
 }
@@ -140,4 +292,6 @@ module.exports = {
   maybeSendBudgetAlertsForUser,
   scheduleBudgetAlertCheck,
   resolveAlertEmail,
+  buildAlertKey,
+  buildAlertDedupeKey,
 };

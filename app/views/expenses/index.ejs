@@ -1,7 +1,7 @@
 <%- include('../partials/header') %>
 
 <link rel="stylesheet" href="/spb.css?v=45">
-<link rel="stylesheet" href="/modal-shell.css?v=4">
+<link rel="stylesheet" href="/modal-shell.css?v=5">
 <link rel="stylesheet" href="/expense-form.css?v=37">
 
 <%
@@ -188,9 +188,15 @@
                   </div>
                 </td>
                 <td class="data-table__category-col">
-                  <span class="expense-cat-pill expense-cat-pill--table" style="--cat-color:<%= expense.category.color %>;">
-                    <%- include('../partials/category-icon', { catName: expense.category.displayName || expense.category.name, catIcon: expense.category.icon, catIconImage: expense.category.iconImage, catColor: expense.category.color, catSize: 'sm' }) %>
-                    <%= expense.category.displayName || expense.category.name %>
+                  <%
+                    var expenseCategoryName = expense.category
+                      ? (expense.category.displayName || expense.category.name || '')
+                      : '';
+                    if (!expenseCategoryName) expenseCategoryName = 'Uncategorized';
+                  %>
+                  <span class="expense-cat-pill expense-cat-pill--table" style="--cat-color:<%= expense.category ? expense.category.color : '' %>;">
+                    <%- include('../partials/category-icon', { catName: expenseCategoryName, catIcon: expense.category ? expense.category.icon : '', catIconImage: expense.category ? expense.category.iconImage : '', catColor: expense.category ? expense.category.color : '', catSize: 'sm' }) %>
+                    <span class="expense-cat-pill__name"><%= expenseCategoryName %></span>
                   </span>
                 </td>
                 <td class="data-table__date-col">
@@ -255,7 +261,8 @@
   categories: categories,
   customCategories: typeof customCategories !== 'undefined' ? customCategories : [],
   generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : [],
-  maxDate: maxDate
+  maxDate: maxDate,
+  returnTo: '/expenses'
 }) %>
 
 <%- include('../partials/transaction-detail-modal') %>
@@ -265,17 +272,19 @@
   generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : []
 }) %>
 
+<script src="/js/budget-notifications.js?v=9"></script>
 <script src="/js/modal-scroll.js?v=3"></script>
 <script src="/js/expense-date.js"></script>
 <script src="/js/expense-upload.js?v=5"></script>
+<script src="/js/category-colours.js"></script>
+<script src="/js/picker-create-category.js?v=2"></script>
 <script src="/js/category-picker-helpers.js?v=1"></script>
-<script src="/js/expense-category-picker.js?v=12"></script>
+<script src="/js/expense-category-picker.js?v=13"></script>
 <script src="/js/expense-add-modal.js?v=9"></script>
-<script src="/js/purchase-check.js?v=2"></script>
 <script src="/js/transaction-category-header-images.js?v=2"></script>
-<script src="/js/transaction-detail-modal.js?v=34"></script>
+<script src="/js/transaction-detail-modal.js?v=35"></script>
 <script src="/js/category-picker-helpers.js?v=1"></script>
-<script src="/js/transaction-category-picker.js?v=4"></script>
+<script src="/js/transaction-category-picker.js?v=5"></script>
 <script>
   document.addEventListener("sw-expense-updated", function (event) {
     var detail = event.detail;

@@ -20,6 +20,7 @@
     currentListId: "txnCurrentCategoryList",
   };
   var helpers = window.SwCategoryPickerHelpers;
+  var createCategoryFlow = null;
   var saving = false;
   var currentCategoryId = "";
   var currentExpenseId = null;
@@ -148,7 +149,7 @@
       })
       .then(function (data) {
         if (onSavedCallback) {
-          onSavedCallback(data.expense, data.previous);
+          onSavedCallback(data.expense, data.previous, data);
         }
         closeModal();
       })
@@ -185,11 +186,40 @@
   if (generalList) generalList.addEventListener("click", handleListClick);
   if (currentList) currentList.addEventListener("click", handleListClick);
 
+  if (window.SwPickerCreateCategory) {
+    createCategoryFlow = window.SwPickerCreateCategory.init({
+      prefix: "txn",
+      onCategoryCreated: function (category) {
+        var pickBtn = window.SwPickerCreateCategory.appendCustomCategoryToList(
+          customList,
+          category,
+          pickSelector,
+          "txn-cat-pick-item"
+        );
+        if (yourSection) yourSection.hidden = false;
+        filterCategories(searchInput ? searchInput.value : "");
+        if (pickBtn) {
+          var categoryId = pickBtn.getAttribute("data-category-id");
+          if (categoryId) saveCategory(categoryId);
+        }
+      },
+    });
+  }
+
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && overlay && !overlay.hidden) {
+    if (e.key !== "Escape" || !overlay || overlay.hidden) return;
+    if (createCategoryFlow && createCategoryFlow.isColourOpen()) {
       e.stopPropagation();
-      closeModal();
+      createCategoryFlow.closeChooseColourModal();
+      return;
     }
+    if (createCategoryFlow && createCategoryFlow.isCreateStepOpen()) {
+      e.stopPropagation();
+      createCategoryFlow.showPickerStep();
+      return;
+    }
+    e.stopPropagation();
+    closeModal();
   });
 
   if (helpers) {

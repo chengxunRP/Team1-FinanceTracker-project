@@ -12,27 +12,20 @@
   var scpGeneralSectionId = scpIsBudgetMode ? 'generalCategoriesSection' : (scpMode === 'transaction' ? 'txnGeneralCategoriesSection' : 'expenseGeneralCategoriesSection');
   var scpEmptyId = scpIsBudgetMode ? '' : (scpMode === 'transaction' ? 'txnCategoryEmpty' : 'expenseCategoryEmpty');
   var scpLegacyPickClass = scpMode === 'transaction' ? ' txn-cat-pick-item' : (scpIsPickMode ? ' expense-cat-pick-item' : '');
+  var scpCreateBtnId = scpIsBudgetMode
+    ? 'openCreateCategory'
+    : (scpMode === 'transaction' ? 'openTxnCreateCategory' : 'openExpenseCreateCategory');
 %>
 
 <section class="spb-modal__section" id="<%= scpYourSectionId %>">
   <h3 class="spb-modal__section-title">Your categories</h3>
-  <% if (scpIsBudgetMode) { %>
-  <button type="button" class="spb-modal__create" id="openCreateCategory">
+  <button type="button" class="spb-modal__create" id="<%= scpCreateBtnId %>">
     <span class="spb-modal__create-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
     </span>
     <span>Create a category</span>
     <svg class="spb-modal__chevron" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
-  <% } else { %>
-  <a href="/categories" target="_blank" rel="noopener" class="spb-modal__create spb-modal__create--link">
-    <span class="spb-modal__create-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-    </span>
-    <span>Create a category</span>
-    <svg class="spb-modal__chevron" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  </a>
-  <% } %>
 
   <ul class="spb-category-list" id="<%= scpCustomListId %>">
     <% scpCustom.forEach(function(cat) { %>

@@ -12,13 +12,140 @@ const {
   normalizeMerchantName,
 } = require('../expenseValidationHelpers');
 const { isExpenseCountedForBudget } = require('../budgetHelpers');
-const { requireLogin } = require('../authHelpers');
+const { requireLogin, getCurrentUserId } = require('../authHelpers');
 const { scheduleBudgetAlertCheck } = require('../budgetAlertEmailService');
 
 router.use(requireLogin);
 
-function triggerBudgetAlerts(req) {
-  scheduleBudgetAlertCheck(req.session.userId);
+function wantsJsonRequest(req) {
+  return (
+    req.xhr ||
+    (req.get('Accept') || '').includes('application/json') ||
+    (req.get('Content-Type') || '').includes('application/json')
+  );
+}
+
+function respondLoginRequired(req, res) {
+  if (wantsJsonRequest(req)) {
+    res.status(401).json({ success: false, error: 'Login required.' });
+    return;
+  }
+  res.redirect('/login');
+}
+
+function requireSessionUserId(req, res) {
+  const userId = getCurrentUserId(req);
+  if (!userId) {
+    respondLoginRequired(req, res);
+    return null;
+  }
+  return userId;
+}
+
+function handleExpenseAuthError(req, res, error) {
+  if (error && error.code === 'AUTH_REQUIRED') {
+    respondLoginRequired(req, res);
+    return true;
+  }
+  return false;
+}
+
+function triggerBudgetAlerts(req, budgetMonth, affectedCategoryId) {
+  const userId = getCurrentUserId(req);
+  const month = budgetMonth ? String(budgetMonth).slice(0, 7) : null;
+  const route = req.originalUrl || req.path || null;
+
+  console.log('[BudgetEmail] mutation trigger', {
+    route,
+    userId: userId || null,
+    affectedMonth: month,
+    affectedCategoryId: affectedCategoryId || null,
+  });
+
+  scheduleBudgetAlertCheck(userId, month, {
+    route,
+    affectedCategoryId: affectedCategoryId || null,
+  });
+}
+
+function buildBudgetAlertReset(req, categoryId, budgetMonth, options = {}) {
+  const month = budgetStore.normalizeBudgetMonth(
+    budgetMonth || budgetStore.getCurrentBudgetMonth()
+  );
+  const meta = {
+    affectedUserId: req.session.userId,
+    affectedMonth: month,
+    affectedCategoryId:
+      categoryId != null && categoryId !== '' ? String(categoryId) : null,
+  };
+  if (
+    options.previousCategoryId != null &&
+    options.previousCategoryId !== '' &&
+    String(options.previousCategoryId) !== String(categoryId)
+  ) {
+    meta.affectedPreviousCategoryId = String(options.previousCategoryId);
+  }
+  if (
+    options.previousMonth &&
+    String(options.previousMonth) !== month &&
+    meta.affectedCategoryId
+  ) {
+    meta.affectedPreviousMonth = budgetStore.normalizeBudgetMonth(
+      options.previousMonth
+    );
+  }
+  return meta;
+}
+
+function appendBudgetAlertResetQuery(url, meta) {
+  if (!meta || !meta.affectedUserId || !meta.affectedMonth) return url;
+  if (!meta.affectedCategoryId) return url;
+  try {
+    const target = new URL(url, 'http://localhost');
+    target.searchParams.set('resetBudgetAlertDismiss', 'category');
+    target.searchParams.set('userId', String(meta.affectedUserId));
+    target.searchParams.set('categoryId', String(meta.affectedCategoryId));
+    target.searchParams.set('month', String(meta.affectedMonth));
+    if (meta.affectedPreviousCategoryId) {
+      target.searchParams.set(
+        'previousCategoryId',
+        String(meta.affectedPreviousCategoryId)
+      );
+    }
+    if (meta.affectedPreviousMonth) {
+      target.searchParams.set(
+        'previousMonth',
+        String(meta.affectedPreviousMonth)
+      );
+    }
+    return target.pathname + target.search + target.hash;
+  } catch (error) {
+    const sep = url.includes('?') ? '&' : '?';
+    let next =
+      url +
+      sep +
+      'resetBudgetAlertDismiss=category' +
+      '&userId=' +
+      encodeURIComponent(meta.affectedUserId) +
+      '&categoryId=' +
+      encodeURIComponent(meta.affectedCategoryId) +
+      '&month=' +
+      encodeURIComponent(meta.affectedMonth);
+    if (meta.affectedPreviousCategoryId) {
+      next +=
+        '&previousCategoryId=' +
+        encodeURIComponent(meta.affectedPreviousCategoryId);
+    }
+    if (meta.affectedPreviousMonth) {
+      next +=
+        '&previousMonth=' + encodeURIComponent(meta.affectedPreviousMonth);
+    }
+    return next;
+  }
+}
+
+function redirectWithBudgetAlertReset(res, url, meta) {
+  res.redirect(appendBudgetAlertResetQuery(url, meta));
 }
 
 function formatSGD(amount) {
@@ -245,6 +372,9 @@ router.get('/new', async (req, res) => {
 
 // POST /expenses
 router.post('/', uploadExpenseImage, async (req, res) => {
+  const userId = requireSessionUserId(req, res);
+  if (!userId) return;
+
   const { title, amount, categoryId, date, notes } = req.body;
   const merchantName = normalizeMerchantName(req.body.merchant_name);
   const errors = [];
@@ -290,16 +420,23 @@ router.post('/', uploadExpenseImage, async (req, res) => {
       date,
       notes: (notes || '').trim(),
       imagePath: expenseImagePath,
+      userId,
     });
-    triggerBudgetAlerts(req);
+    triggerBudgetAlerts(req, String(date).slice(0, 7), categoryId);
+    const budgetAlertReset = buildBudgetAlertReset(
+      req,
+      categoryId,
+      String(date).slice(0, 7)
+    );
     const safeReturnTo = getSafeExpenseReturnTo(req.body.returnTo);
     if (safeReturnTo) {
-      return res.redirect(safeReturnTo);
+      return redirectWithBudgetAlertReset(res, safeReturnTo, budgetAlertReset);
     }
-    res.redirect('/expenses');
+    redirectWithBudgetAlertReset(res, '/expenses', budgetAlertReset);
   } catch (error) {
     console.error('Database error creating expense:', error);
     const safeReturnTo = getSafeExpenseReturnTo(req.body.returnTo);
+    if (handleExpenseAuthError(req, res, error)) return;
     if (safeReturnTo) {
       const sep = safeReturnTo.includes("?") ? "&" : "?";
       return res.redirect(`${safeReturnTo}${sep}addExpenseError=1`);
@@ -366,6 +503,9 @@ router.get('/:id/edit', async (req, res) => {
 
 // PUT/POST /expenses/:id  (POST used by multipart edit forms; _method=PUT fails before multer parses body)
 async function handleExpenseUpdate(req, res) {
+  const userId = requireSessionUserId(req, res);
+  if (!userId) return;
+
   const existing = await store.getExpenseById(req.params.id).catch((error) => {
     console.error('Database error loading expense for update:', error);
     return null;
@@ -417,11 +557,25 @@ async function handleExpenseUpdate(req, res) {
       date,
       notes: (notes || '').trim(),
       imagePath: expenseImagePath,
+      userId,
     });
-    triggerBudgetAlerts(req);
-    res.redirect('/expenses');
+    triggerBudgetAlerts(req, String(date).slice(0, 7), categoryId);
+    const budgetAlertReset = buildBudgetAlertReset(
+      req,
+      categoryId,
+      String(date).slice(0, 7),
+      {
+        previousCategoryId: existing.categoryId,
+        previousMonth: existing.date ? String(existing.date).slice(0, 7) : null,
+      }
+    );
+    redirectWithBudgetAlertReset(res, '/expenses', budgetAlertReset);
   } catch (error) {
     console.error('Database error updating expense:', error);
+    if (error && error.code === 'AUTH_REQUIRED') {
+      respondLoginRequired(req, res);
+      return;
+    }
     const pickerData = await loadPickerCategoryData().catch(() => ({
       categories: [],
       customCategories: [],
@@ -462,8 +616,18 @@ router.post('/:id/update-date', async (req, res) => {
     }
 
     const expense = await store.getExpenseById(req.params.id);
-    triggerBudgetAlerts(req);
-    res.json({ success: true, expense: expenseToJson(expense) });
+    triggerBudgetAlerts(req, String(date).slice(0, 7), existing.categoryId);
+    const budgetAlertReset = buildBudgetAlertReset(
+      req,
+      existing.categoryId,
+      String(date).slice(0, 7),
+      { previousMonth: String(existing.date).slice(0, 7) }
+    );
+    res.json({
+      success: true,
+      expense: expenseToJson(expense),
+      budgetAlertReset,
+    });
   } catch (error) {
     console.error('Database error updating expense date:', error);
     res.status(500).json({ success: false, error: 'Unable to save date.' });
@@ -488,8 +652,21 @@ router.post('/:id/update-amount', async (req, res) => {
     }
 
     const expense = await store.getExpenseById(req.params.id);
-    triggerBudgetAlerts(req);
-    res.json({ success: true, expense: expenseToJson(expense) });
+    const budgetMonth =
+      existing && existing.date
+        ? String(existing.date).slice(0, 7)
+        : budgetStore.getCurrentBudgetMonth();
+    triggerBudgetAlerts(req, budgetMonth, existing.categoryId);
+    const budgetAlertReset = buildBudgetAlertReset(
+      req,
+      existing.categoryId,
+      budgetMonth
+    );
+    res.json({
+      success: true,
+      expense: expenseToJson(expense),
+      budgetAlertReset,
+    });
   } catch (error) {
     console.error('Database error updating expense amount:', error);
     res.status(500).json({ success: false, error: 'Unable to save amount.' });
@@ -573,6 +750,17 @@ router.post('/:id/update-category', async (req, res) => {
 
     const expense = await store.getExpenseById(req.params.id);
     const hasBudgetForMonth = await categoryHasBudgetForMonth(categoryId, budgetMonth);
+    const affectedBudgetMonth =
+      expense && (expense.expense_date || expense.date)
+        ? String(expense.expense_date || expense.date).slice(0, 7)
+        : budgetMonth;
+    triggerBudgetAlerts(req, affectedBudgetMonth, categoryId);
+    const budgetAlertReset = buildBudgetAlertReset(
+      req,
+      categoryId,
+      affectedBudgetMonth,
+      { previousCategoryId: existing.categoryId }
+    );
 
     res.json({
       success: true,
@@ -583,6 +771,7 @@ router.post('/:id/update-category', async (req, res) => {
           : '',
       },
       expense: expenseToDetailJson(expense, { hasBudgetForMonth }),
+      budgetAlertReset,
     });
   } catch (error) {
     console.error('Database error updating expense category:', error);
@@ -607,11 +796,21 @@ router.post('/:id/update-excluded-from-budget', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Expense not found.' });
     }
 
-    triggerBudgetAlerts(req);
+    const affectedBudgetMonth =
+      existing && (existing.expense_date || existing.date)
+        ? String(existing.expense_date || existing.date).slice(0, 7)
+        : null;
+    triggerBudgetAlerts(req, affectedBudgetMonth, existing.categoryId);
+    const budgetAlertReset = buildBudgetAlertReset(
+      req,
+      existing.categoryId,
+      affectedBudgetMonth
+    );
     res.json({
       success: true,
       isExcludedFromBudget: excluded,
       isExcludedFromAllBudget: excluded,
+      budgetAlertReset,
     });
   } catch (error) {
     console.error('Database error updating expense exclusion flags:', error);
@@ -719,8 +918,21 @@ router.post('/:id/delete', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Expense not found.' });
     }
 
-    triggerBudgetAlerts(req);
-    res.json({ success: true, id: String(req.params.id) });
+    triggerBudgetAlerts(
+      req,
+      existing && existing.date ? String(existing.date).slice(0, 7) : null,
+      existing && existing.categoryId
+    );
+    const budgetAlertReset = buildBudgetAlertReset(
+      req,
+      existing.categoryId,
+      existing.date ? String(existing.date).slice(0, 7) : null
+    );
+    res.json({
+      success: true,
+      id: String(req.params.id),
+      budgetAlertReset,
+    });
   } catch (error) {
     console.error('Database error deleting expense:', error);
     res.status(500).json({ success: false, error: 'Unable to delete transaction.' });
@@ -732,8 +944,19 @@ router.post('/:id', uploadExpenseImage, handleExpenseUpdate);
 // POST /expenses/:id  (_method=DELETE) — Expenses page form delete
 router.delete('/:id', async (req, res) => {
   try {
+    const existing = await store.getExpenseById(req.params.id);
     await store.deleteExpense(req.params.id);
-    res.redirect('/expenses');
+    triggerBudgetAlerts(
+      req,
+      existing && existing.date ? String(existing.date).slice(0, 7) : null,
+      existing && existing.categoryId
+    );
+    const budgetAlertReset = buildBudgetAlertReset(
+      req,
+      existing && existing.categoryId,
+      existing && existing.date ? String(existing.date).slice(0, 7) : null
+    );
+    redirectWithBudgetAlertReset(res, '/expenses', budgetAlertReset);
   } catch (error) {
     console.error('Database error deleting expense:', error);
     res.status(500).redirect('/expenses');

@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const { runWithUserId } = require('../requestUserContext');
 
 const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'expenses');
 if (!fs.existsSync(uploadDir)) {
@@ -33,11 +34,12 @@ const upload = multer({
 });
 
 function uploadExpenseImage(req, res, next) {
+  const userId = req.session && req.session.userId ? req.session.userId : null;
   upload.single('expenseImage')(req, res, (err) => {
     if (err) {
       req.uploadError = err.message || 'Image upload failed.';
     }
-    next();
+    runWithUserId(userId, () => next());
   });
 }
 

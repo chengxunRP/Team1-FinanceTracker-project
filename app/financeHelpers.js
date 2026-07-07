@@ -8,6 +8,7 @@ const expenseStore = require("./expenseStore");
 const { getStandardCategoryName } = require("./categoryHelpers");
 const { buildBudgetSummary } = require("./budgetHelpers");
 const { getCategoryImageUrl } = require("./categoryImageHelpers");
+const { buildBudgetNotifications } = require("./budgetNotificationService");
 
 const MONTH_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -624,6 +625,12 @@ async function buildMonthDashboardSummary(budgetMonth, categories) {
     isCustom: row.isCustom,
   }));
 
+  const budgetNotifications = buildBudgetNotifications(
+    categoryRows,
+    overallSection,
+    month
+  );
+
   return {
     budgetMonth: month,
     label: budgetStore.formatBudgetMonthLabel(month),
@@ -634,6 +641,7 @@ async function buildMonthDashboardSummary(budgetMonth, categories) {
     periodSpentNoOverall,
     categoryProgress,
     expensesInMonth,
+    budgetNotifications,
   };
 }
 
@@ -662,6 +670,7 @@ function serializeDashboardMonth(data, categoryMeta) {
     transactions: (data.expensesInMonth || []).map((expense) =>
       enrichExpenseForDashboard(expense, categoryMeta)
     ),
+    budgetAlerts: data.budgetNotifications || { alerts: [], hasAlerts: false },
   };
 }
 

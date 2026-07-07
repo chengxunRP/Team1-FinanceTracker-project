@@ -351,6 +351,71 @@
     list.innerHTML = html;
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function renderBudgetAlerts(notifications, monthKey) {
+    var container = document.getElementById("dashBudgetAlerts");
+    if (!container) return;
+
+    if (
+      window.SpendWiseBudgetNotifications &&
+      typeof window.SpendWiseBudgetNotifications.render === "function"
+    ) {
+      window.SpendWiseBudgetNotifications.render(container, notifications, {
+        showEmpty: true,
+        month: monthKey || "",
+        userId: container.getAttribute("data-user-id") || "guest",
+      });
+      if (typeof window.initBudgetNotificationDismiss === "function") {
+        window.initBudgetNotificationDismiss(container);
+      }
+      return;
+    }
+
+    var alerts =
+      notifications && notifications.alerts ? notifications.alerts : notifications;
+    if (!alerts || !alerts.length) {
+      container.innerHTML =
+        '<p class="budget-notifications__empty">No budget alerts right now.</p>';
+      return;
+    }
+
+    var html = "";
+    for (var i = 0; i < alerts.length; i++) {
+      var alert = alerts[i];
+      var levelClass = alert.level === "danger" ? "danger" : "warning";
+      var icon = alert.level === "danger" ? "!" : "%";
+      html +=
+        '<div class="budget-alert-banner budget-alert-banner--' +
+        levelClass +
+        '" role="alert">';
+      html +=
+        '<span class="budget-alert-banner__icon" aria-hidden="true">' +
+        icon +
+        "</span>";
+      html += "<div>";
+      html += "<strong>" + escapeHtml(alert.title) + "</strong>";
+      html +=
+        "<p>" +
+        escapeHtml(alert.message) +
+        " " +
+        escapeHtml(alert.detail) +
+        "</p>";
+      html += "</div></div>";
+    }
+
+    container.innerHTML = html;
+    if (typeof window.initBudgetNotificationDismiss === "function") {
+      window.initBudgetNotificationDismiss(container);
+    }
+  }
+
   function renderDashboard(monthKey) {
     var monthData = payload.months[monthKey];
     if (!monthData) return;
@@ -428,6 +493,7 @@
     renderBarChart(monthData.last7Days || []);
     renderBudgets(monthData.categoryProgress || []);
     renderTransactions(monthData.transactions || []);
+    renderBudgetAlerts(monthData.budgetAlerts || [], monthKey);
   }
 
   function initMonthNav() {
