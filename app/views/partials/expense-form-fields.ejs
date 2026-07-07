@@ -126,15 +126,12 @@
 
   <div class="expense-txn__actions<%= fieldInModal ? ' expense-txn__actions--centered' : '' %>">
     <% if (fieldInModal) { %>
-      <button type="button" class="btn btn--secondary btn--sm" id="checkPurchaseBtn">Check purchase</button>
       <button type="submit" class="btn expense-txn__save-btn">Save</button>
     <% } else { %>
       <a href="/expenses" class="btn btn--sm expense-txn__cancel-link">Cancel</a>
-        <button type="button" class="btn btn--secondary btn--sm" id="checkPurchaseBtn">Check purchase</button>
-        <button type="submit" class="btn btn--primary btn--sm">
-          <%= fieldIsEdit ? 'Save Changes' : 'Add Expense' %>
-        </button>
+      <button type="submit" class="btn btn--primary btn--sm">
+        <%= fieldIsEdit ? 'Save Changes' : 'Add Expense' %>
+      </button>
     <% } %>
   </div>
-    <div id="purchaseCheckResult" style="margin-top:0.75rem"></div>
 </form>

@@ -29,6 +29,8 @@
     </button>
   </header>
 
+  <%- include('partials/budget-notifications', { budgetNotifications: typeof budgetNotifications !== 'undefined' ? budgetNotifications : { alerts: [], hasAlerts: false }, showBudgetAlertsEmpty: true }) %>
+
   <div class="spb-page__body">
 
   <section class="spb-summary">
@@ -49,13 +51,14 @@
   <section class="spb-cards" aria-label="Category budgets">
     <div class="spb-cards__grid">
       <% categoryRows.forEach(function(row) {
-        var cardClass = row.overspent ? 'spb-card--overspent' : (row.showWarning && row.statusKey === 'warning' ? 'spb-card--warning' : '');
+        var isBudgetDanger = row.overspent || row.statusKey === 'reached';
+        var cardClass = row.overspent ? 'spb-card--overspent' : (isBudgetDanger ? 'spb-card--overspent' : (row.showWarning && row.statusKey === 'warning' ? 'spb-card--warning' : ''));
         var ringR = 29;
         var ringC = 2 * Math.PI * ringR;
         var ringPct = Math.min(Math.max(row.usedPct || 0, 0), 100);
         var ringOffset = ringC * (1 - ringPct / 100);
-        var ringFillClass = row.overspent ? 'spb-ring__fill--danger' : (row.showWarning && row.statusKey === 'warning' ? 'spb-ring__fill--warning' : 'spb-ring__fill--default');
-        var ringWrapClass = row.overspent ? ' spb-card__ring-wrap--alert' : (row.showWarning && row.statusKey === 'warning' ? ' spb-card__ring-wrap--warning' : '');
+        var ringFillClass = isBudgetDanger ? 'spb-ring__fill--danger' : (row.showWarning && row.statusKey === 'warning' ? 'spb-ring__fill--warning' : 'spb-ring__fill--default');
+        var ringWrapClass = isBudgetDanger ? ' spb-card__ring-wrap--alert' : (row.showWarning && row.statusKey === 'warning' ? ' spb-card__ring-wrap--warning' : '');
       %>
       <a href="/budget/categories/<%= row.categoryId %>?month=<%= budgetMonth %>" class="spb-card <%= cardClass %>">
         <div class="spb-card__ring-wrap<%= ringWrapClass %>">
@@ -89,13 +92,14 @@
 
   <% if (overallBudgetSection) {
     var overallRow = overallBudgetSection.card;
-    var overallCardClass = overallRow.overspent ? 'spb-card--overspent' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? 'spb-card--warning' : '');
+    var overallIsDanger = overallRow.overspent || overallRow.statusKey === 'reached';
+    var overallCardClass = overallRow.overspent ? 'spb-card--overspent' : (overallIsDanger ? 'spb-card--overspent' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? 'spb-card--warning' : ''));
     var overallRingR = 29;
     var overallRingC = 2 * Math.PI * overallRingR;
     var overallRingPct = Math.min(Math.max(overallRow.usedPct || 0, 0), 100);
     var overallRingOffset = overallRingC * (1 - overallRingPct / 100);
-    var overallRingFillClass = overallRow.overspent ? 'spb-ring__fill--danger' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? 'spb-ring__fill--warning' : 'spb-ring__fill--default');
-    var overallRingWrapClass = overallRow.overspent ? ' spb-card__ring-wrap--alert' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? ' spb-card__ring-wrap--warning' : '');
+    var overallRingFillClass = overallIsDanger ? 'spb-ring__fill--danger' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? 'spb-ring__fill--warning' : 'spb-ring__fill--default');
+    var overallRingWrapClass = overallIsDanger ? ' spb-card__ring-wrap--alert' : (overallRow.showWarning && overallRow.statusKey === 'warning' ? ' spb-card__ring-wrap--warning' : '');
   %>
   <section class="spb-summary spb-summary--overall">
     <h2 class="spb-summary__title">All Categories Budget &bull; <strong><%= formatMoney(overallBudgetSection.spent) %></strong></h2>
@@ -155,5 +159,7 @@
 <script src="/js/category-colours.js"></script>
 <script src="/js/modal-scroll.js?v=3"></script>
 <script src="/js/budget.js?v=27"></script>
+<script src="/js/budget-notifications.js?v=9"></script>
+<script src="/js/budget-notifications-ui.js?v=8"></script>
 
 <%- include('partials/footer') %>

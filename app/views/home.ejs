@@ -229,15 +229,13 @@
       </article>
     </div>
 
-    <% if (summary.alert.type !== 'safe') { %>
-    <div class="alert-strip alert-strip--<%= summary.alert.type === 'warning' ? 'warning' : 'danger' %>">
-      <strong><%= summary.statusLabel %>:</strong> <%= summary.alert.message %>
-    </div>
-    <% } %>
+    <%- include('partials/budget-notifications', { budgetNotifications: typeof budgetNotifications !== 'undefined' ? budgetNotifications : { alerts: [], hasAlerts: false } }) %>
   </section>
 
 </div>
 
+<script src="/js/budget-notifications.js?v=9"></script>
+<script src="/js/budget-notifications-ui.js?v=8"></script>
 <script src="/js/homepage.js"></script>
 
 <%- include('partials/footer') %>

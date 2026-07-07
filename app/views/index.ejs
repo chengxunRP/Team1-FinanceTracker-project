@@ -14,6 +14,8 @@
     </button>
   </section>
 
+  <%- include('partials/budget-notifications', { budgetNotifications: typeof budgetNotifications !== 'undefined' ? budgetNotifications : { alerts: [], hasAlerts: false }, showBudgetAlertsEmpty: true, budgetNotificationsId: 'dashBudgetAlerts' }) %>
+
   <section class="dash-summary-row" aria-label="Summary">
     <a href="/budget" class="dash-card dash-stat-card dash-card--clickable" aria-label="Monthly Budget - open Budget Alerts">
       <div class="dash-stat-top">
@@ -220,6 +222,8 @@
 </div>
 
 <script id="dashData" type="application/json"><%- JSON.stringify(typeof dashboardPayload !== 'undefined' ? dashboardPayload : { selectedMonth: budgetMonth || '', monthOrder: [], months: {}, categoryMeta: {} }) %></script>
-<script src="/js/dashboard.js?v=5"></script>
+<script src="/js/budget-notifications.js?v=9"></script>
+<script src="/js/budget-notifications-ui.js?v=8"></script>
+<script src="/js/dashboard.js?v=8"></script>
 
 <%- include('partials/footer') %>

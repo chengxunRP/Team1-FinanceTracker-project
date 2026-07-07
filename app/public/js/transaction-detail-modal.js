@@ -54,6 +54,18 @@
     return el.getAttribute("data-" + name) || "";
   }
 
+  function applyBudgetAlertDismissReset(meta) {
+    if (
+      window.SpendWiseBudgetNotificationDismiss &&
+      typeof window.SpendWiseBudgetNotificationDismiss
+        .applyBudgetAlertResetFromMeta === "function"
+    ) {
+      window.SpendWiseBudgetNotificationDismiss.applyBudgetAlertResetFromMeta(
+        meta
+      );
+    }
+  }
+
   function parseJsonResponse(response) {
     var contentType = response.headers.get("content-type") || "";
     if (contentType.indexOf("application/json") === -1) {
@@ -302,6 +314,9 @@
       })
       .then(function (data) {
         var saved = !!data.isExcludedFromBudget;
+        if (data.budgetAlertReset) {
+          applyBudgetAlertDismissReset(data.budgetAlertReset);
+        }
         setDontCountToggle(saved);
         syncDontCountToTrigger(saved);
         if (currentExpenseSnapshot) {
@@ -315,6 +330,7 @@
               isExcludedFromBudget: saved,
               isExcludedFromAllBudget: saved,
               fieldsChanged: ["isExcludedFromBudget", "isExcludedFromAllBudget"],
+              budgetAlertReset: data.budgetAlertReset || null,
             },
           })
         );
@@ -346,7 +362,10 @@
       .then(function (response) {
         return parseJsonResponse(response);
       })
-      .then(function () {
+      .then(function (data) {
+        if (data && data.budgetAlertReset) {
+          applyBudgetAlertDismissReset(data.budgetAlertReset);
+        }
         var triggersBefore = getVisibleTransactionTriggers();
         var indexBefore = findTriggerIndex(
           triggersBefore,
@@ -477,13 +496,13 @@
     if (expenseRow) {
       var pill = expenseRow.querySelector(".expense-cat-pill");
       if (pill) {
-        var nameEl = pill.querySelector(".spb-category-item__name");
+        var nameEl = pill.querySelector(".expense-cat-pill__name");
         if (nameEl) {
-          nameEl.textContent = expense.categoryName || "";
+          nameEl.textContent = expense.categoryName || "Uncategorized";
         } else {
           var textNodes = pill.childNodes;
           if (textNodes.length) {
-            pill.lastChild.textContent = " " + (expense.categoryName || "");
+            pill.lastChild.textContent = " " + (expense.categoryName || "Uncategorized");
           }
         }
       }
@@ -552,7 +571,7 @@
       expenseId: currentExpenseId,
       categoryId: snapshot ? snapshot.categoryId : readData(currentTrigger, "category-id"),
       budgetMonth: page.budgetMonth || (snapshot ? snapshot.date.slice(0, 7) : ""),
-      onSaved: function (expense, previous) {
+      onSaved: function (expense, previous, saveResult) {
         if (!expense) return;
 
         var previousSnapshot = previous || snapshot || {};
@@ -586,19 +605,26 @@
             amount: snapshot ? snapshot.amount : expense.amount,
             date: snapshot ? snapshot.date : expense.date,
           },
-          ["category"]
+          ["category"],
+          saveResult && saveResult.budgetAlertReset
+            ? saveResult.budgetAlertReset
+            : null
         );
       },
     });
   }
 
-  function dispatchExpenseUpdated(expense, previous, fieldsChanged) {
+  function dispatchExpenseUpdated(expense, previous, fieldsChanged, budgetAlertReset) {
+    if (budgetAlertReset) {
+      applyBudgetAlertDismissReset(budgetAlertReset);
+    }
     document.dispatchEvent(
       new CustomEvent("sw-expense-updated", {
         detail: {
           expense: expense,
           previous: previous,
           fieldsChanged: fieldsChanged || [],
+          budgetAlertReset: budgetAlertReset || null,
         },
       })
     );
@@ -951,7 +977,12 @@
 
         applyExpenseToPopup(expense);
         syncTriggerFromExpense(expense);
-        dispatchExpenseUpdated(expense, previous, [activeFieldEdit]);
+        dispatchExpenseUpdated(
+          expense,
+          previous,
+          [activeFieldEdit],
+          data.budgetAlertReset || null
+        );
         closeFieldEditModal();
       })
       .catch(function (error) {

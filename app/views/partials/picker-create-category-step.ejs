@@ -1,0 +1,42 @@
+<%
+  var pccPrefix = (typeof pickerPrefix !== 'undefined' && pickerPrefix) ? pickerPrefix : 'expense';
+%>
+<div class="spb-modal__body spb-modal__body--create pocketguard-style-modal-body" id="<%= pccPrefix %>CreateCategoryStep" hidden>
+  <header class="spb-modal__header spb-modal__header--step">
+    <button type="button" class="spb-modal__back" id="<%= pccPrefix %>BackFromCreateCategory" aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h2 class="spb-modal__title">Create category</h2>
+    <button type="button" class="spb-modal__close" id="<%= pccPrefix %>CloseCreateCategory" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+
+  <div class="spb-create-category">
+    <button type="button" class="spb-colour-preview-btn" id="<%= pccPrefix %>OpenChooseColourCreate" aria-label="Choose colour">
+      <span class="spb-colour-preview" id="<%= pccPrefix %>NewCategoryColourCircle" aria-hidden="true"></span>
+      <span class="spb-colour-preview-label">Choose colour</span>
+    </button>
+    <input type="hidden" id="<%= pccPrefix %>NewCategoryColor" value="">
+
+    <input type="text" id="<%= pccPrefix %>NewCategoryName" class="spb-create-category__name" placeholder="Enter name" autocomplete="off" maxlength="100">
+
+    <aside class="spb-protip spb-protip--create">
+      <span class="spb-protip__label">PRO TIP:</span>
+      Use custom categories to track things you buy regularly. To track spending for holidays, events or trips try using #hashtags.
+    </aside>
+
+    <div class="spb-create-category__upload">
+      <label class="spb-create-category__upload-label" for="<%= pccPrefix %>NewCategoryIcon">Optional icon image</label>
+      <input type="file" id="<%= pccPrefix %>NewCategoryIcon" accept=".png,.jpg,.jpeg,.webp" class="spb-create-category__file">
+    </div>
+
+    <p class="spb-form-error" id="<%= pccPrefix %>CreateCategoryError" hidden></p>
+    <p class="spb-form-success" id="<%= pccPrefix %>CreateCategorySuccess" hidden></p>
+
+    <div class="spb-create-category__footer">
+      <button type="button" class="spb-create-category__cancel" id="<%= pccPrefix %>CancelCreateCategory">Cancel</button>
+      <button type="button" class="spb-btn spb-btn--save" id="<%= pccPrefix %>SaveCreateCategory">Save</button>
+    </div>
+  </div>
+</div>

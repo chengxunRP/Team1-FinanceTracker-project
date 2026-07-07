@@ -30,6 +30,8 @@ const {
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
 const financeHelpers = require("./financeHelpers");
+const { buildBudgetNotifications } = require("./budgetNotificationService");
+const { scheduleBudgetAlertCheck } = require("./budgetAlertEmailService");
 const { getCategoryImageUrl, getCategoryVisual } = require("./categoryImageHelpers");
 const {
   getTodayDateString,
@@ -113,6 +115,31 @@ app.use("/budget", requireLogin);
 app.use("/chatbot", requireLogin);
 app.use("/savings-goals", requireLogin);
 
+function triggerBudgetAlertEmail(req, budgetMonth, affectedCategoryId) {
+  const userId = getCurrentUserId(req);
+  const month = budgetMonth
+    ? budgetStore.normalizeBudgetMonth(budgetMonth)
+    : budgetStore.getCurrentBudgetMonth();
+  const route = req.originalUrl || req.path || null;
+
+  console.log("[BudgetEmail] mutation trigger", {
+    route,
+    userId: userId || null,
+    affectedMonth: month,
+    affectedCategoryId: affectedCategoryId || null,
+  });
+
+  if (!userId) {
+    console.log("[BudgetEmail] skip schedule: no userId");
+    return;
+  }
+
+  scheduleBudgetAlertCheck(userId, month, {
+    route,
+    affectedCategoryId: affectedCategoryId || null,
+  });
+}
+
 async function getBudgetPageData(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()
@@ -184,6 +211,12 @@ async function getBudgetPageData(budgetMonth) {
     categories,
     spendingByCategoryId
   );
+  const overallBudgetSection = await budgetStore.getOverallBudgetSectionData(month);
+  const budgetNotifications = buildBudgetNotifications(
+    categoryRows,
+    overallBudgetSection,
+    month
+  );
 
   return {
     summary,
@@ -204,6 +237,8 @@ async function getBudgetPageData(budgetMonth) {
     categories,
     spendingByCategoryId,
     actualSpendingByCategoryId,
+    overallBudgetSection,
+    budgetNotifications,
   };
 }
 
@@ -261,6 +296,7 @@ async function renderOverviewPage(req, res) {
         ? selectedMonthData.expenseCount
         : pageData.monthExpenseCount,
       dashboardPayload,
+      budgetNotifications: pageData.budgetNotifications,
     });
   } catch (error) {
     console.error("Database error loading overview/dashboard:", error);
@@ -281,6 +317,7 @@ async function renderOverviewPage(req, res) {
         months: {},
         categoryMeta: {},
       },
+      budgetNotifications: { alerts: [], hasAlerts: false },
     });
   }
 }
@@ -292,14 +329,20 @@ app.get("/home", async (req, res) => {
   try {
     const currentUserId = getCurrentUserId(req);
     let summary = buildBudgetSummary(0, [], 0);
+    let budgetNotifications = { alerts: [], hasAlerts: false };
+    let budgetMonth = budgetStore.getCurrentBudgetMonth();
     if (currentUserId) {
       const pageData = await getBudgetPageData();
       summary = pageData.summary;
+      budgetNotifications = pageData.budgetNotifications;
+      budgetMonth = pageData.budgetMonth;
     }
     res.render("home", {
       pageTitle: "Home",
       activePage: "landing",
       summary,
+      budgetMonth,
+      budgetNotifications: budgetNotifications || { alerts: [], hasAlerts: false },
     });
   } catch (error) {
     console.error("Database error loading home:", error);
@@ -307,6 +350,8 @@ app.get("/home", async (req, res) => {
       pageTitle: "Home",
       activePage: "landing",
       summary: buildBudgetSummary(0, []),
+      budgetMonth: budgetStore.getCurrentBudgetMonth(),
+      budgetNotifications: { alerts: [], hasAlerts: false },
     });
   }
 });
@@ -435,24 +480,17 @@ app.post("/recommendation", requireLogin, async (req, res) => {
 });
 
 app.get("/budget", async (req, res) => {
-  const currentUserId = getCurrentUserId(req);
-  console.log("Current user:", req.session);
-  console.log("Current user id:", currentUserId);
   try {
     const selectedMonth = budgetStore.normalizeBudgetMonth(
       req.query.month || budgetStore.getCurrentBudgetMonth()
     );
-    const [pageData, overallBudgetSection] = await Promise.all([
-      getBudgetPageData(selectedMonth),
-      budgetStore.getOverallBudgetSectionData(selectedMonth),
-    ]);
+    const pageData = await getBudgetPageData(selectedMonth);
     const successMessage =
       req.query.saved === "1" ? "Budgets saved successfully." : "";
     res.render("budget", {
       pageTitle: "Spending & Budgets",
       activePage: "budget",
       ...pageData,
-      overallBudgetSection,
       errors: [],
       successMessage,
     });
@@ -469,6 +507,7 @@ app.get("/budget", async (req, res) => {
       categorySetupRows: [],
       monthExpenseCount: 0,
       overallBudgetSection: null,
+      budgetNotifications: { alerts: [], hasAlerts: false },
       budgetMonth: budgetStore.getCurrentBudgetMonth(),
       budgetMonthLabel: budgetStore.formatBudgetMonthLabel(
         budgetStore.getCurrentBudgetMonth()
@@ -497,6 +536,7 @@ app.post("/budget", async (req, res) => {
     }
 
     await budgetStore.setMonthlyBudget(validation.budget);
+    triggerBudgetAlertEmail(req, budgetMonth);
     const updated = await getBudgetPageData(budgetMonth);
 
     res.render("budget", {
@@ -550,6 +590,7 @@ app.post("/budget/categories", async (req, res) => {
     });
 
     await budgetStore.setCategoryBudgets(budgetMonth, budgetsByCategoryId);
+    triggerBudgetAlertEmail(req, budgetMonth);
     const updated = await getBudgetPageData(budgetMonth);
 
     res.render("budget", {
@@ -663,6 +704,7 @@ app.post("/budget/setup", async (req, res) => {
     if (Object.keys(budgetsByCategoryId).length > 0) {
       await budgetStore.setCategoryBudgets(budgetMonth, budgetsByCategoryId);
     }
+    triggerBudgetAlertEmail(req, budgetMonth);
 
     res.redirect(`/budget?month=${encodeURIComponent(budgetMonth)}&saved=1`);
   } catch (error) {
@@ -712,7 +754,12 @@ app.post("/budget/add", async (req, res) => {
       return res.status(400).json({ errors: ["Category not found."] });
     }
 
-    const existing = await budgetStore.getActiveBudgetForCategory(categoryId);
+    const selectedMonth = budgetStore.normalizeBudgetMonth(budgetMonth);
+    const existing = await budgetStore.getVisibleBudgetForCategory(
+      categoryId,
+      selectedMonth,
+      categories
+    );
     if (existing) {
       return res.status(400).json({
         errors: [
@@ -724,8 +771,11 @@ app.post("/budget/add", async (req, res) => {
     await budgetStore.createCategoryBudget(
       categoryId,
       validation.budget,
-      Boolean(rolloverEnabled)
+      Boolean(rolloverEnabled),
+      selectedMonth,
+      categories
     );
+    triggerBudgetAlertEmail(req, selectedMonth);
     res.json({
       success: true,
       redirect: `/budget?month=${encodeURIComponent(budgetMonth)}&saved=1`,
@@ -752,6 +802,7 @@ app.post("/budget/add-overall", async (req, res) => {
       validation.budget,
       Boolean(rolloverEnabled)
     );
+    triggerBudgetAlertEmail(req);
 
     const redirect = monthFromUrl
       ? `/budget?month=${encodeURIComponent(
@@ -772,6 +823,7 @@ app.delete("/budget/categories/:id", async (req, res) => {
 
   try {
     await budgetStore.deleteCategoryBudget(categoryId, budgetMonth);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.json({ success: true, redirect: `/budget?month=${encodeURIComponent(budgetMonth)}&saved=1` });
   } catch (error) {
     console.error("Database error deleting category budget:", error);
@@ -904,6 +956,7 @@ app.post("/budget/all-categories", async (req, res) => {
 
   try {
     await budgetStore.updateOverallMonthlyBudgetAmount(validation.budget);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.json({
       success: true,
       redirect: `/budget/all-categories?month=${encodeURIComponent(budgetMonth)}&saved=1`,
@@ -925,6 +978,7 @@ app.delete("/budget/all-categories", async (req, res) => {
 
   try {
     await budgetStore.deactivateOverallMonthlyBudget();
+    triggerBudgetAlertEmail(req, budgetMonth);
     const redirect = budgetMonth
       ? `/budget?month=${encodeURIComponent(budgetMonth)}`
       : "/budget";
@@ -942,6 +996,7 @@ app.post("/budget/all-categories/enable-rollover", async (req, res) => {
 
   try {
     await budgetStore.setOverallMonthlyBudgetRollover(true);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
   } catch (error) {
     console.error("Database error enabling all categories budget rollover:", error);
@@ -959,6 +1014,7 @@ app.post("/budget/all-categories/disable-rollover", async (req, res) => {
 
   try {
     await budgetStore.setOverallMonthlyBudgetRollover(false);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
   } catch (error) {
     console.error("Database error disabling all categories budget rollover:", error);
@@ -976,6 +1032,7 @@ app.post("/budget/all-categories/reset-rollover", async (req, res) => {
 
   try {
     await budgetStore.resetOverallRolloverForMonth(budgetMonth);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
   } catch (error) {
     console.error("Database error resetting all categories budget rollover:", error);
@@ -993,6 +1050,7 @@ app.post("/budget/all-categories/undo-reset-rollover", async (req, res) => {
 
   try {
     await budgetStore.undoOverallResetRolloverForMonth(budgetMonth);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.redirect(`/budget/all-categories?month=${encodeURIComponent(budgetMonth)}`);
   } catch (error) {
     console.error("Database error undoing all categories budget rollover reset:", error);
@@ -1080,6 +1138,7 @@ app.post("/budget/categories/:id/enable-rollover", async (req, res) => {
 
   try {
     await budgetStore.setCategoryBudgetRollover(categoryId, true);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.redirect(
       `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
     );
@@ -1100,6 +1159,7 @@ app.post("/budget/categories/:id/disable-rollover", async (req, res) => {
 
   try {
     await budgetStore.setCategoryBudgetRollover(categoryId, false);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.redirect(
       `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
     );
@@ -1120,6 +1180,7 @@ app.post("/budget/categories/:id/reset-rollover", async (req, res) => {
 
   try {
     await budgetStore.resetRolloverForMonth(categoryId, budgetMonth);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.redirect(
       `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
     );
@@ -1142,6 +1203,7 @@ app.post("/budget/categories/:id/undo-reset-rollover", async (req, res) => {
 
   try {
     await budgetStore.undoResetRolloverForMonth(categoryId, budgetMonth);
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.redirect(
       `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}`
     );
@@ -1172,6 +1234,7 @@ app.post("/budget/categories/:id", async (req, res) => {
       validation.budget,
       rolloverEnabled === undefined ? undefined : Boolean(rolloverEnabled)
     );
+    triggerBudgetAlertEmail(req, budgetMonth);
     res.json({
       success: true,
       redirect: `/budget/categories/${categoryId}?month=${encodeURIComponent(budgetMonth)}&saved=1`,

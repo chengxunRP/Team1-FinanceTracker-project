@@ -2,6 +2,7 @@ const db = require("./config/db");
 const {
   getCategoryBudgetStatus,
   getCategoryStatusMessage,
+  getBudgetUsageState,
   isExpenseCountedForBudget,
   isExpenseCountedForAllBudget,
 } = require("./budgetHelpers");
@@ -239,6 +240,161 @@ async function getActiveBudgetForCategory(categoryId) {
   return budgets.find((b) => String(b.categoryId) === String(categoryId)) || null;
 }
 
+/** Logged-in user's budget row for a category (any is_active), excluding user_id NULL legacy rows. */
+async function getOwnedCategoryBudget(categoryId) {
+  const isRecurring = await usesRecurringBudgetSchema();
+  if (!isRecurring) {
+    const budgets = await getCategoryBudgetsLegacy(getCurrentBudgetMonth());
+    return budgets.find((b) => String(b.categoryId) === String(categoryId)) || null;
+  }
+
+  const userId = requireUserId();
+  const [rows] = await db.query(
+    `SELECT
+      id AS budgetId,
+      category_id AS categoryId,
+      CAST(budget_limit AS DECIMAL(10,2)) AS budgetLimit,
+      budget_month AS budgetMonth,
+      rollover_enabled AS rolloverEnabled,
+      is_active AS isActive,
+      created_at AS createdAt
+    FROM category_budgets
+    WHERE category_id = ? AND user_id = ?
+    ORDER BY is_active DESC, id DESC
+    LIMIT 1`,
+    [Number(categoryId), userId]
+  );
+
+  return rows.length ? mapBudgetRow(rows[0]) : null;
+}
+
+/** Matches Spending & Budgets card visibility for the selected month. */
+async function getVisibleBudgetForCategory(categoryId, budgetMonth, categories) {
+  const budget = await getActiveBudgetForCategory(categoryId);
+  if (!budget) return null;
+
+  const month = normalizeBudgetMonth(budgetMonth || getCurrentBudgetMonth());
+  if (!isBudgetActiveForMonth(budget, month)) return null;
+
+  if (categories && categories.length) {
+    const cat = categories.find(
+      (c) => String(c.id) === String(categoryId)
+    );
+    if (!cat) return null;
+  }
+
+  return budget;
+}
+
+async function findCategoryBudgetRowsForCategory(categoryId) {
+  const [rows] = await db.query(
+    `SELECT
+      id,
+      category_id AS categoryId,
+      CAST(budget_limit AS DECIMAL(10,2)) AS budgetLimit,
+      budget_month AS budgetMonth,
+      rollover_enabled AS rolloverEnabled,
+      is_active AS isActive,
+      user_id AS userId,
+      created_at AS createdAt
+    FROM category_budgets
+    WHERE category_id = ?`,
+    [Number(categoryId)]
+  );
+  return rows;
+}
+
+/**
+ * Reuse or claim an existing category_budgets row for the logged-in user before INSERT.
+ * Returns true when the row was updated/claimed (no INSERT needed).
+ */
+async function prepareCategoryBudgetSlot(
+  categoryId,
+  amount,
+  rolloverEnabled,
+  budgetMonth
+) {
+  const userId = requireUserId();
+  const month = normalizeBudgetMonth(budgetMonth || getCurrentBudgetMonth());
+  const rows = await findCategoryBudgetRowsForCategory(categoryId);
+
+  const ownRow = rows.find(
+    (row) => row.userId != null && Number(row.userId) === Number(userId)
+  );
+  if (ownRow) {
+    const budget = mapBudgetRow(ownRow);
+    const resetStartMonth =
+      !budget.isActive || !isBudgetActiveForMonth(budget, month);
+    await reactivateCategoryBudget(
+      categoryId,
+      amount,
+      rolloverEnabled,
+      resetStartMonth
+    );
+    return true;
+  }
+
+  const legacyRow = rows.find((row) => row.userId == null);
+  if (legacyRow) {
+    return claimLegacyCategoryBudgetRow(categoryId, amount, rolloverEnabled);
+  }
+
+  return false;
+}
+
+function throwDuplicateCategoryBudgetError() {
+  const err = new Error(
+    "This category already has an active budget. Edit the existing budget instead."
+  );
+  err.code = "DUPLICATE";
+  throw err;
+}
+
+async function reactivateCategoryBudget(
+  categoryId,
+  amount,
+  rolloverEnabled,
+  resetStartMonth
+) {
+  const userId = requireUserId();
+  let sql = `UPDATE category_budgets
+    SET budget_limit = ?, rollover_enabled = ?, is_active = 1, budget_month = ?`;
+  const params = [amount, rolloverEnabled ? 1 : 0, getCurrentBudgetMonth()];
+
+  if (resetStartMonth) {
+    sql += `, created_at = CURRENT_TIMESTAMP`;
+  }
+
+  sql += ` WHERE category_id = ? AND user_id = ?`;
+  params.push(Number(categoryId), userId);
+
+  await db.query(sql, params);
+}
+
+async function claimLegacyCategoryBudgetRow(categoryId, amount, rolloverEnabled) {
+  const userId = requireUserId();
+  const [result] = await db.query(
+    `UPDATE category_budgets
+     SET user_id = ?,
+         budget_limit = ?,
+         rollover_enabled = ?,
+         is_active = 1,
+         budget_month = ?,
+         created_at = CURRENT_TIMESTAMP
+     WHERE category_id = ? AND user_id IS NULL
+     LIMIT 1`,
+    [
+      userId,
+      amount,
+      rolloverEnabled ? 1 : 0,
+      getCurrentBudgetMonth(),
+      Number(categoryId),
+    ]
+  );
+
+  return result.affectedRows > 0;
+}
+
 function getCategoryBudgetStartMonth(budgetEntry) {
   if (!budgetEntry) return getCurrentBudgetMonth();
   if (budgetEntry.startMonth) {
@@ -347,18 +503,19 @@ function computeRolloverAmount(
 function buildBudgetAmounts(baseBudget, actual, rolloverEnabled, rolloverAmount) {
   const rollover = rolloverEnabled ? Number(rolloverAmount || 0) : 0;
   const availableBudget = Number(baseBudget) + rollover;
-  const remaining = availableBudget - Number(actual || 0);
-  const usedPct =
-    availableBudget > 0 ? Math.round((Number(actual || 0) / availableBudget) * 100) : 0;
+  const actualNum = Number(actual || 0);
+  const usage = getBudgetUsageState(actualNum, availableBudget);
+  const remaining = (usage.budgetCents - usage.spentCents) / 100;
 
   return {
     baseBudget: Number(baseBudget),
     rollover,
     availableBudget,
-    actual: Number(actual || 0),
+    actual: actualNum,
     remaining,
-    usedPct,
-    overspent: remaining < 0,
+    usedPct: usage.usedPct,
+    overspent: usage.state === "exceeded",
+    budgetReached: usage.state === "reached",
   };
 }
 
@@ -463,7 +620,8 @@ function calculateOverallBudgetForMonth(
   const availableBudget = rolloverEnabled
     ? baseBudget + rolledOverFromLastMonth
     : baseBudget;
-  const leftToSpend = availableBudget - currentMonthSpent;
+  const usage = getBudgetUsageState(currentMonthSpent, availableBudget);
+  const leftToSpend = (usage.budgetCents - usage.spentCents) / 100;
 
   return {
     baseBudget,
@@ -471,7 +629,8 @@ function calculateOverallBudgetForMonth(
     rolledOverFromLastMonth: rolloverEnabled ? rolledOverFromLastMonth : 0,
     availableBudget,
     leftToSpend,
-    isOverspent: leftToSpend < 0,
+    isOverspent: usage.state === "exceeded",
+    budgetReached: usage.state === "reached",
     rolloverEnabled,
   };
 }
@@ -481,7 +640,7 @@ function mapOverallBudgetCalculation(calc) {
     calc.availableBudget > 0
       ? Math.round((calc.currentMonthSpent / calc.availableBudget) * 100)
       : 0;
-  const status = getCategoryBudgetStatus(usedPct);
+  const status = getCategoryBudgetStatus(calc.currentMonthSpent, calc.availableBudget);
 
   return {
     budgeted: calc.baseBudget,
@@ -492,8 +651,9 @@ function mapOverallBudgetCalculation(calc) {
     remaining: calc.leftToSpend,
     usedPct,
     overspent: calc.isOverspent,
+    budgetReached: calc.budgetReached,
     overspentAmount: calc.isOverspent ? Math.abs(calc.leftToSpend) : 0,
-    statusMessage: getCategoryStatusMessage(calc.leftToSpend),
+    statusMessage: getCategoryStatusMessage(calc.leftToSpend, calc.currentMonthSpent, calc.availableBudget),
     statusKey: status.key,
     statusBarClass: status.barClass,
     statusBadgeClass: status.badgeClass,
@@ -502,19 +662,26 @@ function mapOverallBudgetCalculation(calc) {
   };
 }
 
-async function createCategoryBudget(categoryId, amount, rolloverEnabled = false) {
-  const existing = await getActiveBudgetForCategory(categoryId);
-  if (existing) {
-    const err = new Error(
-      "This category already has an active budget. Edit the existing budget instead."
-    );
-    err.code = "DUPLICATE";
-    throw err;
+async function createCategoryBudget(
+  categoryId,
+  amount,
+  rolloverEnabled = false,
+  budgetMonth,
+  categories
+) {
+  const month = normalizeBudgetMonth(budgetMonth || getCurrentBudgetMonth());
+
+  if (await getVisibleBudgetForCategory(categoryId, month, categories)) {
+    throwDuplicateCategoryBudgetError();
+  }
+
+  if (await prepareCategoryBudgetSlot(categoryId, amount, rolloverEnabled, month)) {
+    return;
   }
 
   const isRecurring = await usesRecurringBudgetSchema();
   if (!isRecurring) {
-    return setCategoryBudget(categoryId, getCurrentBudgetMonth(), amount);
+    return setCategoryBudget(categoryId, month, amount);
   }
 
   try {
@@ -538,11 +705,22 @@ async function createCategoryBudget(categoryId, amount, rolloverEnabled = false)
     );
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
-      const dupErr = new Error(
-        "This category already has an active budget. Edit the existing budget instead."
-      );
-      dupErr.code = "DUPLICATE";
-      throw dupErr;
+      if (
+        await prepareCategoryBudgetSlot(
+          categoryId,
+          amount,
+          rolloverEnabled,
+          month
+        )
+      ) {
+        return;
+      }
+
+      if (await getVisibleBudgetForCategory(categoryId, month, categories)) {
+        throwDuplicateCategoryBudgetError();
+      }
+
+      throwDuplicateCategoryBudgetError();
     }
     throw error;
   }
@@ -996,7 +1174,7 @@ async function getBudgetRows(budgetMonth, categories, spendingByCategoryId) {
         budgetEntry.rolloverEnabled,
         rollover
       );
-      const status = getCategoryBudgetStatus(amounts.usedPct);
+      const status = getCategoryBudgetStatus(amounts.actual, amounts.availableBudget);
 
       return {
         categoryId: cat.id,
@@ -1014,7 +1192,12 @@ async function getBudgetRows(budgetMonth, categories, spendingByCategoryId) {
         remaining: amounts.remaining,
         usedPct: amounts.usedPct,
         overspent: amounts.overspent,
-        statusMessage: getCategoryStatusMessage(amounts.remaining),
+        budgetReached: amounts.budgetReached,
+        statusMessage: getCategoryStatusMessage(
+          amounts.remaining,
+          amounts.actual,
+          amounts.availableBudget
+        ),
         statusLabel: status.label,
         statusKey: status.key,
         statusBarClass: status.barClass,
@@ -1651,7 +1834,7 @@ async function getCategoryDetailData(categoryId, budgetMonth, spendingByCategory
     budgetEntry.rolloverEnabled,
     rollover
   );
-  const status = getCategoryBudgetStatus(amounts.usedPct);
+  const status = getCategoryBudgetStatus(amounts.actual, amounts.availableBudget);
 
   const [allExpenses, chart] = await Promise.all([
     getCategoryExpensesAllFromDb(categoryId),
@@ -1690,8 +1873,13 @@ async function getCategoryDetailData(categoryId, budgetMonth, spendingByCategory
     remaining: amounts.remaining,
     usedPct: amounts.usedPct,
     overspent: amounts.overspent,
-    overspentAmount: amounts.remaining < 0 ? Math.abs(amounts.remaining) : 0,
-    statusMessage: getCategoryStatusMessage(amounts.remaining),
+    budgetReached: amounts.budgetReached,
+    overspentAmount: amounts.overspent ? Math.abs(amounts.remaining) : 0,
+    statusMessage: getCategoryStatusMessage(
+      amounts.remaining,
+      amounts.actual,
+      amounts.availableBudget
+    ),
     statusKey: status.key,
     statusBarClass: status.barClass,
     statusBadgeClass: status.badgeClass,
@@ -2061,6 +2249,8 @@ module.exports = {
   getCategoryBudgets,
   getActiveCategoryBudgets,
   getActiveBudgetForCategory,
+  getOwnedCategoryBudget,
+  getVisibleBudgetForCategory,
   createCategoryBudget,
   updateCategoryBudget,
   setCategoryBudgetRollover,

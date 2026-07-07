@@ -12,10 +12,30 @@
     try {
       pageData = JSON.parse(el.textContent);
       isOverallBudget = pageData.budgetType === "overall";
+      selectedMonth = getInitialSelectedMonth();
     } catch (e) {
       pageData = {};
       isOverallBudget = false;
+      selectedMonth = null;
     }
+  }
+
+  function getInitialSelectedMonth() {
+    try {
+      var url = new URL(window.location.href);
+      var monthFromQuery = (url.searchParams.get("month") || "").trim();
+      if (/^\d{4}-\d{2}$/.test(monthFromQuery)) {
+        return monthFromQuery;
+      }
+    } catch (e) {
+      // Ignore URL parsing errors and use fallback month below.
+    }
+
+    if (pageData && /^\d{4}-\d{2}$/.test(String(pageData.budgetMonth || ""))) {
+      return String(pageData.budgetMonth);
+    }
+
+    return null;
   }
 
   function formatMoney(value) {

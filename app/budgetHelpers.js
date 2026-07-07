@@ -51,19 +51,98 @@ function calculateRemainingBudget(monthlyBudget, totalSpent) {
   return monthlyBudget - totalSpent;
 }
 
-function getStatus(percentageUsed) {
-  if (percentageUsed >= 100) {
+function toBudgetCents(value) {
+  return Math.round((Number(value) || 0) * 100);
+}
+
+function getBudgetUsageState(spent, budget) {
+  const spentCents = toBudgetCents(spent);
+  const budgetCents = toBudgetCents(budget);
+
+  if (budgetCents <= 0) {
+    return {
+      state: "safe",
+      usedPct: 0,
+      spentCents,
+      budgetCents,
+    };
+  }
+
+  const usedPct = Math.round((spentCents / budgetCents) * 100);
+
+  if (spentCents > budgetCents) {
+    return { state: "exceeded", usedPct, spentCents, budgetCents };
+  }
+  if (spentCents === budgetCents) {
+    return { state: "reached", usedPct, spentCents, budgetCents };
+  }
+  if (usedPct >= 80) {
+    return { state: "warning", usedPct, spentCents, budgetCents };
+  }
+  return { state: "safe", usedPct, spentCents, budgetCents };
+}
+
+function getStatus(percentageUsed, totalSpent, monthlyBudget) {
+  if (totalSpent !== undefined && monthlyBudget !== undefined) {
+    const usage = getBudgetUsageState(totalSpent, monthlyBudget);
+    if (usage.state === "exceeded") {
+      return {
+        label: "Overspending",
+        badge: "danger",
+        type: "overspending",
+        message: "You have exceeded your budget. Review your expenses.",
+        progressClass: "progress-bar__fill--danger",
+      };
+    }
+    if (usage.state === "reached") {
+      return {
+        label: "Budget reached",
+        badge: "danger",
+        type: "reached",
+        message: "You have used all of your budget.",
+        progressClass: "progress-bar__fill--danger",
+      };
+    }
+    if (usage.state === "warning") {
+      return {
+        label: "Warning",
+        badge: "warning",
+        type: "warning",
+        message:
+          "You have used 80% or more of your budget. Consider slowing down spending.",
+        progressClass: "progress-bar__fill--warning",
+      };
+    }
+    return {
+      label: "Safe",
+      badge: "success",
+      type: "safe",
+      message: null,
+      progressClass: "",
+    };
+  }
+
+  const pct = Number(percentageUsed) || 0;
+  if (pct > 100) {
     return {
       label: "Overspending",
       badge: "danger",
       type: "overspending",
-      message:
-        "You have reached or exceeded your budget. Review your expenses.",
+      message: "You have exceeded your budget. Review your expenses.",
+      progressClass: "progress-bar__fill--danger",
+    };
+  }
+  if (pct === 100) {
+    return {
+      label: "Budget reached",
+      badge: "danger",
+      type: "reached",
+      message: "You have used all of your budget.",
       progressClass: "progress-bar__fill--danger",
     };
   }
 
-  if (percentageUsed >= 80) {
+  if (pct >= 80) {
     return {
       label: "Warning",
       badge: "warning",
@@ -83,10 +162,10 @@ function getStatus(percentageUsed) {
   };
 }
 
-function getCategoryBudgetStatus(usedPct) {
-  const pct = Number(usedPct) || 0;
+function getCategoryBudgetStatus(spent, budget) {
+  const usage = getBudgetUsageState(spent, budget);
 
-  if (pct >= 100) {
+  if (usage.state === "exceeded") {
     return {
       label: "Overspent",
       key: "overspent",
@@ -98,19 +177,31 @@ function getCategoryBudgetStatus(usedPct) {
     };
   }
 
-  if (pct >= 80) {
+  if (usage.state === "reached") {
+    return {
+      label: "Budget reached",
+      key: "reached",
+      barClass: "budget-progress--overspent",
+      badgeClass: "budget-badge--overspent",
+      cardClass: "budget-cat-card--overspent",
+      warningMessage: null,
+      showWarning: true,
+    };
+  }
+
+  if (usage.state === "warning") {
     return {
       label: "Warning",
       key: "warning",
       barClass: "budget-progress--near-limit",
       badgeClass: "budget-badge--near-limit",
       cardClass: "budget-cat-card--near-limit",
-      warningMessage: "You've used " + pct + "% of this category budget.",
+      warningMessage: "You've used " + usage.usedPct + "% of this category budget.",
       showWarning: true,
     };
   }
 
-  if (pct >= 70) {
+  if (usage.usedPct >= 70) {
     return {
       label: "Watch",
       key: "watch",
@@ -133,11 +224,28 @@ function getCategoryBudgetStatus(usedPct) {
   };
 }
 
-function getMonthlyHealthStatus(percentageUsed) {
+function getMonthlyHealthStatus(percentageUsed, totalSpent, monthlyBudget) {
+  if (totalSpent !== undefined && monthlyBudget !== undefined) {
+    const usage = getBudgetUsageState(totalSpent, monthlyBudget);
+    if (usage.state === "exceeded") {
+      return { label: "Over budget", key: "danger", helper: "Spending has exceeded your limit" };
+    }
+    if (usage.state === "reached") {
+      return { label: "Budget reached", key: "danger", helper: "You have used all of your budget" };
+    }
+    if (usage.state === "warning") {
+      return { label: "Watch spending", key: "warning", helper: "Approaching your monthly limit" };
+    }
+    return { label: "On track", key: "safe", helper: "Spending is within your budget" };
+  }
+
   const pct = Number(percentageUsed) || 0;
 
-  if (pct >= 100) {
+  if (pct > 100) {
     return { label: "Over budget", key: "danger", helper: "Spending has exceeded your limit" };
+  }
+  if (pct === 100) {
+    return { label: "Budget reached", key: "danger", helper: "You have used all of your budget" };
   }
   if (pct >= 80) {
     return { label: "Watch spending", key: "warning", helper: "Approaching your monthly limit" };
@@ -152,7 +260,7 @@ function buildBudgetSummary(monthlyBudget, expenses, totalSpentOverride) {
       : calculateTotalSpent(expenses);
   const percentageUsed = calculatePercentageUsed(totalSpent, monthlyBudget);
   const remainingBudget = calculateRemainingBudget(monthlyBudget, totalSpent);
-  const status = getStatus(percentageUsed);
+  const status = getStatus(percentageUsed, totalSpent, monthlyBudget);
 
   const progressWidth = Math.min(percentageUsed, 100);
   const progressWidthStep = Math.min(100, Math.round(progressWidth / 5) * 5);
@@ -191,12 +299,29 @@ function validateCategoryBudgetAmount(amount) {
   };
 }
 
-function getCategoryStatusMessage(remaining) {
+function getCategoryStatusMessage(remaining, spent, budget) {
+  if (spent !== undefined && spent !== null && budget !== undefined && budget !== null) {
+    const usage = getBudgetUsageState(spent, budget);
+    if (usage.state === "exceeded") {
+      const overspent = (usage.spentCents - usage.budgetCents) / 100;
+      const text =
+        overspent % 1 === 0
+          ? "$" + overspent.toLocaleString()
+          : "$" + overspent.toFixed(2);
+      return text + " overspent";
+    }
+
+    const left = Math.max((usage.budgetCents - usage.spentCents) / 100, 0);
+    const leftText = left % 1 === 0 ? "$" + left.toLocaleString() : "$" + left.toFixed(2);
+    return leftText + " left to spend";
+  }
+
   const num = Number(remaining) || 0;
 
   if (num < 0) {
     const overspent = Math.abs(num);
-    const text = overspent % 1 === 0 ? "$" + overspent.toLocaleString() : "$" + overspent.toFixed(2);
+    const text =
+      overspent % 1 === 0 ? "$" + overspent.toLocaleString() : "$" + overspent.toFixed(2);
     return text + " overspent";
   }
 
@@ -217,6 +342,8 @@ module.exports = {
   validateCategoryBudgetAmount,
   calculatePercentageUsed,
   calculateRemainingBudget,
+  toBudgetCents,
+  getBudgetUsageState,
   getStatus,
   getCategoryBudgetStatus,
   getMonthlyHealthStatus,

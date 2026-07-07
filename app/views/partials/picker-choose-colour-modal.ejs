@@ -1,0 +1,21 @@
+<%
+  var pccPrefix = (typeof pickerPrefix !== 'undefined' && pickerPrefix) ? pickerPrefix : 'expense';
+%>
+<div class="spb-modal-overlay spb-modal-overlay--nested" id="<%= pccPrefix %>ChooseColourOverlay" hidden>
+  <div class="spb-modal spb-modal--colours" role="dialog" aria-labelledby="<%= pccPrefix %>ChooseColourTitle" aria-modal="true">
+    <header class="spb-modal__header spb-modal__header--step">
+      <button type="button" class="spb-modal__back" id="<%= pccPrefix %>BackFromChooseColour" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h2 class="spb-modal__title" id="<%= pccPrefix %>ChooseColourTitle">Choose a colour</h2>
+      <button type="button" class="spb-modal__close" id="<%= pccPrefix %>CloseChooseColour" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="spb-colour-picker" id="<%= pccPrefix %>ChooseColourBody"></div>
+    <div class="spb-colour-picker__custom">
+      <label class="spb-colour-picker__custom-label" for="<%= pccPrefix %>CustomColourInput">Custom colour</label>
+      <input type="color" id="<%= pccPrefix %>CustomColourInput" class="spb-colour-picker__custom-input" value="#22c55e">
+    </div>
+  </div>
+</div>

@@ -1,0 +1,57 @@
+<%
+  var notifications = (typeof budgetNotifications !== 'undefined' && budgetNotifications)
+    ? budgetNotifications
+    : { alerts: [], hasAlerts: false };
+  var showEmpty = typeof showBudgetAlertsEmpty !== 'undefined' ? showBudgetAlertsEmpty : false;
+
+  var overallAlert = notifications.overallAlert || null;
+  var visibleCategoryAlerts = notifications.visibleCategoryAlerts || [];
+  var hiddenCategoryAlerts = notifications.hiddenCategoryAlerts || [];
+  var hasAlerts = notifications.hasAlerts;
+  var alertMonth = (typeof budgetMonth !== 'undefined' && budgetMonth) ? budgetMonth : (typeof budgetAlertMonth !== 'undefined' ? budgetAlertMonth : '');
+  var alertUserId = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? currentUser.id : '';
+
+  function buildServerAlertId(alert) {
+    if (!alert) return '';
+    if (alert.scope === 'overall') {
+      return 'user-' + alertUserId + '-' + alertMonth + '-overall-' + (alert.level || 'warning');
+    }
+    return 'user-' + alertUserId + '-' + alertMonth + '-category-' + (alert.categoryId || alert.name || 'unknown') + '-' + (alert.level || 'warning');
+  }
+
+  var allAlerts = [];
+  if (Array.isArray(notifications.alerts) && notifications.alerts.length) {
+    notifications.alerts.forEach(function(alert) {
+      allAlerts.push(alert);
+    });
+  } else {
+    if (overallAlert) allAlerts.push(overallAlert);
+    visibleCategoryAlerts.forEach(function(alert) { allAlerts.push(alert); });
+    hiddenCategoryAlerts.forEach(function(alert) { allAlerts.push(alert); });
+  }
+
+  if (!overallAlert && !visibleCategoryAlerts.length && !hiddenCategoryAlerts.length && (notifications.alerts || []).length) {
+    hasAlerts = true;
+  }
+
+  var activeAlertIds = allAlerts.map(function(alert) {
+    return buildServerAlertId(alert);
+  });
+%>
+
+<section class="budget-notifications"<% if (typeof budgetNotificationsId !== 'undefined' && budgetNotificationsId) { %> id="<%= budgetNotificationsId %>"<% } %> data-budget-alerts-ui="1" data-user-id="<%= alertUserId %>" data-budget-month="<%= alertMonth %>" data-has-alerts="<%= hasAlerts ? '1' : '0' %>" data-alerts-expanded="false" data-active-alert-ids='<%- JSON.stringify(activeAlertIds) %>' aria-label="Budget alerts">
+  <% if (hasAlerts && allAlerts.length) { %>
+    <% allAlerts.forEach(function(alert) { %>
+      <div class="budget-notification-alert budget-alert-banner budget-alert-banner--<%= alert.level === 'danger' ? 'danger' : 'warning' %>" role="alert" data-alert-id="<%= buildServerAlertId(alert) %>">
+        <span class="budget-alert-banner__icon" aria-hidden="true"><%= alert.level === 'danger' ? '!' : '%' %></span>
+        <div>
+          <strong><%= alert.title %></strong>
+          <p><%= alert.message %> <%= alert.detail %></p>
+        </div>
+        <button type="button" class="budget-alert-banner__dismiss js-dismiss-budget-alert" aria-label="Dismiss alert">&times;</button>
+      </div>
+    <% }); %>
+  <% } else if (showEmpty) { %>
+    <p class="budget-notifications__empty">No budget alerts right now.</p>
+  <% } %>
+</section>

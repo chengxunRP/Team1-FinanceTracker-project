@@ -3358,6 +3358,27 @@ a.dash-card--clickable {
   line-height: 1.45;
 }
 
+.budget-alert-banner__dismiss {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0.1rem 0.2rem;
+}
+
+.budget-alert-banner__dismiss:hover {
+  color: var(--text);
+}
+
+.budget-alert-banner__dismiss:focus-visible {
+  outline: 2px solid var(--blue, #2563eb);
+  outline-offset: 1px;
+}
+
 .budget-alert-banner--success {
   background: var(--green-light);
   border-color: #a5d6a7;
@@ -3396,6 +3417,73 @@ a.dash-card--clickable {
 
 .budget-alert-banner--danger strong { color: var(--danger-text); }
 .budget-alert-banner--danger p { color: #b71c1c; }
+
+.budget-notifications {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.budget-notification-alert[hidden] {
+  display: none !important;
+}
+
+.budget-notifications__empty {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius);
+  background: var(--surface-muted, #f5f7fa);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.dash-page .budget-notifications {
+  margin: 0 0 1rem;
+}
+
+.spb-page .budget-notifications {
+  margin: 0 1rem 1rem;
+}
+
+.home-live-section .budget-notifications {
+  margin-top: 1rem;
+}
+
+.budget-notifications__more {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.budget-notifications__more[hidden] {
+  display: none;
+}
+
+.budget-notifications__toggle {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0.35rem 0.65rem;
+  border: none;
+  background: transparent;
+  color: var(--blue, #2563eb);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.budget-notifications__toggle:hover {
+  color: var(--blue-dark, #1d4ed8);
+}
+
+.budget-notifications__toggle:focus-visible {
+  outline: 2px solid var(--blue, #2563eb);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 
 .budget-layout {
   display: grid;
@@ -5874,6 +5962,17 @@ a.dash-card--clickable {
   border-color: color-mix(in srgb, var(--cat-color, #64748b) 20%, white);
   background: color-mix(in srgb, var(--cat-color, #64748b) 8%, white);
   color: var(--cat-color, var(--text));
+  max-width: 100%;
+}
+
+.expense-cat-pill__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text, #1e293b);
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .expense-cat-pill--detail {
