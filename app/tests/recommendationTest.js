@@ -58,6 +58,9 @@ tests.push(function(){
   const item = { itemName: 'NoBudget', itemPrice: 10, category: 'Food' };
   const out = rec.getSpendingRecommendation(summary, expenses, item);
   if(out.result !== 'Not recommended') throw new Error('Expected Not recommended with no budget, got ' + out.result);
+  if(out.budgetNote !== 'This category does not have a budget yet, so only general purchase advice can be shown.') {
+    throw new Error('Unexpected budgetNote for no-budget case: ' + out.budgetNote);
+  }
 });
 
 // Input validation should reject empty/invalid values
@@ -118,6 +121,9 @@ tests.push(function(){
   }
   if (out.analysis.remainingBudget !== 79) {
     throw new Error('Expected category remaining 79, got ' + out.analysis.remainingBudget);
+  }
+  if (!String(out.budgetNote || '').includes('selected category budget')) {
+    throw new Error('Unexpected budgetNote for category-only case: ' + out.budgetNote);
   }
 });
 

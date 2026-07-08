@@ -279,12 +279,12 @@ function getSpendingRecommendation(summary, expenses, item, options) {
     budgetMode = "category-only";
     effectiveSummary = buildCategoryBudgetSummary(categoryRow);
     budgetNote =
-      "This check is based on your selected category budget because no All Categories Budget is set.";
+      "Overall budget is not set yet, but you can still check this purchase against your selected category budget.";
   } else {
     budgetMode = "none";
     effectiveSummary = buildBudgetSummary(0, [], 0);
     budgetNote =
-      "No All Categories Budget is set and the selected category has no category budget. Set a budget on Spending & Budgets for a full recommendation.";
+      "This category does not have a budget yet, so only general purchase advice can be shown.";
   }
 
   if (budgetMode === "none") {
