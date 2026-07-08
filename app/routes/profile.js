@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const financeHelpers = require('../financeHelpers');
+const budgetStore = require('../budgetStore');
 const { requireLogin } = require('../authHelpers');
 
 router.use(requireLogin);
@@ -40,6 +41,30 @@ async function buildSummary() {
   };
 }
 
+async function buildMonthlyHistory(monthsBack = 6) {
+  const history = [];
+
+  for (let i = 1; i <= monthsBack; i++) {
+    const date = new Date();
+    date.setDate(1); // avoid month-rollover bugs
+    date.setMonth(date.getMonth() - i);
+    const budgetMonth = budgetStore.getCurrentBudgetMonth(date);
+
+    const monthFinance = await financeHelpers.getDisplayMonthFinanceSummary(budgetMonth);
+
+    history.push({
+      budgetMonth: monthFinance.budgetMonth,
+      label: monthFinance.budgetMonthLabel,
+      budget: monthFinance.summary.monthlyBudget,
+      spent: monthFinance.summary.totalSpent,
+      percentUsed: monthFinance.summary.percentageUsed,
+      overBudget: monthFinance.summary.monthlyBudget > 0 && monthFinance.summary.totalSpent > monthFinance.summary.monthlyBudget,
+    });
+  }
+
+  return history;
+}
+
 function buildRenderUser(row, income) {
   return {
     ...row,
@@ -62,6 +87,7 @@ router.get('/', async (req, res) => {
     const user = rows[0];
     const summary = await buildSummary();
     summary.income = user.monthly_income != null ? Number(user.monthly_income) : 0;
+    const history = await buildMonthlyHistory();
 
     res.render('auth/profile', {
       pageTitle: 'Profile Settings',
@@ -69,6 +95,7 @@ router.get('/', async (req, res) => {
       user,
       currencies: CURRENCIES,
       summary,
+      history,
       errors: [],
       success: false,
     });
@@ -111,12 +138,14 @@ router.post('/', async (req, res) => {
       };
       const summary = await buildSummary();
       summary.income = parsedMonthlyIncome != null ? Number(parsedMonthlyIncome) : 0;
+      const history = await buildMonthlyHistory();
       return res.render('auth/profile', {
         pageTitle: 'Profile Settings',
         activePage: 'profile',
         user: draftUser,
         currencies: CURRENCIES,
         summary,
+        history,
         errors,
         success: false,
       });
@@ -146,6 +175,7 @@ router.post('/', async (req, res) => {
     const user = rows[0];
     const summary = await buildSummary();
     summary.income = user.monthly_income != null ? Number(user.monthly_income) : 0;
+    const history = await buildMonthlyHistory();
 
     res.render('auth/profile', {
       pageTitle: 'Profile Settings',
@@ -153,6 +183,7 @@ router.post('/', async (req, res) => {
       user,
       currencies: CURRENCIES,
       summary,
+      history,
       errors: [],
       success: true,
     });
@@ -171,6 +202,7 @@ router.post('/', async (req, res) => {
       },
       currencies: CURRENCIES,
       summary: { budgetMonth: '', income: 0, budget: 0, spent: 0, remaining: 0, percentUsed: 0 },
+      history: [],
       errors: ['Unable to save changes right now. Please try again.'],
       success: false,
     });
