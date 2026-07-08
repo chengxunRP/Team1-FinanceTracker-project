@@ -10,6 +10,7 @@ const {
   validateExpenseDate,
   getSafeExpenseReturnTo,
   normalizeMerchantName,
+  validateExpenseAmount,
 } = require('../expenseValidationHelpers');
 const { isExpenseCountedForBudget } = require('../budgetHelpers');
 const { requireLogin, getCurrentUserId } = require('../authHelpers');
@@ -27,10 +28,140 @@ function wantsJsonRequest(req) {
 
 function respondLoginRequired(req, res) {
   if (wantsJsonRequest(req)) {
-    res.status(401).json({ success: false, error: 'Login required.' });
+    res.status(401).json({
+      success: false,
+      message: 'Session expired. Please log in again.',
+      fieldErrors: {},
+    });
     return;
   }
   res.redirect('/login');
+}
+
+function buildAddExpenseFieldErrors(body, uploadError) {
+  const { title, amount, categoryId, date } = body;
+  const errors = [];
+  const fieldErrors = {};
+
+  if (uploadError) {
+    errors.push(uploadError);
+    fieldErrors.receipt = uploadError;
+    fieldErrors.expenseImage = uploadError;
+  }
+  if (!title || !String(title).trim()) {
+    const msg = 'Expense title is required.';
+    errors.push(msg);
+    fieldErrors.title = msg;
+  }
+  const amountCheck = validateExpenseAmount(amount);
+  if (!amountCheck.valid) {
+    errors.push(amountCheck.error);
+    fieldErrors.amount = amountCheck.error;
+  }
+  if (!categoryId) {
+    const msg = 'Category is missing.';
+    errors.push(msg);
+    fieldErrors.categoryId = msg;
+    fieldErrors.category_id = msg;
+  }
+  const dateCheck = validateExpenseDate(date);
+  if (!dateCheck.valid) {
+    errors.push(dateCheck.error);
+    fieldErrors.date = dateCheck.error;
+    fieldErrors.expense_date = dateCheck.error;
+  }
+
+  return {
+    errors,
+    fieldErrors,
+    message: errors[0] || 'Unable to save expense. Please check the form and try again.',
+  };
+}
+
+function mapExpenseSaveError(error) {
+  if (!error) {
+    return {
+      message: 'Unable to save expense due to a server error.',
+      fieldErrors: {},
+    };
+  }
+  if (error.code === 'AUTH_REQUIRED') {
+    return {
+      message: 'Session expired. Please log in again.',
+      fieldErrors: {},
+      status: 401,
+    };
+  }
+  if (
+    error.code === 'ER_WARN_DATA_OUT_OF_RANGE' &&
+    /amount/i.test(String(error.sqlMessage || ''))
+  ) {
+    const msg = 'Amount is too large. Maximum is $99,999,999.99.';
+    return { message: msg, fieldErrors: { amount: msg } };
+  }
+  return {
+    message: 'Unable to save expense due to a server error.',
+    fieldErrors: {},
+  };
+}
+
+function respondAddExpenseFailure(req, res, options = {}) {
+  const {
+    message,
+    fieldErrors = {},
+    errors = message ? [message] : [],
+    status = 400,
+    safeReturnTo = null,
+    expenseBody = null,
+    expenseImagePath = null,
+  } = options;
+
+  if (wantsJsonRequest(req)) {
+    return res.status(status).json({
+      success: false,
+      message: message || errors[0] || 'Unable to save expense. Please check the form and try again.',
+      fieldErrors,
+      errors,
+    });
+  }
+
+  if (safeReturnTo) {
+    const sep = safeReturnTo.includes('?') ? '&' : '?';
+    const errorMsg = encodeURIComponent(
+      message || errors[0] || 'Unable to save expense. Please check the form and try again.'
+    );
+    return res.redirect(`${safeReturnTo}${sep}addExpenseError=1&addExpenseErrorMsg=${errorMsg}`);
+  }
+
+  return loadPickerCategoryData()
+    .catch(() => ({
+      categories: [],
+      customCategories: [],
+      generalCategories: [],
+    }))
+    .then((pickerData) => {
+      res.status(status).render('expenses/form', {
+        pageTitle: 'Add Expense',
+        activePage: 'expenses',
+        expense: expenseBody || {},
+        categories: pickerData.categories,
+        customCategories: pickerData.customCategories,
+        generalCategories: pickerData.generalCategories,
+        errors,
+        formAction: '/expenses',
+        isEdit: false,
+        maxDate: getTodayDateString(),
+        imagePath: expenseImagePath || '',
+      });
+    });
+}
+
+function respondAddExpenseSuccess(req, res, redirectUrl, budgetAlertReset) {
+  const finalUrl = appendBudgetAlertResetQuery(redirectUrl, budgetAlertReset);
+  if (wantsJsonRequest(req)) {
+    return res.json({ success: true, redirectUrl: finalUrl });
+  }
+  return redirectWithBudgetAlertReset(res, redirectUrl, budgetAlertReset);
 }
 
 function requireSessionUserId(req, res) {
@@ -377,35 +508,30 @@ router.post('/', uploadExpenseImage, async (req, res) => {
 
   const { title, amount, categoryId, date, notes } = req.body;
   const merchantName = normalizeMerchantName(req.body.merchant_name);
-  const errors = [];
+  const safeReturnTo = getSafeExpenseReturnTo(req.body.returnTo);
 
-  if (req.uploadError) errors.push(req.uploadError);
-  if (!title || !title.trim())                          errors.push('Title is required.');
-  if (!amount || isNaN(amount) || +amount <= 0)         errors.push('Amount must be a positive number.');
-  if (!categoryId)                                      errors.push('Please select a category.');
+  console.log('[AddExpenseDebug] received body', {
+    userId,
+    amount,
+    title: title ? String(title).slice(0, 40) : '',
+    category_id: categoryId || '',
+    expense_date: date || '',
+    hasFile: Boolean(req.file),
+    returnUrl: safeReturnTo || req.body.returnTo || '',
+  });
 
-  const dateCheck = validateExpenseDate(date);
-  if (!dateCheck.valid)                                 errors.push(dateCheck.error);
-
-  if (errors.length) {
-    const safeReturnTo = getSafeExpenseReturnTo(req.body.returnTo);
-    if (safeReturnTo) {
-      const sep = safeReturnTo.includes("?") ? "&" : "?";
-      return res.redirect(`${safeReturnTo}${sep}addExpenseError=1`);
-    }
-    const pickerData = await loadPickerCategoryData().catch(() => ({
-      categories: [],
-      customCategories: [],
-      generalCategories: [],
-    }));
-    return res.render('expenses/form', {
-      pageTitle: 'Add Expense', activePage: 'expenses',
-      expense: req.body,
-      categories: pickerData.categories,
-      customCategories: pickerData.customCategories,
-      generalCategories: pickerData.generalCategories,
-      errors, formAction: '/expenses', isEdit: false,
-      maxDate: getTodayDateString(),
+  const validation = buildAddExpenseFieldErrors(req.body, req.uploadError);
+  if (validation.errors.length) {
+    console.log('[AddExpenseDebug] save failed', {
+      message: validation.message,
+      code: 'VALIDATION',
+    });
+    return respondAddExpenseFailure(req, res, {
+      message: validation.message,
+      fieldErrors: validation.fieldErrors,
+      errors: validation.errors,
+      safeReturnTo,
+      expenseBody: req.body,
     });
   }
 
@@ -428,35 +554,23 @@ router.post('/', uploadExpenseImage, async (req, res) => {
       categoryId,
       String(date).slice(0, 7)
     );
-    const safeReturnTo = getSafeExpenseReturnTo(req.body.returnTo);
-    if (safeReturnTo) {
-      return redirectWithBudgetAlertReset(res, safeReturnTo, budgetAlertReset);
-    }
-    redirectWithBudgetAlertReset(res, '/expenses', budgetAlertReset);
+    const redirectUrl = safeReturnTo || '/expenses';
+    return respondAddExpenseSuccess(req, res, redirectUrl, budgetAlertReset);
   } catch (error) {
-    console.error('Database error creating expense:', error);
-    const safeReturnTo = getSafeExpenseReturnTo(req.body.returnTo);
+    console.error('[AddExpenseDebug] save failed', {
+      message: error && error.message,
+      code: error && error.code,
+    });
     if (handleExpenseAuthError(req, res, error)) return;
-    if (safeReturnTo) {
-      const sep = safeReturnTo.includes("?") ? "&" : "?";
-      return res.redirect(`${safeReturnTo}${sep}addExpenseError=1`);
-    }
-    const pickerData = await loadPickerCategoryData().catch(() => ({
-      categories: [],
-      customCategories: [],
-      generalCategories: [],
-    }));
-    res.status(500).render('expenses/form', {
-      pageTitle: 'Add Expense',
-      activePage: 'expenses',
-      expense: { ...req.body, imagePath: expenseImagePath || '' },
-      categories: pickerData.categories,
-      customCategories: pickerData.customCategories,
-      generalCategories: pickerData.generalCategories,
-      errors: ['Unable to save expense right now. Please try again.'],
-      formAction: '/expenses',
-      isEdit: false,
-      maxDate: getTodayDateString(),
+    const mapped = mapExpenseSaveError(error);
+    return respondAddExpenseFailure(req, res, {
+      message: mapped.message,
+      fieldErrors: mapped.fieldErrors,
+      errors: [mapped.message],
+      status: mapped.status || 500,
+      safeReturnTo,
+      expenseBody: { ...req.body, imagePath: expenseImagePath || '' },
+      expenseImagePath,
     });
   }
 });

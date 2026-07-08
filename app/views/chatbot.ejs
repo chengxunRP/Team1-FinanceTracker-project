@@ -1,6 +1,9 @@
 <%- include('partials/header') %>
 
 <%
+  if (typeof groqAvailable === 'undefined') {
+    groqAvailable = false;
+  }
   if (typeof liveSummary === 'undefined' || !liveSummary) {
     liveSummary = {
       hasBudget: Number(summary && summary.monthlyBudget) > 0,
@@ -140,7 +143,7 @@
           </form>
           <% }); %>
         </div>
-        <p class="finbot-note"><%= groqAiMode ? 'Groq AI replies — numbers always come from your MySQL data.' : 'Rule-based replies — add GROQ_API_KEY in app/.env for Groq AI mode.' %></p>
+        <p class="finbot-note"><%= groqAvailable ? (groqAiMode ? 'Groq AI replies — numbers always come from your MySQL data.' : 'Groq AI is ready — replies use your live budget data.') : 'Rule-based replies — add GROQ_API_KEY in app/.env for Groq AI mode.' %></p>
       </section>
     </aside>
 
@@ -149,7 +152,7 @@
         <span class="finbot-avatar" aria-hidden="true">🤖</span>
         <div class="finbot-chat__identity">
           <strong>FinBot</strong>
-          <span class="finbot-status">Online · <%= groqAiMode ? 'Groq AI mode' : 'rule-based mode' %></span>
+          <span class="finbot-status">Online · <%= groqAvailable ? (groqAiMode ? 'Groq AI mode' : 'Groq AI ready') : 'rule-based mode' %></span>
         </div>
         <form method="POST" action="/chatbot/clear" class="finbot-clear-form">
           <button type="submit" class="finbot-clear-btn">Clear chat</button>

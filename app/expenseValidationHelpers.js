@@ -97,6 +97,26 @@ function normalizeMerchantName(value) {
   return trimmed.slice(0, 100);
 }
 
+/** Matches expenses.amount DECIMAL(10,2) column limit. */
+const MAX_EXPENSE_AMOUNT = 99999999.99;
+
+function validateExpenseAmount(amount) {
+  if (amount === undefined || amount === null || String(amount).trim() === "") {
+    return { valid: false, error: "Amount must be greater than 0." };
+  }
+  const parsed = Number(amount);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return { valid: false, error: "Amount must be greater than 0." };
+  }
+  if (parsed > MAX_EXPENSE_AMOUNT) {
+    return {
+      valid: false,
+      error: "Amount is too large. Maximum is $99,999,999.99.",
+    };
+  }
+  return { valid: true, error: null };
+}
+
 module.exports = {
   FUTURE_DATE_HINT,
   getTodayDateString,
@@ -106,4 +126,6 @@ module.exports = {
   getDefaultExpenseDateForBudgetMonth,
   getSafeExpenseReturnTo,
   normalizeMerchantName,
+  MAX_EXPENSE_AMOUNT,
+  validateExpenseAmount,
 };

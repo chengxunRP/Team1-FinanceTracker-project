@@ -8,18 +8,40 @@ const {
   buildPurchaseCheckReply,
   isSpendingAdviceQuestion,
   isSavingTipsQuestion,
+  isImprovementAdviceQuestion,
+  isCategoryReduceQuestion,
+  isBudgetHealthQuestion,
+  isBudgetAlertExplanationQuestion,
 } = require("./purchaseCheckHelpers");
 const recommendationHelpers = require("./recommendationHelpers");
 const { roundMoney } = require("./financeSummaryService");
 
 const SUGGESTED_QUESTIONS = [
   "How much have I spent this month?",
-  "How much did I spend in budget categories?",
-  "What category did I spend the most on?",
+  "Is there any improvement I can do?",
+  "What category should I reduce?",
   "How much budget do I have left?",
-  "Am I close to overspending?",
+  "How can I save more?",
   "Can I buy a $50 item?",
   "Show my budget summary",
+];
+
+const CLEARLY_OFF_TOPIC_KEYWORDS = [
+  "weather",
+  "football",
+  "soccer",
+  "joke",
+  "recipe",
+  "movie",
+  "song",
+  "capital of",
+  "who is",
+  "tell me a story",
+  "play a game",
+  "write a poem",
+  "translate this",
+  "write code",
+  "homework answer",
 ];
 
 const FINANCE_KEYWORDS = [
@@ -35,6 +57,7 @@ const FINANCE_KEYWORDS = [
   "categories",
   "saving",
   "savings",
+  "save",
   "income",
   "money",
   "finance",
@@ -62,6 +85,14 @@ const FINANCE_KEYWORDS = [
   "summary",
   "advice",
   "reduce",
+  "improve",
+  "improvement",
+  "suggest",
+  "recommend",
+  "control",
+  "problem",
+  "situation",
+  "dashboard",
   "spendwise",
   "finbot",
   "everything else",
@@ -69,24 +100,54 @@ const FINANCE_KEYWORDS = [
   "rollover",
   "overspend",
   "over budget",
+  "exceeded",
+  "reached",
+  "goal",
+  "tips",
+  "tip",
 ];
 
 const OFF_TOPIC_REPLY =
-  "Sorry, I'm designed to help with your spending, budgets, expenses, and finance decisions in spendWise. Try asking me something like 'How much have I spent this month?' or 'Can I buy a $50 item?'";
+  "I focus on spendWise finance help — spending, budgets, expenses, savings, and purchase decisions. Try asking \"Is there any improvement I can do?\" or \"How much budget do I have left?\"";
 
 function normalizeMessage(message) {
   return String(message || "").trim().toLowerCase();
 }
 
+function isClearlyOffTopicMessage(message) {
+  const text = normalizeMessage(message);
+  return CLEARLY_OFF_TOPIC_KEYWORDS.some(function (keyword) {
+    return text.includes(keyword);
+  });
+}
+
+function isFinanceCoachingQuestion(message) {
+  const text = normalizeMessage(message);
+  return (
+    isImprovementAdviceQuestion(message) ||
+    isCategoryReduceQuestion(message) ||
+    isBudgetHealthQuestion(message) ||
+    isBudgetAlertExplanationQuestion(message) ||
+    isSpendingAdviceQuestion(message) ||
+    isSavingTipsQuestion(message) ||
+    text.includes("what should i") ||
+    text.includes("what can i do") ||
+    text.includes("how can i") ||
+    text.includes("how do i") ||
+    text.includes("am i spending") ||
+    text.includes("biggest problem") ||
+    text.includes("give me advice") ||
+    text.includes("summarize my") ||
+    text.includes("explain my")
+  );
+}
+
 function isFinanceRelatedMessage(message) {
   const text = normalizeMessage(message);
   if (!text) return false;
+  if (isClearlyOffTopicMessage(message)) return false;
 
-  if (
-    isPurchaseQuestion(message) ||
-    isSpendingAdviceQuestion(message) ||
-    isSavingTipsQuestion(message)
-  ) {
+  if (isFinanceCoachingQuestion(message) || isPurchaseQuestion(message)) {
     return true;
   }
 
@@ -97,9 +158,24 @@ function isFinanceRelatedMessage(message) {
     return true;
   }
 
-  return FINANCE_KEYWORDS.some(function (keyword) {
+  if (FINANCE_KEYWORDS.some(function (keyword) {
     return text.includes(keyword);
-  });
+  })) {
+    return true;
+  }
+
+  if (
+    text.includes("?") &&
+    (text.includes("how ") ||
+      text.includes("what ") ||
+      text.includes("should ") ||
+      text.includes("can i") ||
+      text.includes("am i"))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function isGreetingMessage(message) {
@@ -144,12 +220,13 @@ function buildGreetingReply(message) {
   if (text === "what can you do" || text === "what do you do" || text === "help" || text === "help me") {
     return [
       "I can help with:",
-      "- How much you've spent this month",
-      "- Budget remaining and category spending",
+      "- Spending and budget summaries",
+      "- Improvement advice based on your data",
+      "- Which category to reduce",
       "- Whether a purchase fits your budget",
-      "- Spending and saving advice",
+      "- Budget alerts and saving tips",
       "",
-      "Try: \"How much have I spent this month?\" or \"Can I buy a $50 item?\"",
+      'Try: "Is there any improvement I can do?" or "Can I buy a $50 item?"',
     ].join("\n");
   }
 
@@ -158,6 +235,223 @@ function buildGreetingReply(message) {
 
 function buildOffTopicReply() {
   return OFF_TOPIC_REPLY;
+}
+
+function getBudgetStressCategories(categoryRows) {
+  return (categoryRows || [])
+    .filter(function (row) {
+      const usedPct = Number(row.usedPct) || 0;
+      return (
+        row.overspent ||
+        row.budgetReached ||
+        row.statusKey === "reached" ||
+        row.statusKey === "overspent" ||
+        usedPct >= 80
+      );
+    })
+    .sort(function (a, b) {
+      return (Number(b.usedPct) || 0) - (Number(a.usedPct) || 0);
+    });
+}
+
+function formatCategoryStress(row) {
+  const name = row.displayName || row.name;
+  if (row.overspent) {
+    return `${name} (exceeded: $${money(row.actual)} of $${money(row.availableBudget)})`;
+  }
+  if (row.budgetReached || row.statusKey === "reached") {
+    return `${name} (reached: 100% used)`;
+  }
+  return `${name} (${row.usedPct}% used)`;
+}
+
+function buildImprovementAdviceReply(fields, liveSummary, financeSnapshot, monthNote) {
+  const stressed = getBudgetStressCategories(liveSummary.budgetBreakdown);
+  const lines = [`Yes. Based on your current budget${monthNote}, here is what I suggest:`, ""];
+
+  if (fields.hasAllTransactionsBudget) {
+    if (Number(fields.allRemaining) < 0) {
+      lines.push(
+        `- Your All Categories Budget is overspent by $${money(Math.abs(Number(fields.allRemaining)))} ($${fields.allSpent} of $${fields.allBudget}).`
+      );
+    } else if (Number(fields.allPct) >= 100) {
+      lines.push(
+        `- Your All Categories Budget is fully used ($${fields.allSpent} of $${fields.allBudget}, 100% used).`
+      );
+    } else if (Number(fields.allPct) >= 80) {
+      lines.push(
+        `- Your All Categories Budget is at ${fields.allPct}% ($${fields.allSpent} of $${fields.allBudget}, $${fields.allRemaining} left).`
+      );
+    }
+  }
+
+  if (stressed.length) {
+    lines.push(
+      `- Focus on these categories first: ${stressed
+        .slice(0, 4)
+        .map(formatCategoryStress)
+        .join("; ")}.`
+    );
+  } else if (financeSnapshot.highestCategory && financeSnapshot.highestCategory !== "—") {
+    lines.push(
+      `- Your highest spending category is ${financeSnapshot.highestCategory} ($${money(financeSnapshot.highestCategoryAmount)}). Review that area first.`
+    );
+  } else {
+    lines.push(`- You spent $${fields.allSpent} across all transactions${monthNote}.`);
+  }
+
+  lines.push("", "Advice:");
+  lines.push("- Pause non-essential spending until stressed categories are back under control.");
+  if (stressed.length) {
+    const top = stressed[0];
+    lines.push(
+      `- Lower spending in ${top.displayName || top.name} first — it is your most pressured budget category.`
+    );
+  }
+  lines.push("- Use Don't Count only for transactions that should not affect your budget totals.");
+  if (fields.hasAllTransactionsBudget && Number(fields.allRemaining) > 0) {
+    lines.push(`- Protect your remaining $${fields.allRemaining} in All Categories Budget.`);
+  } else if (fields.hasCategoryBudgets && Number(fields.catRemaining) > 0) {
+    lines.push(`- Protect your remaining $${fields.catRemaining} across category budgets.`);
+  }
+
+  return lines.join("\n");
+}
+
+function buildCategoryReduceReply(liveSummary, monthNote) {
+  const stressed = getBudgetStressCategories(liveSummary.budgetBreakdown);
+  if (stressed.length) {
+    const top = stressed[0];
+    const name = top.displayName || top.name;
+    const lines = [
+      `Start with ${name}${monthNote}.`,
+      top.overspent
+        ? `It is over budget at $${money(top.actual)} of $${money(top.availableBudget)} (${top.usedPct}% used).`
+        : top.budgetReached || top.statusKey === "reached"
+          ? `It has reached 100% of its budget ($${money(top.actual)} of $${money(top.availableBudget)}).`
+          : `It is at ${top.usedPct}% of its budget ($${money(top.actual)} of $${money(top.availableBudget)}).`,
+      "",
+      "Advice:",
+      `- Cut one non-essential ${name} purchase this week.`,
+    ];
+    if (stressed.length > 1) {
+      lines.push(
+        `- Also watch ${stressed[1].displayName || stressed[1].name} (${stressed[1].usedPct}% used).`
+      );
+    }
+    return lines.join("\n");
+  }
+
+  const topName = liveSummary.topCategoryName || "—";
+  const topSpent = money(liveSummary.topCategorySpent || 0);
+  if (topName !== "—" && Number(liveSummary.topCategorySpent) > 0) {
+    return [
+      `No category budget is over its limit${monthNote}, but your highest spending category is ${topName} ($${topSpent}).`,
+      "",
+      "Advice:",
+      `- Review ${topName} purchases first if you want to reduce spending.`,
+      "- Set a weekly spending cap for that category.",
+    ].join("\n");
+  }
+
+  return `I could not find a stressed category budget${monthNote}. Try setting category budgets on Spending & Budgets first.`;
+}
+
+function buildSavingAdviceReply(fields, liveSummary, financeSnapshot, monthNote) {
+  const lines = [`Here is how you can save more${monthNote}:`, ""];
+
+  if (fields.hasAllTransactionsBudget) {
+    lines.push(
+      `- All Categories Budget remaining: $${fields.allRemaining} ($${fields.allSpent} spent of $${fields.allBudget}).`
+    );
+  }
+  if (fields.hasCategoryBudgets) {
+    lines.push(
+      `- Category budgets remaining: $${fields.catRemaining} ($${fields.catSpent} spent of $${fields.catBudget}).`
+    );
+  }
+
+  const stressed = getBudgetStressCategories(liveSummary.budgetBreakdown);
+  if (stressed.length) {
+    lines.push(`- Cut back in ${stressed[0].displayName || stressed[0].name} first.`);
+  } else if (financeSnapshot.highestCategory && financeSnapshot.highestCategory !== "—") {
+    lines.push(`- Your largest spending category is ${financeSnapshot.highestCategory} ($${money(financeSnapshot.highestCategoryAmount)}).`);
+  }
+
+  lines.push(
+    "- Delay non-essential purchases until next month.",
+    "- Use Don't Count only when a transaction should not affect budget totals."
+  );
+
+  return lines.join("\n");
+}
+
+function buildBudgetHealthReply(fields, monthNote) {
+  const lines = [`Budget health check${monthNote}:`, ""];
+
+  if (fields.hasAllTransactionsBudget) {
+    const allStatus =
+      Number(fields.allRemaining) < 0
+        ? "over budget"
+        : Number(fields.allPct) >= 100
+          ? "fully used"
+          : Number(fields.allPct) >= 80
+            ? "in warning zone"
+            : "on track";
+    lines.push(
+      `- All Categories Budget: ${allStatus} ($${fields.allSpent} of $${fields.allBudget}, $${fields.allRemaining} left).`
+    );
+  }
+
+  if (fields.hasCategoryBudgets) {
+    const catStatus =
+      Number(fields.catRemaining) < 0
+        ? "over budget"
+        : Number(fields.catPct) >= 100
+          ? "fully used"
+          : Number(fields.catPct) >= 80
+            ? "in warning zone"
+            : "on track";
+    lines.push(
+      `- Category budgets: ${catStatus} ($${fields.catSpent} of $${fields.catBudget}, $${fields.catRemaining} left).`
+    );
+  }
+
+  if (!fields.hasAllTransactionsBudget && !fields.hasCategoryBudgets) {
+    lines.push(`- No budgets are set yet. You spent $${fields.allSpent} across all transactions.`);
+  }
+
+  return lines.join("\n");
+}
+
+function buildBudgetAlertExplanationReply(liveSummary, monthNote) {
+  const stressed = getBudgetStressCategories(liveSummary.budgetBreakdown);
+  const lines = [`Budget alerts${monthNote} appear when a category or All Categories Budget hits 80% (warning), 100% (reached), or goes over budget (exceeded).`, ""];
+
+  if (!stressed.length && !(liveSummary.hasAllTransactionsBudget && Number(liveSummary.allTransactionsPctUsed) >= 80)) {
+    lines.push("You do not have active budget alerts right now.");
+    return lines.join("\n");
+  }
+
+  if (liveSummary.hasAllTransactionsBudget && Number(liveSummary.allTransactionsPctUsed) >= 80) {
+    lines.push(
+      `- All Categories Budget: ${liveSummary.allTransactionsPctUsed}% used ($${money(liveSummary.allTransactionsSpent)} of $${money(liveSummary.allTransactionsBudget)}).`
+    );
+  }
+
+  stressed.slice(0, 5).forEach(function (row) {
+    const state = row.overspent
+      ? "exceeded"
+      : row.budgetReached || row.statusKey === "reached"
+        ? "reached"
+        : "warning";
+    lines.push(
+      `- ${row.displayName || row.name}: ${state} (${row.usedPct}% used, $${money(row.actual)} of $${money(row.availableBudget)}).`
+    );
+  });
+
+  lines.push("", "Review Spending & Budgets to adjust spending or budgets.");
+  return lines.join("\n");
 }
 
 function money(value) {
@@ -407,22 +701,28 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
     }
   }
 
+  if (isImprovementAdviceQuestion(message)) {
+    return buildImprovementAdviceReply(fields, liveSummary, financeSnapshot, monthNote);
+  }
+
+  if (isCategoryReduceQuestion(message)) {
+    return buildCategoryReduceReply(liveSummary, monthNote);
+  }
+
+  if (isBudgetHealthQuestion(message)) {
+    return buildBudgetHealthReply(fields, monthNote);
+  }
+
+  if (isBudgetAlertExplanationQuestion(message)) {
+    return buildBudgetAlertExplanationReply(liveSummary, monthNote);
+  }
+
   if (isSavingTipsQuestion(message)) {
-    return buildBudgetSummaryReply(
-      fields,
-      highestCategory,
-      highestCategoryAmount,
-      monthNote
-    );
+    return buildSavingAdviceReply(fields, liveSummary, financeSnapshot, monthNote);
   }
 
   if (isSpendingAdviceQuestion(message)) {
-    return buildBudgetSummaryReply(
-      fields,
-      highestCategory,
-      highestCategoryAmount,
-      monthNote
-    );
+    return buildImprovementAdviceReply(fields, liveSummary, financeSnapshot, monthNote);
   }
 
   if (
@@ -501,13 +801,13 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
   }
 
   return [
-    "I can help with:",
-    "- Total spending and spending in budgeted categories",
-    "- All Transactions and category budget remaining",
-    "- Highest spending category",
-    "- Whether you are close to overspending",
-    "- Purchase checks (e.g. Can I buy $50?)",
-    "- Spending advice and saving tips",
+    "I can help with that. Based on your spendWise data, try asking:",
+    '- "Is there any improvement I can do?"',
+    '- "What category should I reduce?"',
+    '- "How much budget do I have left?"',
+    '- "Can I buy a $50 item?"',
+    "",
+    `You spent $${fields.allSpent} across all transactions${monthNote}.`,
   ].join("\n");
 }
 

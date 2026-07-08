@@ -1,5 +1,6 @@
 ﻿// Finance Tracker - Express server with EJS views (Feature 4: Budget + Alerts)
-require("./envConfig").logGroqKeyStatus();
+const { hasGroqApiKey, logGroqKeyStatus } = require("./envConfig");
+logGroqKeyStatus();
 
 const path = require("path");
 const express = require("express");
@@ -1319,6 +1320,7 @@ function renderChatbotPage(res, liveSummary, messages, groqAiMode, inputText) {
     suggestedQuestions: SUGGESTED_QUESTIONS,
     inputText: inputText || "",
     groqAiMode: Boolean(groqAiMode),
+    groqAvailable: hasGroqApiKey(),
   });
 }
 
@@ -1373,6 +1375,7 @@ app.get("/chatbot", async (req, res) => {
       suggestedQuestions: SUGGESTED_QUESTIONS,
       inputText: "",
       groqAiMode: false,
+      groqAvailable: hasGroqApiKey(),
     });
   }
 });
@@ -1491,6 +1494,7 @@ app.post("/chatbot", async (req, res) => {
       suggestedQuestions: SUGGESTED_QUESTIONS,
       inputText: rawMessage,
       groqAiMode: false,
+      groqAvailable: hasGroqApiKey(),
     });
   }
 });

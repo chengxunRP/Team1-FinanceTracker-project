@@ -37,7 +37,13 @@ function uploadExpenseImage(req, res, next) {
   const userId = req.session && req.session.userId ? req.session.userId : null;
   upload.single('expenseImage')(req, res, (err) => {
     if (err) {
-      req.uploadError = err.message || 'Image upload failed.';
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        req.uploadError = 'Receipt file is too large.';
+      } else if (err.message === 'Only image files are allowed.') {
+        req.uploadError = 'Receipt must be an image file.';
+      } else {
+        req.uploadError = err.message || 'Image upload failed.';
+      }
     }
     runWithUserId(userId, () => next());
   });

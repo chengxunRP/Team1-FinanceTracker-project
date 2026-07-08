@@ -20,6 +20,27 @@ function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabe
 
   const monthLabel = budgetMonthLabel || "current month";
   const ls = liveSummary || {};
+  const stressedLines = (ls.budgetBreakdown || [])
+    .filter((row) => {
+      const usedPct = Number(row.usedPct) || 0;
+      return (
+        row.overspent ||
+        row.budgetReached ||
+        row.statusKey === "reached" ||
+        row.statusKey === "overspent" ||
+        usedPct >= 80
+      );
+    })
+    .slice(0, 8)
+    .map((row) => {
+      const state = row.overspent
+        ? "exceeded"
+        : row.budgetReached || row.statusKey === "reached"
+          ? "reached"
+          : "warning";
+      return `- ${row.displayName || row.name}: ${state} — $${row.actual} of $${row.availableBudget} (${row.usedPct}% used)`;
+    })
+    .join("\n");
 
   return [
     `User finance data for ${monthLabel} (use only this data in your answer):`,
@@ -37,12 +58,17 @@ function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabe
     `- Everything Else (unbudgeted categories): $${ls.everythingElseTotal || 0}`,
     `- Highest spending category overall: ${financeSnapshot.highestCategory} ($${financeSnapshot.highestCategoryAmount})`,
     "",
+    "Stressed category budgets (warning / reached / exceeded):",
+    stressedLines || "- None",
+    "",
     "Rules:",
     "- 'How much have I spent this month?' → use All Transactions total spent.",
     "- 'How much did I spend in budget categories?' → use spent in budgeted categories only.",
     "- 'How much budget do I have left?' → mention All Transactions remaining and category budget remaining separately.",
     "- 'Can I buy $X?' → use All Transactions remaining by default.",
     "- Never subtract all-transaction spending from category budget total.",
+    "- For improvement/advice questions, name specific stressed categories and amounts from the data above.",
+    "- At exactly 100% used, say budget reached — not exceeded. Exceeded only when spent is above budget.",
     "",
     "Spending by category this month:",
     categoryLines || "- No category data",

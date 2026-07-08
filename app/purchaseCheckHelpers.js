@@ -158,9 +158,15 @@ function isSpendingAdviceQuestion(message) {
   const text = (message || "").trim().toLowerCase();
 
   return (
-    (text.includes("advice") && (text.includes("spending") || text.includes("budget") || text.includes("current"))) ||
+    (text.includes("advice") &&
+      (text.includes("spending") ||
+        text.includes("budget") ||
+        text.includes("current") ||
+        text.includes("finance"))) ||
     text.includes("how am i doing") ||
-    text.includes("spending advice")
+    text.includes("spending advice") ||
+    text.includes("give me advice") ||
+    text.includes("what should i do")
   );
 }
 
@@ -170,9 +176,68 @@ function isSavingTipsQuestion(message) {
   return (
     text.includes("saving tip") ||
     text.includes("save money") ||
+    text.includes("save more") ||
+    text.includes("how can i save") ||
     text.includes("reduce spending") ||
     text.includes("cut spending") ||
-    (text.includes("save") && text.includes("example"))
+    (text.includes("save") && (text.includes("more") || text.includes("example")))
+  );
+}
+
+function isImprovementAdviceQuestion(message) {
+  const text = (message || "").trim().toLowerCase();
+
+  return (
+    text.includes("improvement") ||
+    text.includes("improve my") ||
+    text.includes("improve spending") ||
+    text.includes("improve budget") ||
+    text.includes("any improvement") ||
+    text.includes("what can i improve") ||
+    text.includes("how can i improve") ||
+    text.includes("better with my budget") ||
+    text.includes("do better")
+  );
+}
+
+function isCategoryReduceQuestion(message) {
+  const text = (message || "").trim().toLowerCase();
+
+  return (
+    (text.includes("category") || text.includes("categories")) &&
+    (text.includes("reduce") ||
+      text.includes("cut") ||
+      text.includes("control") ||
+      text.includes("lower")) ||
+    text.includes("what should i reduce") ||
+    text.includes("which category") ||
+    text.includes("where should i cut")
+  );
+}
+
+function isBudgetHealthQuestion(message) {
+  const text = (message || "").trim().toLowerCase();
+
+  return (
+    text.includes("budget situation") ||
+    text.includes("budget health") ||
+    text.includes("how is my budget") ||
+    text.includes("am i spending too much") ||
+    text.includes("summarize my finance") ||
+    text.includes("summarize my budget") ||
+    text.includes("explain my dashboard") ||
+    (text.includes("budget") && text.includes("right now"))
+  );
+}
+
+function isBudgetAlertExplanationQuestion(message) {
+  const text = (message || "").trim().toLowerCase();
+
+  return (
+    text.includes("budget alert") ||
+    text.includes("explain my alert") ||
+    text.includes("why do i have alert") ||
+    text.includes("what are my alerts")
   );
 }
 
@@ -229,5 +294,9 @@ module.exports = {
   buildSavingTipsReply,
   isSpendingAdviceQuestion,
   isSavingTipsQuestion,
+  isImprovementAdviceQuestion,
+  isCategoryReduceQuestion,
+  isBudgetHealthQuestion,
+  isBudgetAlertExplanationQuestion,
   buildFormatRulesForPrompt,
 };
