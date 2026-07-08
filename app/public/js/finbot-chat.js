@@ -7,6 +7,8 @@
   var sendBtn = inputForm.querySelector(".finbot-send-btn");
   var suggestionForms = document.querySelectorAll(".finbot-suggestions form");
   var clearForm = document.querySelector(".finbot-clear-form");
+  var modeStatusEl = document.getElementById("finbotModeStatus");
+  var modeNoteEl = document.getElementById("finbotModeNote");
   var pendingController = null;
   var isSubmitting = false;
   var TYPING_ID = "finbotTypingIndicator";
@@ -167,6 +169,21 @@
     scrollToBottom();
   }
 
+  function updateModeLabel(modeLabel) {
+    var label = String(modeLabel || "").trim();
+    if (!label) return;
+
+    if (modeStatusEl) {
+      modeStatusEl.textContent = "Online · " + label;
+    }
+    if (modeNoteEl) {
+      modeNoteEl.textContent =
+        label === "Groq AI ready"
+          ? "Groq AI replies — numbers always come from your MySQL data."
+          : "Rule-based replies — add GROQ_API_KEY in app/.env for Groq AI mode.";
+    }
+  }
+
   function setLoading(loading) {
     isSubmitting = loading;
     input.disabled = loading;
@@ -228,6 +245,7 @@
       })
       .then(function (data) {
         removeTypingIndicator();
+        updateModeLabel(data.modeLabel);
         appendBotBubble(data.reply || "");
       })
       .catch(function (err) {

@@ -643,6 +643,30 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
   const monthNote = budgetMonthLabel ? ` (${budgetMonthLabel})` : " this month";
   const fields = liveFields(liveSummary, summary);
 
+  const spendSaveMatch = text.match(
+    /spend\s*\$?\s*(\d+(?:\.\d+)?)\b[\s\S]*save\s*\$?\s*(\d+(?:\.\d+)?)\b[\s\S]*(left|have left|how much)/i
+  );
+  if (spendSaveMatch) {
+    const spendAmount = Number(spendSaveMatch[1]);
+    const saveAmount = Number(spendSaveMatch[2]);
+    const hasRemainingBase = fields.hasAllTransactionsBudget;
+    const currentRemaining = Number(summary.remainingBudget) || 0;
+    const afterSpend = currentRemaining - spendAmount;
+
+    if (hasRemainingBase) {
+      return [
+        `If your current remaining budget is $${money(currentRemaining)}${monthNote}, spending $${money(spendAmount)} would leave $${money(afterSpend)} for this month.`,
+        `Saving $${money(saveAmount)} next month does not increase this month's remaining budget, but it does improve next month's savings by $${money(saveAmount)}.`,
+      ].join("\n\n");
+    }
+
+    return [
+      `I can calculate this with an assumption: if you currently have $X remaining${monthNote}, then after spending $${money(spendAmount)} you would have X - $${money(spendAmount)} left.`,
+      `Saving $${money(saveAmount)} next month helps next month's savings, not this month's remaining budget.`,
+      "To give an exact number, set an All Categories Budget so I can read your current remaining amount.",
+    ].join("\n\n");
+  }
+
   // Purchase checks use All Transactions remaining by default (summary.primary).
   const itemPrice = extractItemPrice(message);
   if (itemPrice != null && isPurchaseQuestion(message)) {
@@ -821,12 +845,14 @@ async function getFinBotReply(
   financeSnapshot,
   expenses,
   budgetMonthLabel,
-  liveSummary
+  liveSummary,
+  recentMessages
 ) {
-  if (!isFinanceRelatedMessage(message)) {
-    if (isGreetingMessage(message)) {
-      return { text: buildGreetingReply(message), usedGroq: false };
-    }
+  if (isGreetingMessage(message)) {
+    return { text: buildGreetingReply(message), usedGroq: false };
+  }
+
+  if (isClearlyOffTopicMessage(message)) {
     return { text: buildOffTopicReply(), usedGroq: false };
   }
 
@@ -850,7 +876,8 @@ async function getFinBotReply(
       financeSnapshot,
       expenses,
       budgetMonthLabel,
-      liveSummary
+      liveSummary,
+      recentMessages
     );
 
     if (aiReply) {

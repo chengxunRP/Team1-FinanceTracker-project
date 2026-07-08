@@ -4,6 +4,7 @@ logGroqKeyStatus();
 
 const path = require("path");
 const express = require("express");
+const db = require("./config/db");
 const {
   validateMonthlyBudget,
   validateCategoryBudgetAmount,
@@ -30,6 +31,7 @@ const {
 } = require("./chatHistory");
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
+const savingsGoalStore = require("./savingsGoalStore");
 const financeHelpers = require("./financeHelpers");
 const { buildBudgetNotifications } = require("./budgetNotificationService");
 const { scheduleBudgetAlertCheck } = require("./budgetAlertEmailService");
@@ -1307,7 +1309,7 @@ function ensureFinanceSnapshot(summary, financeSnapshotOrExpenses, categories, s
   return snapshot;
 }
 
-function renderChatbotPage(res, liveSummary, messages, groqAiMode, inputText) {
+function renderChatbotPage(res, liveSummary, messages, groqAiMode, inputText, botModeLabel) {
   res.render("chatbot", {
     pageTitle: "FinBot",
     activePage: "chatbot",
@@ -1321,7 +1323,34 @@ function renderChatbotPage(res, liveSummary, messages, groqAiMode, inputText) {
     inputText: inputText || "",
     groqAiMode: Boolean(groqAiMode),
     groqAvailable: hasGroqApiKey(),
+    botModeLabel: botModeLabel || (hasGroqApiKey() ? "Groq AI ready" : "rule-based mode"),
   });
+}
+
+async function getChatbotUserContext(req, month) {
+  const userId = getCurrentUserId(req);
+  let currency = "USD";
+  let savingsGoalSummary = "No savings goal data available.";
+
+  try {
+    const [rows] = await db.query("SELECT currency FROM users WHERE id = ? LIMIT 1", [userId]);
+    if (rows.length && rows[0].currency) {
+      currency = String(rows[0].currency);
+    }
+  } catch (error) {
+    console.error("Chatbot currency lookup failed:", error);
+  }
+
+  try {
+    const goal = await savingsGoalStore.getGoalForMonth(month);
+    if (goal) {
+      savingsGoalSummary = `${goal.goalName}: ${goal.currentAmount}/${goal.targetAmount} saved (${goal.progressPercent}% complete)`;
+    }
+  } catch (error) {
+    console.error("Chatbot savings goal lookup failed:", error);
+  }
+
+  return { currency, savingsGoalSummary };
 }
 
 /** Same MySQL load as GET /budget, mapped for FinBot snapshot + answers. */
@@ -1336,7 +1365,14 @@ app.get("/chatbot", async (req, res) => {
     const welcomeText = getWelcomeMessage();
     const messages = await getChatHistory(sessionId, welcomeText);
 
-    renderChatbotPage(res, liveSummary, messages, false, "");
+    renderChatbotPage(
+      res,
+      liveSummary,
+      messages,
+      false,
+      "",
+      hasGroqApiKey() ? "Groq AI ready" : "rule-based mode"
+    );
   } catch (error) {
     console.error("Database error loading chatbot:", error);
     const emptySummary = buildBudgetSummary(0, []);
@@ -1415,10 +1451,13 @@ app.post("/chatbot", async (req, res) => {
     const welcomeText = getWelcomeMessage();
 
     let groqAiMode = false;
+    let botModeLabel = hasGroqApiKey() ? "Groq AI ready" : "rule-based mode";
     let replyText = "";
 
     if (rawMessage.length > 0) {
-      await addChatMessage(sessionId, "user", rawMessage, welcomeText);
+      const historyAfterUser = await addChatMessage(sessionId, "user", rawMessage, welcomeText);
+      const recentMessages = (historyAfterUser || []).slice(-20);
+      const userContext = await getChatbotUserContext(req, liveSummary.month || liveSummary.budgetMonth);
 
       try {
         const reply = await getFinBotReply(
@@ -1427,11 +1466,14 @@ app.post("/chatbot", async (req, res) => {
           financeSnapshot,
           expensesInMonth,
           budgetMonthLabel,
-          liveSummary
+          liveSummary,
+          recentMessages,
+          userContext
         );
         replyText = reply.text;
         await addChatMessage(sessionId, "bot", replyText, welcomeText);
         groqAiMode = reply.usedGroq;
+        botModeLabel = groqAiMode ? "Groq AI ready" : "rule-based mode";
       } catch (error) {
         console.log("Groq API failed, using fallback");
         replyText = buildFinBotReply(
@@ -1444,15 +1486,16 @@ app.post("/chatbot", async (req, res) => {
         );
         await addChatMessage(sessionId, "bot", replyText, welcomeText);
         groqAiMode = false;
+        botModeLabel = "rule-based mode";
       }
     }
 
     if (wantsJson) {
-      return res.json({ reply: replyText, usedGroq: groqAiMode });
+      return res.json({ reply: replyText, usedGroq: groqAiMode, modeLabel: botModeLabel });
     }
 
     const messages = await getChatHistory(sessionId, welcomeText);
-    renderChatbotPage(res, liveSummary, messages, groqAiMode, rawMessage);
+    renderChatbotPage(res, liveSummary, messages, groqAiMode, rawMessage, botModeLabel);
   } catch (error) {
     console.error("FinBot message error:", error);
     if (wantsJson) {

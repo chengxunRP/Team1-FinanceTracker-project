@@ -23,7 +23,7 @@ async function getCategoryColumns() {
       FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = DATABASE()
         AND TABLE_NAME = 'categories'
-        AND COLUMN_NAME IN ('is_custom', 'is_deleted', 'deleted_at', 'icon_image', 'user_id')`
+        AND COLUMN_NAME IN ('is_custom', 'is_deleted', 'deleted_at', 'icon_image', 'user_id', 'is_active')`
     );
     const names = new Set(rows.map((r) => r.COLUMN_NAME));
     categoryColumnsCache = {
@@ -32,6 +32,7 @@ async function getCategoryColumns() {
       hasDeletedAt: names.has("deleted_at"),
       hasIconImage: names.has("icon_image"),
       hasUserId: names.has("user_id"),
+      hasIsActive: names.has("is_active"),
     };
   } catch (error) {
     categoryColumnsCache = {
@@ -40,6 +41,7 @@ async function getCategoryColumns() {
       hasDeletedAt: false,
       hasIconImage: false,
       hasUserId: false,
+      hasIsActive: false,
     };
   }
   return categoryColumnsCache;
@@ -79,7 +81,8 @@ function resolveCategoryVisual(options = {}) {
   };
 }
 
-const DUPLICATE_CATEGORY_MESSAGE = "Category name already exists.";
+const DUPLICATE_CATEGORY_MESSAGE =
+  "Category already exists. Please select it from the list.";
 
 function buildJoinedCategorySelect(columns, alias) {
   const a = alias || "c";
@@ -175,9 +178,12 @@ async function findCategoryByNameIncludingDeleted(name) {
   query += " FROM categories WHERE LOWER(name) = LOWER(?)";
   const params = [trimmed];
   if (columns.hasUserId && columns.hasIsCustom) {
-    const accessible = accessibleCategoryClause();
-    query += ` AND ${accessible.clause}`;
-    params.push(...accessible.params);
+    // Match picker visibility rules:
+    // - Visible defaults: is_custom=0 AND (icon IS NULL OR icon != DEFAULT_CUSTOM_ICON_KEY)
+    // - Visible custom categories: is_custom=1 AND user_id=currentUser
+    query +=
+      " AND ((is_custom = 0 AND (icon IS NULL OR icon != ?)) OR (is_custom = 1 AND user_id = ?))";
+    params.push(DEFAULT_CUSTOM_ICON_KEY, requireUserId());
   } else if (columns.hasUserId) {
     query += " AND user_id = ?";
     params.push(requireUserId());
@@ -216,10 +222,29 @@ async function findSoftDeletedCategoryByName(name) {
   if (columns.hasIsCustom) query += ", is_custom";
   if (columns.hasIsDeleted) query += ", is_deleted";
   if (columns.hasIconImage) query += ", icon_image";
-  if (columns.hasUserId) query += ", user_id";
-  query += " FROM categories WHERE LOWER(name) = LOWER(?) AND is_deleted = 1 LIMIT 1";
 
-  const [rows] = await db.query(query, [trimmed]);
+  // Optional fields for debug/restore decisions.
+  if (columns.hasUserId) query += ", user_id";
+  if (columns.hasIsActive) query += ", is_active";
+
+  query += " FROM categories WHERE LOWER(name) = LOWER(?) AND is_deleted = 1";
+
+  const params = [trimmed];
+  if (columns.hasUserId && columns.hasIsCustom) {
+    // Match picker visibility rules:
+    // - Visible defaults: is_custom=0 AND (icon IS NULL OR icon != DEFAULT_CUSTOM_ICON_KEY)
+    // - Visible custom categories: is_custom=1 AND user_id=currentUser
+    query +=
+      " AND ((is_custom = 0 AND (icon IS NULL OR icon != ?)) OR (is_custom = 1 AND user_id = ?))";
+    params.push(DEFAULT_CUSTOM_ICON_KEY, requireUserId());
+  } else if (columns.hasUserId) {
+    query += " AND user_id = ?";
+    params.push(requireUserId());
+  }
+
+  query += " LIMIT 1";
+
+  const [rows] = await db.query(query, params);
   if (!rows.length) return null;
   return mapCategoryRow(rows[0]);
 }
@@ -277,9 +302,10 @@ async function categoryNameExists(name, excludeId) {
   const params = [trimmed];
   const columns = await getCategoryColumns();
   if (columns.hasUserId && columns.hasIsCustom) {
-    const accessible = accessibleCategoryClause();
-    query += ` AND ${accessible.clause}`;
-    params.push(...accessible.params);
+    // Match picker visibility rules (defaults visible only when icon != DEFAULT_CUSTOM_ICON_KEY).
+    query +=
+      " AND ((is_custom = 0 AND (icon IS NULL OR icon != ?)) OR (is_custom = 1 AND user_id = ?))";
+    params.push(DEFAULT_CUSTOM_ICON_KEY, requireUserId());
   } else if (columns.hasUserId) {
     query += " AND user_id = ?";
     params.push(requireUserId());
@@ -379,6 +405,43 @@ async function createCategory(name, options = {}) {
 
   const visual = resolveCategoryVisual(options);
   const columns = await getCategoryColumns();
+  const normalizedName = trimmed.toLowerCase();
+
+  async function logCategoryDuplicateDebug(inputName) {
+    // Temporary diagnostic logging for the false duplicate bug.
+    // Enable/disable via DEBUG_CATEGORY_DUPLICATE=0/1 if you want to reduce noise later.
+    try {
+      const shouldLog =
+        process.env.DEBUG_CATEGORY_DUPLICATE === "1" ||
+        process.env.NODE_ENV === "development";
+      if (!shouldLog) return;
+
+      const currentUserId = requireUserId();
+      const selectFields = [
+        "id",
+        "name",
+        columns.hasUserId ? "user_id" : null,
+        columns.hasIsCustom ? "is_custom" : null,
+        columns.hasIsDeleted ? "is_deleted" : null,
+        columns.hasDeletedAt ? "deleted_at" : null,
+        columns.hasIsActive ? "is_active" : null,
+      ].filter(Boolean);
+
+      const [dupRows] = await db.query(
+        `SELECT ${selectFields.join(", ")} FROM categories WHERE LOWER(name) = LOWER(?) LIMIT 10`,
+        [trimmed]
+      );
+
+      console.warn("[CATEGORY DUPLICATE DEBUG]", {
+        currentUserId,
+        inputName,
+        normalizedName,
+        duplicateRows: dupRows || [],
+      });
+    } catch (e) {
+      // Never break category creation on debug logging.
+    }
+  }
 
   const existingAny = await findCategoryByNameIncludingDeleted(trimmed);
   if (existingAny) {
@@ -386,6 +449,7 @@ async function createCategory(name, options = {}) {
       await restoreSoftDeletedCategory(existingAny.id, trimmed, visual);
       return returnRestoredCategory(existingAny.id);
     }
+    await logCategoryDuplicateDebug(name);
     const err = new Error(DUPLICATE_CATEGORY_MESSAGE);
     err.code = "DUPLICATE";
     throw err;
@@ -399,6 +463,7 @@ async function createCategory(name, options = {}) {
 
   const activeDuplicate = await categoryNameExists(trimmed);
   if (activeDuplicate) {
+    await logCategoryDuplicateDebug(name);
     const err = new Error(DUPLICATE_CATEGORY_MESSAGE);
     err.code = "DUPLICATE";
     throw err;
@@ -413,6 +478,7 @@ async function createCategory(name, options = {}) {
         await restoreSoftDeletedCategory(hiddenDeleted.id, trimmed, visual);
         return returnRestoredCategory(hiddenDeleted.id);
       }
+      await logCategoryDuplicateDebug(name);
       const err = new Error(DUPLICATE_CATEGORY_MESSAGE);
       err.code = "DUPLICATE";
       throw err;

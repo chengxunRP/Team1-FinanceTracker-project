@@ -70,8 +70,18 @@ router.post('/api', uploadCategoryIcon, async (req, res) => {
     res.json({ success: true, category });
   } catch (error) {
     console.error('Database error creating category via API:', error);
-    const message = error.message || 'Unable to save category right now. Please try again.';
-    const status = error.code === 'VALIDATION' || error.code === 'DUPLICATE' ? 400 : 500;
+    const isClientError = error.code === 'VALIDATION' || error.code === 'DUPLICATE';
+    const status = isClientError ? 400 : 500;
+
+    let message;
+    if (error.code === 'DUPLICATE') {
+      message = 'Category already exists. Please select it from the list.';
+    } else if (error.code === 'VALIDATION') {
+      message = error.message || 'Invalid input. Please try again.';
+    } else {
+      message = 'Unable to create category. Please try again.';
+    }
+
     res.status(status).json({ success: false, errors: [message] });
   }
 });

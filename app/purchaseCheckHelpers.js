@@ -8,6 +8,8 @@ function extractItemPrice(message) {
     /buy\s*(?:a\s*)?\$?\s*(\d+(?:\.\d+)?)\s*(?:item|thing)?/i,
     /afford\s*(?:a\s*)?\$?\s*(\d+(?:\.\d+)?)/i,
     /\$(\d+(?:\.\d+)?)\s*item/i,
+    /what about\s*\$?\s*(\d+(?:\.\d+)?)/i,
+    /(?:^|\s)\$(\d+(?:\.\d+)?)(?:\s|$)/i,
   ];
 
   for (let i = 0; i < patterns.length; i++) {
@@ -29,7 +31,8 @@ function isPurchaseQuestion(message) {
     text.includes("afford") ||
     text.includes("buy this") ||
     text.includes("buy a") ||
-    text.includes("purchase")
+    text.includes("purchase") ||
+    text.includes("what about")
   );
 }
 
