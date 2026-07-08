@@ -33,7 +33,10 @@
         <h2 style="margin:0 0 0.15rem;font-size:1.15rem;font-weight:700;"><%= user.name %></h2>
         <p style="margin:0;font-size:0.85rem;color:var(--text-muted);"><%= user.email %></p>
       </div>
-      <button type="button" onclick="showEditForm()" class="btn btn--primary btn--sm">Edit</button>
+      <div style="display:flex;gap:0.5rem;">
+        <button type="button" onclick="toggleHistory()" class="btn btn--sm" style="background:var(--grey-200,#eee);border:none;">History</button>
+        <button type="button" onclick="showEditForm()" class="btn btn--primary btn--sm">Edit</button>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;">
@@ -85,6 +88,30 @@
       </p>
     </div>
   </div>
+
+  <!-- ===== MONTHLY USAGE HISTORY (hidden by default) ===== -->
+  <% if (typeof history !== 'undefined' && history.length > 0) { %>
+    <div id="historyView" class="card-panel" style="max-width:520px;width:100%;margin:0 auto 1.25rem;display:none;">
+      <h2 style="margin:0 0 1rem;font-size:1rem;font-weight:700;">Monthly Usage History</h2>
+
+      <div style="display:flex;flex-direction:column;gap:0.85rem;">
+        <% history.forEach(function(m) { %>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:0.85rem;margin-bottom:0.3rem;">
+              <span style="font-weight:600;color:var(--text);"><%= m.label %></span>
+              <span style="color:<%= m.overBudget ? '#d32f2f' : 'var(--text-muted)' %>;font-weight:<%= m.overBudget ? '700' : '400' %>;">
+                <%= user.currency || 'USD' %> <%= m.spent.toFixed(2) %> / <%= m.budget.toFixed(2) %>
+                <% if (m.overBudget) { %> ⚠<% } %>
+              </span>
+            </div>
+            <div style="background:var(--grey-200,#eee);border-radius:999px;height:6px;overflow:hidden;">
+              <div style="height:100%;border-radius:999px;width:<%= Math.min(m.percentUsed, 100) %>%;background:<%= m.percentUsed >= 100 ? '#d32f2f' : (m.percentUsed >= 80 ? '#f9a825' : '#43a047') %>;"></div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  <% } %>
 
   <!-- ===== EDIT FORM (hidden by default) ===== -->
   <div id="editView" class="card-panel" style="max-width:480px;width:100%;margin:0 auto 1.25rem;display:none;">
@@ -153,6 +180,11 @@
   function showSummaryView() {
     document.getElementById('editView').style.display = 'none';
     document.getElementById('summaryView').style.display = 'block';
+  }
+  function toggleHistory() {
+    const historyView = document.getElementById('historyView');
+    if (!historyView) return;
+    historyView.style.display = historyView.style.display === 'none' ? 'block' : 'none';
   }
   <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
     showEditForm();
