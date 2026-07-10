@@ -25,6 +25,7 @@
 
   vars:
     groq_api_key: "your_groq_api_key_here"   # override via --extra-vars
+    smtp_pass: "your_smtp_app_password"      # override via --extra-vars
     app_dir: "/opt/spendwise"
     env_file_path: "/opt/spendwise/.env"
     sql_file_path: "/opt/spendwise/init.sql"
@@ -234,6 +235,13 @@
           DB_PASSWORD: "{{ db_password | string }}"
           DB_NAME: "{{ db_name }}"
           DB_PORT: "{{ db_port | string }}"
+          SMTP_HOST: "{{ smtp_host }}"
+          SMTP_PORT: "{{ smtp_port | string }}"
+          SMTP_SECURE: "{{ smtp_secure | string }}"
+          SMTP_USER: "{{ smtp_user }}"
+          SMTP_PASS: "{{ smtp_pass }}"
+          SMTP_FROM: "{{ smtp_from }}"
+          APP_BASE_URL: "{{ app_base_url }}"
 
     # -----------------------------------------------------------
     # PART 7 — Validate deployment

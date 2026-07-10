@@ -36,3 +36,13 @@ db_user=finance_user
 db_password=password123
 db_name=finance_tracker
 db_port=3306
+
+# SMTP settings for budget email alerts (Profile -> Email Budget Notifications)
+smtp_host=smtp.gmail.com
+smtp_port=587
+smtp_secure=false
+smtp_user=your-sender-email@gmail.com
+smtp_from=spendWise <your-sender-email@gmail.com>
+
+# App base URL used for absolute links in budget alert emails
+app_base_url=http://192.0.2.3:3000
