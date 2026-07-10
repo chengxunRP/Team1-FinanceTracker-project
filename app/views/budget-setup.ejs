@@ -1,0 +1,122 @@
+<%- include('partials/header') %>
+
+<%
+  if (typeof categorySetupRows === 'undefined') categorySetupRows = [];
+  if (typeof budgetMonth === 'undefined') budgetMonth = '';
+  if (typeof budgetMonthLabel === 'undefined') budgetMonthLabel = budgetMonth;
+
+  function budgetIconSvg(type) {
+    var icons = {
+      budget: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
+      spend: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.75"/></svg>',
+      food: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21c4-4 6-7.5 6-11a6 6 0 10-12 0c0 3.5 2 7 6 11z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M12 13a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" stroke-width="1.75"/></svg>',
+      transport: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 17h14M5 17a2 2 0 100-4 2 2 0 000 4zM19 17a2 2 0 100-4 2 2 0 000 4zM5 17V8l2-3h10l2 3v9" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M7 8h10" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
+      school: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3L2 8l10 5 10-5-10-5z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M6 10.5V17c2 2 8 2 12 0v-6.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
+      shopping: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 9V7a5 5 0 0110 0v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M6 9h12l-1 12H7L6 9z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
+      bills: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4h8l2 4v12H6V4h2z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>',
+      entertainment: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M10 9.5l5 3-5 3v-6z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
+      others: '<svg class="budget-cat-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"/><path d="M8.5 12h7M12 8.5v7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>'
+    };
+    return icons[type] || icons.spend;
+  }
+
+  function formatMoney(value) {
+    var num = Number(value);
+    if (Number.isNaN(num)) return '$0';
+    var text = num.toFixed(2);
+    if (text.slice(-3) === '.00') return '$' + text.slice(0, -3);
+    return '$' + text;
+  }
+%>
+
+<div class="budget-page budget-page--setup">
+  <header class="budget-page-header">
+    <div class="budget-page-header__text">
+      <a href="/budget<%= budgetMonth ? '?month=' + budgetMonth : '' %>" class="budget-back-link">&larr; Back to Budget Alerts</a>
+      <span class="budget-page-eyebrow">Budget setup</span>
+      <h1 class="budget-page-title">Set or Update Budgets</h1>
+      <p class="budget-page-subtitle">Configure your monthly spending limit and optional category budgets for <%= budgetMonthLabel %>.</p>
+    </div>
+  </header>
+
+  <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+  <div class="budget-flash budget-flash--error">
+    <% errors.forEach(function(error) { %>
+      <p><%= error %></p>
+    <% }); %>
+  </div>
+  <% } %>
+
+  <form class="budget-setup-page-form" method="POST" action="/budget/setup">
+    <input type="hidden" name="budgetMonth" value="<%= budgetMonth %>">
+
+    <section class="budget-setup-section">
+      <div class="budget-setup-section__head">
+        <span class="budget-setup-card__icon" aria-hidden="true"><%- budgetIconSvg('budget') %></span>
+        <div>
+          <h2 class="budget-setup-section__title">Monthly Budget</h2>
+          <p class="budget-setup-section__intro">Overall spending limit for <%= budgetMonthLabel %>.</p>
+        </div>
+      </div>
+      <div class="form-group budget-setup-monthly">
+        <label for="monthlyBudget">Monthly budget ($)</label>
+        <input
+          type="number"
+          id="monthlyBudget"
+          name="monthlyBudget"
+          min="0.01"
+          step="0.01"
+          required
+          value="<%= typeof formValues !== 'undefined' && formValues.monthlyBudget !== undefined ? formValues.monthlyBudget : summary.monthlyBudget %>"
+        >
+      </div>
+    </section>
+
+    <section class="budget-setup-section">
+      <div class="budget-setup-section__head">
+        <span class="budget-setup-card__icon" aria-hidden="true"><%- budgetIconSvg('spend') %></span>
+        <div>
+          <h2 class="budget-setup-section__title">Category Budgets</h2>
+          <p class="budget-setup-section__intro">Optional limits per category. Leave blank to skip a category.</p>
+        </div>
+      </div>
+
+      <% if (categorySetupRows.length === 0) { %>
+      <p class="budget-spending-section__none">No categories found. Add categories first before setting budgets.</p>
+      <% } else { %>
+      <div class="budget-cat-setup-list">
+        <% categorySetupRows.forEach(function(row) { %>
+        <div class="budget-cat-setup-field">
+          <div class="budget-cat-setup-field__info">
+            <%- include('partials/category-icon', { catName: row.name, catIcon: row.icon, catSize: 'md' }) %>
+            <div>
+              <label class="budget-cat-setup-field__label" for="categoryBudget_<%= row.categoryId %>"><%= row.name %></label>
+              <span class="budget-cat-setup-field__hint">Monthly limit</span>
+            </div>
+          </div>
+          <div class="budget-cat-setup-input">
+            <span class="budget-cat-setup-prefix">$</span>
+            <input
+              type="number"
+              id="categoryBudget_<%= row.categoryId %>"
+              name="categoryBudget_<%= row.categoryId %>"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value="<%= row.budgeted !== '' ? row.budgeted : '' %>"
+            >
+          </div>
+        </div>
+        <% }); %>
+      </div>
+      <% } %>
+    </section>
+
+    <div class="budget-setup-actions">
+      <a href="/budget<%= budgetMonth ? '?month=' + budgetMonth : '' %>" class="btn btn--secondary">Cancel</a>
+      <button type="submit" class="btn btn--primary">Save budgets</button>
+    </div>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

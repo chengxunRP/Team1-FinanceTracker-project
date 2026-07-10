@@ -1,0 +1,284 @@
+---
+# =============================================================
+# SpendWise Finance Tracker — Ansible Deployment Playbook
+# =============================================================
+# Run with:
+#   ansible-playbook playbook.yml
+#
+# Pass secrets securely at runtime (recommended):
+#   ansible-playbook playbook.yml \
+#     --extra-vars "groq_api_key=gsk_xxx db_password=yourpassword"
+#
+# Parts:
+#   1. Verify connectivity (mirrors 7.4.8 ping test)
+#   2. Install Docker
+#   3. Copy project files to server
+#   4. Generate .env from template
+#   5. Deploy MySQL container + initialize database schema
+#   6. Deploy SpendWise app container
+#   7. Validate the deployment
+# =============================================================
+
+- name: Deploy SpendWise Finance Tracker
+  hosts: spendwise
+  become: yes
+
+  vars:
+    groq_api_key: "your_groq_api_key_here"   # override via --extra-vars
+    app_dir: "/opt/spendwise"
+    env_file_path: "/opt/spendwise/.env"
+    sql_file_path: "/opt/spendwise/init.sql"
+    mysql_root_password: "rootpassword"
+    db_host: "127.0.0.1"   # cosmetic placeholder; real DB_HOST is injected later from the MySQL container's actual IP
+
+  # -----------------------------------------------------------
+  # PART 1 — Verify connectivity (same as 7.4.8 Part 3)
+  # -----------------------------------------------------------
+  pre_tasks:
+    - name: PING — Verify Ansible can reach the server
+      ping:
+
+    - name: ECHO — Confirm remote shell is working
+      command: /bin/echo "SpendWise deployment starting on {{ inventory_hostname }}"
+      register: echo_result
+
+    - name: Show echo result
+      debug:
+        msg: "{{ echo_result.stdout }}"
+
+  tasks:
+    # -----------------------------------------------------------
+    # PART 2 — Install Docker
+    # -----------------------------------------------------------
+    - name: UPDATE — Refresh apt package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # Docker's official docker-ce/containerd.io packages conflict with Ubuntu's
+    # docker.io/containerd packages. Remove them if present so the install below
+    # doesn't fail with "pkgProblemResolver::Resolve generated breaks".
+    - name: CLEANUP — Remove conflicting Docker CE packages if present
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: absent
+      ignore_errors: yes
+
+    - name: INSTALL — Install Docker and Python Docker SDK
+      apt:
+        name:
+          - docker.io
+          - curl
+          - python3-docker     # required for Ansible docker_container module
+          - mysql-client       # allows manual DB inspection from the host
+        state: latest
+
+    - name: ENABLE — Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    # -----------------------------------------------------------
+    # PART 3 — Copy project files to the server
+    # -----------------------------------------------------------
+    - name: MKDIR — Create SpendWise app directory on server
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: COPY — Transfer database init SQL to server
+      # This copies db/init.sql from your project into the server.
+      # Ansible resolves 'files/init.sql' relative to the playbook directory.
+      # Place db/init.sql at ansible/files/init.sql before running.
+      copy:
+        src: files/init.sql
+        dest: "{{ sql_file_path }}"
+        mode: '0644'
+
+    # -----------------------------------------------------------
+    # PART 4 — Generate .env file from Jinja2 template
+    # -----------------------------------------------------------
+    - name: ENV — Generate .env file from template
+      template:
+        src: templates/env.j2
+        dest: "{{ env_file_path }}"
+        mode: '0600'    # restrict read — file contains secrets
+      notify:
+        - RESTART spendwise container
+
+    # -----------------------------------------------------------
+    # PART 5 — Deploy MySQL container + initialize schema
+    # -----------------------------------------------------------
+    - name: MYSQL — Pull MySQL 8 image
+      community.docker.docker_image:
+        name: mysql:8
+        source: pull
+
+    - name: MYSQL — Run MySQL container
+      community.docker.docker_container:
+        name: spendwise-mysql
+        image: mysql:8
+        state: started
+        restart_policy: always
+        ports:
+          - "3306:3306"
+        env:
+          MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
+          MYSQL_DATABASE: "{{ db_name }}"
+          MYSQL_USER: "{{ db_user }}"
+          MYSQL_PASSWORD: "{{ db_password }}"
+
+    # FIX #4: Wait long enough for MySQL to fully initialize before importing
+    - name: MYSQL — Wait for MySQL port to open (up to 60s)
+      wait_for:
+        host: 127.0.0.1
+        port: 3306
+        delay: 10
+        timeout: 60
+
+    # On first-ever init, MySQL 8 starts a temporary internal server, then
+    # restarts into the real one — the port/ping can briefly succeed against
+    # the temporary server and then drop. Retry generously so we land after
+    # the real server is up, not the transient one.
+    - name: MYSQL — Confirm MySQL is accepting connections
+      command: >
+        docker exec spendwise-mysql
+        mysqladmin ping -u root -p{{ mysql_root_password }} --silent
+      register: mysql_ping
+      retries: 12
+      delay: 5
+      until: mysql_ping.rc == 0
+      ignore_errors: yes
+
+    # Extra settle time to clear the temporary-server restart window on
+    # first-time initialization.
+    - name: MYSQL — Extra settle time after first-init restart
+      pause:
+        seconds: 15
+
+    - name: MYSQL — Re-confirm MySQL is accepting connections
+      command: >
+        docker exec spendwise-mysql
+        mysqladmin ping -u root -p{{ mysql_root_password }} --silent
+      register: mysql_ping2
+      retries: 6
+      delay: 5
+      until: mysql_ping2.rc == 0
+
+    # FIX #1 + #2: Copy init.sql into the container and run it
+    - name: MYSQL — Copy init.sql into MySQL container
+      command: >
+        docker cp {{ sql_file_path }} spendwise-mysql:/init.sql
+
+    - name: MYSQL — Initialize database schema and seed data
+      command: >
+        docker exec spendwise-mysql
+        bash -c "mysql -u root -p{{ mysql_root_password }} {{ db_name }} < /init.sql"
+      register: db_init
+      failed_when: db_init.rc != 0
+
+    - name: Show DB init result
+      debug:
+        msg: "{{ db_init.stdout | default('Schema applied successfully.') }}"
+
+    # -----------------------------------------------------------
+    # PART 6 — Deploy SpendWise app container
+    # -----------------------------------------------------------
+    - name: SPENDWISE — Remove old container if it exists
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: SPENDWISE — Pull latest image from Docker Hub
+      community.docker.docker_image:
+        name: "{{ docker_image }}"
+        source: pull
+
+    # FIX #3: On Linux servers, use the MySQL container's IP directly
+    # instead of host.docker.internal (which only works on Docker Desktop)
+    # Newer Docker versions don't always populate the legacy top-level
+    # NetworkSettings.IPAddress field — pull the IP from whichever network
+    # the container is actually attached to instead.
+    - name: MYSQL — Get MySQL container IP address
+      command: >
+        docker inspect -f
+        '{{ "{{" }}range .NetworkSettings.Networks{{ "}}" }}{{ "{{" }}.IPAddress{{ "}}" }}{{ "{{" }}end{{ "}}" }}'
+        spendwise-mysql
+      register: mysql_ip
+
+    - name: Show MySQL container IP
+      debug:
+        msg: "MySQL container IP: {{ mysql_ip.stdout }}"
+
+    - name: SPENDWISE — Run SpendWise app container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ docker_image }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "{{ app_port }}:{{ app_port }}"
+        env:
+          PORT: "{{ app_port | string }}"
+          GROQ_API_KEY: "{{ groq_api_key }}"
+          DB_HOST: "{{ mysql_ip.stdout | trim }}"   # FIX #3: use container IP
+          DB_USER: "{{ db_user }}"
+          DB_PASSWORD: "{{ db_password | string }}"
+          DB_NAME: "{{ db_name }}"
+          DB_PORT: "{{ db_port | string }}"
+
+    # -----------------------------------------------------------
+    # PART 7 — Validate deployment
+    # -----------------------------------------------------------
+    - name: VALIDATE — Wait for app to respond on port {{ app_port }}
+      wait_for:
+        host: localhost
+        port: "{{ app_port }}"
+        delay: 5
+        timeout: 30
+
+    - name: VALIDATE — HTTP health check on SpendWise
+      uri:
+        url: "http://localhost:{{ app_port }}"
+        return_content: no
+        status_code: 200
+      register: health_check
+      retries: 3
+      delay: 5
+
+    - name: VALIDATE — Show running containers
+      command: docker ps
+      register: docker_ps
+
+    - name: Show running containers
+      debug:
+        msg: "{{ docker_ps.stdout_lines }}"
+
+  # -----------------------------------------------------------
+  # HANDLERS
+  # -----------------------------------------------------------
+  handlers:
+    - name: RESTART spendwise container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: started
+        restart: yes
+
+  # -----------------------------------------------------------
+  # POST — Summary
+  # -----------------------------------------------------------
+  post_tasks:
+    - name: DONE — Deployment complete
+      debug:
+        msg: >
+          SpendWise is live at http://{{ inventory_hostname }}:{{ app_port }}.
+          Container: {{ container_name }} | Image: {{ docker_image }}
+          MySQL IP used: {{ mysql_ip.stdout | trim }}

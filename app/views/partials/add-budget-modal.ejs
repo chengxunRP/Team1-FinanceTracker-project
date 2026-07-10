@@ -1,0 +1,187 @@
+<%
+  if (typeof availableCategories === 'undefined') availableCategories = [];
+  if (typeof budgetMonth === 'undefined') budgetMonth = '';
+  if (typeof budgetMonthLabel === 'undefined') budgetMonthLabel = budgetMonth;
+  if (typeof hasOverallBudget === 'undefined') hasOverallBudget = false;
+  if (typeof currentMonthName === 'undefined') {
+    currentMonthName = (budgetMonthLabel || '').split(' ')[0] || 'this month';
+  }
+  var customCategories = availableCategories.filter(function(c) { return c.isCustom; });
+  var generalCategories = availableCategories.filter(function(c) { return !c.isCustom; });
+%>
+
+<!-- Add budget modal -->
+<%- include('modal-shell-overlay-start', { overlayId: 'addBudgetOverlay', ariaLabelledBy: 'addBudgetTitle' }) %>
+    <%- include('modal-shell-header', {
+      title: 'Add a budget',
+      titleId: 'addBudgetTitle',
+      closeId: 'closeAddBudget',
+      headerId: 'addBudgetHeader'
+    }) %>
+
+    <div class="spb-modal__search" id="addBudgetSearch">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      <input type="search" id="categorySearch" placeholder="Search category" autocomplete="off">
+    </div>
+
+    <div class="spb-modal__body pocketguard-style-modal-body" id="categoryPickerStep">
+      <%- include('shared-category-picker-lists', {
+        pickerMode: 'budget',
+        customCategories: customCategories,
+        generalCategories: generalCategories,
+        hasOverallBudget: hasOverallBudget
+      }) %>
+      <% if (availableCategories.length === 0) { %>
+      <p class="spb-modal__empty">No categories found. Create a category first.</p>
+      <% } %>
+    </div>
+
+    <!-- Create category step (hidden initially) -->
+    <div class="spb-modal__body spb-modal__body--create pocketguard-style-modal-body" id="createCategoryStep" hidden>
+      <header class="spb-modal__header spb-modal__header--step">
+        <button type="button" class="spb-modal__back" id="backFromCreateCategory" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <h2 class="spb-modal__title">Create category</h2>
+        <button type="button" class="spb-modal__close" id="closeCreateCategory" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <div class="spb-create-category">
+        <button type="button" class="spb-colour-preview-btn" id="openChooseColourCreate" aria-label="Choose colour">
+          <span class="spb-colour-preview" id="newCategoryColourCircle" aria-hidden="true"></span>
+          <span class="spb-colour-preview-label">Choose colour</span>
+        </button>
+        <input type="hidden" id="newCategoryColor" value="">
+
+        <input type="text" id="newCategoryName" class="spb-create-category__name" placeholder="Enter name" autocomplete="off" maxlength="100">
+
+        <aside class="spb-protip spb-protip--create">
+          <span class="spb-protip__label">PRO TIP:</span>
+          Use custom categories to track things you buy regularly. To track spending for holidays, events or trips try using #hashtags.
+        </aside>
+
+        <div class="spb-create-category__upload">
+          <label class="spb-create-category__upload-label" for="newCategoryIcon">Optional icon image</label>
+          <input type="file" id="newCategoryIcon" accept=".png,.jpg,.jpeg,.webp" class="spb-create-category__file">
+        </div>
+
+        <p class="spb-form-error" id="createCategoryError" hidden></p>
+        <p class="spb-form-success" id="createCategorySuccess" hidden></p>
+
+        <div class="spb-create-category__footer">
+          <button type="button" class="spb-create-category__cancel" id="cancelCreateCategory">Cancel</button>
+          <button type="button" class="spb-btn spb-btn--save" id="saveCreateCategory">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit category step (hidden initially) -->
+    <div class="spb-modal__body spb-modal__body--create pocketguard-style-modal-body" id="editCategoryStep" hidden>
+      <header class="spb-modal__header spb-modal__header--step">
+        <button type="button" class="spb-modal__back" id="backFromEditCategory" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <h2 class="spb-modal__title">Edit category</h2>
+        <button type="button" class="spb-modal__close" id="closeEditCategory" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <div class="spb-create-category">
+        <button type="button" class="spb-colour-preview-btn" id="openChooseColourEdit" aria-label="Choose colour">
+          <span class="spb-colour-preview" id="editCategoryColourCircle" aria-hidden="true"></span>
+          <span class="spb-colour-preview-label">Choose colour</span>
+        </button>
+        <input type="hidden" id="editCategoryColor" value="">
+
+        <input type="text" id="editCategoryName" class="spb-create-category__name" placeholder="Enter name" autocomplete="off" maxlength="100" aria-label="Category name">
+
+        <div class="spb-create-category__upload">
+          <label class="spb-create-category__upload-label" for="editCategoryIcon">Optional icon image</label>
+          <input type="file" id="editCategoryIcon" accept=".png,.jpg,.jpeg,.webp" class="spb-create-category__file">
+        </div>
+
+        <p class="spb-form-error" id="editCategoryError" hidden></p>
+        <div class="spb-create-category__footer">
+          <button type="button" class="spb-create-category__cancel" id="cancelEditCategory">Cancel</button>
+          <button type="button" class="spb-btn spb-btn--save" id="saveEditCategory">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Set amount step (hidden initially) -->
+    <div class="spb-modal__body spb-modal__body--amount pocketguard-style-modal-body" id="amountStep" hidden>
+      <header class="spb-modal__header spb-modal__header--step">
+        <button type="button" class="spb-modal__back" id="backToCategories" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <h2 class="spb-modal__title">Add a budget</h2>
+        <button type="button" class="spb-modal__close" id="closeAddBudgetAmount" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <p class="spb-amount-prompt">How much would you like to budget for <strong id="selectedCategoryName">Category</strong>?</p>
+
+      <div class="spb-amount-input-wrap">
+        <input type="text" inputmode="decimal" id="budgetAmountInput" class="spb-amount-input" placeholder="Enter amount" autocomplete="off">
+      </div>
+
+      <aside class="spb-note">
+        <span class="spb-note__label">NOTE:</span>
+        <span class="spb-note__text" id="budgetSpentNote">You've spent $0.00 so far in <%= currentMonthName %>. Your budget will start over at the beginning of every month.</span>
+      </aside>
+
+      <div class="spb-rollover">
+        <span class="spb-rollover__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0113.66-5.66M20 12a8 8 0 01-13.66 5.66" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M16 6h4V2M8 18H4v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <div class="spb-rollover__text">
+          <strong>Make this budget a monthly rollover</strong>
+          <p>Every month the left to spend balance will rollover to the next month. <a href="#" class="spb-rollover__link">Learn more</a></p>
+        </div>
+        <label class="spb-toggle">
+          <input type="checkbox" id="rolloverToggle">
+          <span class="spb-toggle__track"></span>
+        </label>
+      </div>
+
+      <p class="spb-form-error" id="budgetFormError" hidden></p>
+
+      <button type="button" class="spb-btn spb-btn--save" id="saveBudgetBtn">Save</button>
+    </div>
+<%- include('modal-shell-overlay-end') %>
+
+<!-- Choose colour modal -->
+<div class="spb-modal-overlay spb-modal-overlay--nested" id="chooseColourOverlay" hidden>
+  <div class="spb-modal spb-modal--colours" role="dialog" aria-labelledby="chooseColourTitle" aria-modal="true">
+    <header class="spb-modal__header spb-modal__header--step">
+      <button type="button" class="spb-modal__back" id="backFromChooseColour" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h2 class="spb-modal__title" id="chooseColourTitle">Choose a colour</h2>
+      <button type="button" class="spb-modal__close" id="closeChooseColour" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="spb-colour-picker" id="chooseColourBody"></div>
+    <div class="spb-colour-picker__custom">
+      <label class="spb-colour-picker__custom-label" for="customColourInput">Custom colour</label>
+      <input type="color" id="customColourInput" class="spb-colour-picker__custom-input" value="#22c55e">
+    </div>
+  </div>
+</div>
+
+<!-- Delete category confirmation -->
+<div class="spb-modal-overlay spb-modal-overlay--alert" id="deleteCategoryOverlay" hidden>
+  <div class="spb-alert" role="alertdialog" aria-labelledby="deleteCategoryTitle" aria-modal="true">
+    <h2 class="spb-alert__title" id="deleteCategoryTitle">Delete category?</h2>
+    <p class="spb-alert__text">Are you sure you want to delete <strong id="deleteCategoryName">this category</strong>?</p>
+    <div class="spb-alert__actions">
+      <button type="button" class="spb-alert__cancel" id="deleteCategoryCancel">Cancel</button>
+      <button type="button" class="spb-alert__proceed spb-alert__proceed--danger" id="deleteCategoryConfirm">Delete</button>
+    </div>
+  </div>
+</div>

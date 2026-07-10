@@ -1,0 +1,68 @@
+<%- include('../partials/header') %>
+
+<%
+  var isEdit = typeof isEdit !== 'undefined' ? isEdit : false;
+  var exp = expense || {};
+  var maxDate = typeof maxDate !== 'undefined' ? maxDate : new Date().toISOString().slice(0, 10);
+  var defaultDate = exp.date || maxDate;
+  var customCategories = (typeof customCategories !== 'undefined' && Array.isArray(customCategories))
+    ? customCategories
+    : (categories || []).filter(function(c) { return c.isCustom || Number(c.is_custom) === 1; });
+  var generalCategories = (typeof generalCategories !== 'undefined' && Array.isArray(generalCategories))
+    ? generalCategories
+    : (categories || []).filter(function(c) { return !(c.isCustom || Number(c.is_custom) === 1); });
+  var selectedCategoryId = exp.categoryId ? String(exp.categoryId) : '';
+  var selectedCat = (categories || []).find(function(c) { return String(c.id) === selectedCategoryId; });
+%>
+
+<link rel="stylesheet" href="/expense-form.css?v=37">
+<link rel="stylesheet" href="/spb.css?v=31">
+
+<div class="expense-txn">
+
+  <div class="page-header" style="margin-bottom:1rem;">
+    <a href="/expenses" class="expense-txn__back"
+       style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem;font-weight:600;color:var(--text-muted);text-decoration:none;margin-bottom:0.5rem;">
+      <svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back to Expenses
+    </a>
+    <span class="eyebrow">Finance Tracker</span>
+    <h1><%= isEdit ? 'Edit Expense' : 'Add Expense' %></h1>
+    <p><%= isEdit ? 'Update the details of this expense record.' : 'Record a new expense to track your spending.' %></p>
+  </div>
+
+  <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
+    <div class="form-errors" style="margin-bottom:1rem;">
+      <% errors.forEach(function(err) { %><p>⚠ <%= err %></p><% }) %>
+    </div>
+  <% } %>
+
+  <div class="expense-txn__card">
+    <%- include('../partials/expense-form-fields', {
+      expense: exp,
+      categories: categories,
+      selectedCategoryId: selectedCategoryId,
+      isEdit: isEdit,
+      maxDate: maxDate,
+      defaultDate: defaultDate,
+      formAction: formAction,
+      inModal: false
+    }) %>
+  </div>
+</div>
+
+<!-- Choose category modal -->
+<%- include('../partials/expense-category-picker-modal', {
+  customCategories: customCategories,
+  generalCategories: generalCategories,
+  selectedCategoryId: selectedCategoryId
+}) %>
+
+<script src="/js/expense-date.js"></script>
+<script src="/js/expense-upload.js?v=5"></script>
+<script src="/js/category-colours.js"></script>
+<script src="/js/picker-create-category.js?v=2"></script>
+<script src="/js/category-picker-helpers.js?v=1"></script>
+<script src="/js/expense-category-picker.js?v=13"></script>
+<script src="/js/expense-nav.js"></script>
+<%- include('../partials/footer') %>

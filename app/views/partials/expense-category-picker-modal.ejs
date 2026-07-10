@@ -1,0 +1,10 @@
+<%- include('category-picker-modal', {
+  pickerInstance: 'expense',
+  pickerMode: typeof pickerMode !== 'undefined' ? pickerMode : 'expense',
+  nestedOverlay: false,
+  customCategories: typeof customCategories !== 'undefined' ? customCategories : [],
+  generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : [],
+  categories: typeof categories !== 'undefined' ? categories : [],
+  selectedCategoryId: typeof selectedCategoryId !== 'undefined' ? selectedCategoryId : '',
+  expense: typeof expense !== 'undefined' ? expense : null
+}) %>

@@ -1,0 +1,329 @@
+<%- include('../partials/header') %>
+
+<link rel="stylesheet" href="/spb.css?v=45">
+<link rel="stylesheet" href="/modal-shell.css?v=5">
+<link rel="stylesheet" href="/expense-form.css?v=37">
+
+<%
+  if (typeof hasAnyExpenses === 'undefined') hasAnyExpenses = false;
+  if (typeof isFiltered === 'undefined') isFiltered = false;
+  if (typeof categories === 'undefined' || !Array.isArray(categories)) categories = [];
+  if (typeof maxDate === 'undefined' || !maxDate) maxDate = new Date().toISOString().slice(0, 10);
+  if (typeof allTimeFinance === 'undefined') allTimeFinance = { totalSpent: total, expenseCount: expenses.length, highestCategory: 'None', highestCategoryAmount: 0 };
+  if (typeof monthFinance === 'undefined') monthFinance = { summary: { totalSpent: 0 }, monthExpenseCount: 0, budgetMonthLabel: '' };
+  if (typeof budgetMonthLabel === 'undefined') budgetMonthLabel = monthFinance.budgetMonthLabel || '';
+  var topCat = isFiltered
+    ? byCategory.filter(function(c){ return c.count > 0; }).sort(function(a,b){ return b.total - a.total; })[0]
+    : { name: allTimeFinance.highestCategory, total: allTimeFinance.highestCategoryAmount };
+%>
+
+<div style="display:flex;flex-direction:column;gap:1.25rem;width:100%;max-width:none;" data-hide-txn-nav>
+
+  <!-- Page header -->
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+    <div class="page-header" style="margin-bottom:0;">
+      <span class="eyebrow">Finance Tracker</span>
+      <h1>Expenses</h1>
+      <p>Track, filter and manage all your spending records.</p>
+    </div>
+    <div style="display:flex;gap:0.65rem;flex-shrink:0;">
+      <a href="/categories" class="btn btn--sm" style="background:var(--white);color:var(--text-muted);border:1px solid var(--border-soft);">
+        <svg viewBox="0 0 24 24" fill="none" width="14" height="14" style="margin-right:0.3rem" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/></svg>
+        Categories
+      </a>
+      <button type="button" class="btn btn--primary btn--sm js-open-add-expense">
+        <svg viewBox="0 0 24 24" fill="none" width="14" height="14" style="margin-right:0.3rem" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"/></svg>
+        Add Expense
+      </button>
+    </div>
+  </div>
+
+  <!-- Stat cards — all-time totals from MySQL unless filters are active -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <span class="stat-card__label"><%= isFiltered ? 'Total Spent (filtered)' : 'Total Spent (all time)' %></span>
+      <span class="stat-card__value stat-card__value--blue"><%= formatSGD(total) %></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card__label">Spent this month</span>
+      <span class="stat-card__sub" style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem;"><%= budgetMonthLabel %></span>
+      <span class="stat-card__value stat-card__value--blue"><%= formatSGD(monthFinance.summary.totalSpent) %></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card__label"><%= isFiltered ? 'Records (filtered)' : 'Records (all time)' %></span>
+      <span class="stat-card__value"><%= isFiltered ? expenses.length : allTimeFinance.expenseCount %></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card__label">Top Category<%= isFiltered ? ' (filtered)' : ' (all time)' %></span>
+      <span class="stat-card__value stat-card__value--sm"><%= topCat && topCat.name !== '—' ? topCat.name : 'None' %></span>
+    </div>
+  </div>
+
+  <!-- Category breakdown -->
+  <% if (byCategory.filter(function(c){ return c.count > 0; }).length > 0) { %>
+  <div class="card-panel" style="padding:1.15rem 1.35rem;">
+    <h2 style="margin:0 0 0.85rem;font-size:0.88rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);">Spending by Category</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+      <% byCategory.filter(function(c){ return c.count > 0; }).forEach(function(cat) { %>
+        <a href="/expenses?category=<%= cat.id %>&sort=<%= sort %>"
+           class="expense-cat-pill<%= activeCategory === cat.id ? ' expense-cat-pill--active' : '' %>"
+           style="--cat-color:<%= cat.color %>;">
+          <%- include('../partials/category-icon', { catName: cat.displayName || cat.name, catIcon: cat.icon, catIconImage: cat.iconImage, catColor: cat.color, catSize: 'sm' }) %>
+          <%= cat.displayName || cat.name %>
+          <span class="expense-cat-pill__amount"><%= formatSGD(cat.total) %></span>
+        </a>
+      <% }) %>
+      <% if (activeCategory) { %>
+        <a href="/expenses?sort=<%= sort %>" style="display:inline-flex;align-items:center;gap:0.35rem;padding:0.35rem 0.85rem;border-radius:999px;font-size:0.8rem;font-weight:600;text-decoration:none;border:1.5px solid var(--border-soft);color:var(--text-muted);background:var(--white);">
+          ✕ Clear filter
+        </a>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Filter bar -->
+  <div class="card-panel" style="padding:1rem 1.35rem;">
+    <form method="GET" action="/expenses" style="display:flex;flex-wrap:wrap;gap:0.65rem;align-items:flex-end;">
+      <div class="form-group" style="flex:1;min-width:180px;margin:0;">
+        <label for="search" style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.3rem;display:block;">Search</label>
+        <div style="position:relative;">
+          <svg style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text-muted);" viewBox="0 0 24 24" fill="none" width="15" height="15" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          <input type="text" id="search" name="search" value="<%= search %>" placeholder="Search expenses by title, merchant or notes…"
+            style="padding:0.6rem 0.9rem 0.6rem 2.25rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+        </div>
+      </div>
+      <div class="form-group" style="min-width:150px;margin:0;">
+        <label for="category" style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.3rem;display:block;">Category</label>
+        <select id="category" name="category" style="padding:0.6rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+          <option value="">All Categories</option>
+          <% categories.forEach(function(cat) { %>
+            <option value="<%= cat.id %>" <%= activeCategory === cat.id ? 'selected' : '' %>><%= cat.displayName || cat.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="form-group" style="min-width:150px;margin:0;">
+        <label for="sort" style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.3rem;display:block;">Sort by</label>
+        <select id="sort" name="sort" style="padding:0.6rem 0.9rem;border:1px solid var(--grey-300);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text);background:var(--white);width:100%;">
+          <option value="date-desc"   <%= sort === 'date-desc'   ? 'selected' : '' %>>Newest First</option>
+          <option value="date-asc"    <%= sort === 'date-asc'    ? 'selected' : '' %>>Oldest First</option>
+          <option value="amount-desc" <%= sort === 'amount-desc' ? 'selected' : '' %>>Highest Amount</option>
+          <option value="amount-asc"  <%= sort === 'amount-asc'  ? 'selected' : '' %>>Lowest Amount</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:flex-end;">
+        <button type="submit" class="btn btn--primary btn--sm">Filter</button>
+        <% if (search || activeCategory) { %>
+          <a href="/expenses" class="btn btn--sm" style="background:var(--white);border:1px solid var(--border-soft);color:var(--text-muted);">Clear</a>
+        <% } %>
+      </div>
+    </form>
+  </div>
+
+  <!-- Expense table or empty state -->
+  <% if (expenses.length === 0) { %>
+    <div class="expense-empty-state card-panel">
+      <% if (!hasAnyExpenses && !isFiltered) { %>
+      <div class="expense-empty-state__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" width="48" height="48">
+          <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2 class="expense-empty-state__title">No expenses added yet.</h2>
+      <p class="expense-empty-state__text">Add your first expense to start tracking your spending.</p>
+      <button type="button" class="btn btn--primary btn--sm js-open-add-expense">Add your first expense</button>
+      <% } else { %>
+      <div class="expense-empty-state__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" width="48" height="48">
+          <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M9 12h6M9 9h6M9 15h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2 class="expense-empty-state__title">No expenses found</h2>
+      <p class="expense-empty-state__text">Try adjusting your filters or <button type="button" class="expense-empty-state__link js-open-add-expense">add a new expense</button>.</p>
+      <% } %>
+    </div>
+  <% } else { %>
+    <div class="expense-table-card">
+      <div class="table-wrap expense-table-wrap">
+        <table class="data-table data-table--expenses">
+          <thead>
+            <tr>
+              <th class="data-table__image-col">Image</th>
+              <th class="data-table__expense-col">Expense</th>
+              <th class="data-table__category-col">Category</th>
+              <th class="data-table__date-col">Date</th>
+              <th class="data-table__right data-table__amount-col">Amount</th>
+              <th class="data-table__right data-table__actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% expenses.forEach(function(expense) { %>
+              <tr class="expense-table-row" data-expense-id="<%= expense.id %>">
+                <td class="data-table__image-col">
+                  <%- include('../partials/expense-thumb', {
+                    expenseTitle: expense.title,
+                    imagePath: expense.imagePath,
+                    thumbLink: '/expenses/' + expense.id,
+                    thumbSize: 'md'
+                  }) %>
+                </td>
+                <td class="data-table__expense-col">
+                  <div class="expense-row-details">
+                    <div class="expense-row-details__title-row">
+                      <a href="/expenses/<%= expense.id %>" class="expense-row-details__title"><%= expense.title %></a>
+                      <% if (expense.imagePath && String(expense.imagePath).trim()) { %>
+                      <span class="expense-row-details__receipt" aria-label="Receipt attached" title="Receipt attached">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8.5 12.5l7.2-7.2a3 3 0 114.2 4.2l-8.4 8.4a4.5 4.5 0 01-6.4-6.4l9-9a6 6 0 018.5 8.5l-9.2 9.2a7.5 7.5 0 01-10.6-10.6l8.5-8.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </span>
+                      <% } %>
+                    </div>
+                    <% if (expense.merchantName) { %>
+                      <span class="expense-row-details__merchant"><%= expense.merchantName %></span>
+                    <% } %>
+                    <% if (expense.notes) { %>
+                      <span class="expense-row-details__notes"><%= expense.notes %></span>
+                    <% } %>
+                  </div>
+                </td>
+                <td class="data-table__category-col">
+                  <%
+                    var expenseCategoryName = expense.category
+                      ? (expense.category.displayName || expense.category.name || '')
+                      : '';
+                    if (!expenseCategoryName) expenseCategoryName = 'Uncategorized';
+                  %>
+                  <span class="expense-cat-pill expense-cat-pill--table" style="--cat-color:<%= expense.category ? expense.category.color : '' %>;">
+                    <%- include('../partials/category-icon', { catName: expenseCategoryName, catIcon: expense.category ? expense.category.icon : '', catIconImage: expense.category ? expense.category.iconImage : '', catColor: expense.category ? expense.category.color : '', catSize: 'sm' }) %>
+                    <span class="expense-cat-pill__name"><%= expenseCategoryName %></span>
+                  </span>
+                </td>
+                <td class="data-table__date-col">
+                  <%= new Date(expense.date + 'T00:00:00').toLocaleDateString('en-SG', { day:'numeric', month:'short', year:'numeric' }) %>
+                </td>
+                <td class="data-table__right data-table__amount"><%= formatSGD(expense.amount) %></td>
+                <td class="data-table__right data-table__actions-col">
+                  <div class="expense-row-actions">
+                    <button type="button"
+                            class="expense-action-btn expense-action-btn--edit js-transaction-detail-trigger"
+                            data-expense-id="<%= expense.id %>"
+                            data-expense-date="<%= expense.date %>"
+                            data-amount="<%= expense.amount %>"
+                            data-title="<%= expense.title %>"
+                            data-merchant-name="<%= expense.merchantName || '' %>"
+                            data-category="<%= expense.category.displayName || expense.category.name || '' %>"
+                            data-category-id="<%= expense.categoryId %>"
+                            data-category-icon="<%= expense.category.icon || '' %>"
+                            data-category-icon-image="<%= expense.category.iconImage || '' %>"
+                            data-category-color="<%= expense.category.color || '' %>"
+                            data-category-is-custom="<%= (expense.category.isCustom || Number(expense.category.is_custom) === 1) ? '1' : '0' %>"
+                            data-notes="<%= expense.notes || '' %>"
+                            data-excluded-from-budget="<%= (expense.isExcludedFromBudget || expense.isExcludedFromAllBudget) ? '1' : '0' %>"
+                            data-excluded-from-all-budget="<%= (expense.isExcludedFromBudget || expense.isExcludedFromAllBudget) ? '1' : '0' %>"
+                            data-has-receipt="<%= (expense.imagePath && String(expense.imagePath).trim()) ? '1' : '0' %>"
+                            data-image-path="<%= (expense.imagePath && String(expense.imagePath).trim()) ? String(expense.imagePath).trim() : '' %>">
+                      <svg viewBox="0 0 24 24" fill="none" width="12" height="12" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      Edit
+                    </button>
+                    <form method="POST" action="/expenses/<%= expense.id %>" class="expense-action-form"
+                          data-confirm
+                          data-confirm-title="Are you sure?"
+                          data-confirm-message="This cannot be undone."
+                          data-confirm-action-text="Delete"
+                          data-confirm-type="danger">
+                      <input type="hidden" name="_method" value="DELETE">
+                      <button type="submit" class="expense-action-btn expense-action-btn--delete">
+                        <svg viewBox="0 0 24 24" fill="none" width="12" height="12" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4"><strong>Total</strong></td>
+              <td class="data-table__right data-table__amount"><strong><%= formatSGD(total) %></strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  <% } %>
+
+</div>
+
+<%- include('../partials/add-expense-modal', {
+  categories: categories,
+  customCategories: typeof customCategories !== 'undefined' ? customCategories : [],
+  generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : [],
+  maxDate: maxDate,
+  returnTo: '/expenses'
+}) %>
+
+<%- include('../partials/transaction-detail-modal') %>
+
+<%- include('../partials/transaction-category-picker-modal', {
+  customCategories: typeof customCategories !== 'undefined' ? customCategories : [],
+  generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : []
+}) %>
+
+<script src="/js/budget-notifications.js?v=9"></script>
+<script src="/js/modal-scroll.js?v=3"></script>
+<script src="/js/expense-date.js"></script>
+<script src="/js/expense-upload.js?v=5"></script>
+<script src="/js/category-colours.js"></script>
+<script src="/js/picker-create-category.js?v=2"></script>
+<script src="/js/category-picker-helpers.js?v=1"></script>
+<script src="/js/expense-category-picker.js?v=13"></script>
+<script src="/js/expense-add-modal.js?v=10"></script>
+<script src="/js/transaction-category-header-images.js?v=2"></script>
+<script src="/js/transaction-detail-modal.js?v=35"></script>
+<script src="/js/category-picker-helpers.js?v=1"></script>
+<script src="/js/transaction-category-picker.js?v=5"></script>
+<script>
+  document.addEventListener("sw-expense-updated", function (event) {
+    var detail = event.detail;
+    if (!detail || !detail.expense) return;
+
+    var fieldsChanged = detail.fieldsChanged || [];
+    var needsReload =
+      fieldsChanged.indexOf("amount") !== -1 ||
+      fieldsChanged.indexOf("date") !== -1 ||
+      fieldsChanged.indexOf("isExcludedFromBudget") !== -1 ||
+      fieldsChanged.indexOf("category") !== -1;
+
+    if (needsReload) {
+      window.location.reload();
+      return;
+    }
+
+    var expenseId = String(detail.expense.id);
+    var row = document.querySelector('tr.expense-table-row[data-expense-id="' + expenseId + '"]');
+    var trigger = document.querySelector(
+      '.js-transaction-detail-trigger[data-expense-id="' + expenseId + '"]'
+    );
+
+    if (fieldsChanged.indexOf("title") !== -1) {
+      var rowTitle = document.querySelector(
+        '.expense-row-details__title[href="/expenses/' + expenseId + '"]'
+      );
+      if (rowTitle) rowTitle.textContent = detail.expense.title || "";
+      if (trigger) trigger.setAttribute("data-title", detail.expense.title || "");
+    }
+
+    if (fieldsChanged.indexOf("merchant") !== -1 && trigger) {
+      trigger.setAttribute("data-merchant-name", detail.expense.merchantName || "");
+      var merchantEl = row && row.querySelector(".expense-row-details__merchant");
+      if (merchantEl) {
+        merchantEl.textContent = detail.expense.merchantName || "";
+        merchantEl.hidden = !detail.expense.merchantName;
+      }
+    }
+  });
+</script>
+<%- include('../partials/footer') %>

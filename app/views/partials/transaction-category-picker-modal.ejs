@@ -1,0 +1,9 @@
+<%- include('category-picker-modal', {
+  pickerInstance: 'txn',
+  pickerMode: 'transaction',
+  nestedOverlay: true,
+  customCategories: typeof customCategories !== 'undefined' ? customCategories : [],
+  generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : [],
+  categories: typeof categories !== 'undefined' ? categories : [],
+  selectedCategoryId: typeof selectedCategoryId !== 'undefined' ? selectedCategoryId : ''
+}) %>

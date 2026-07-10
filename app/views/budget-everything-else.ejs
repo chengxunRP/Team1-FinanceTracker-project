@@ -1,0 +1,166 @@
+<%- include('partials/header') %>
+
+<link rel="stylesheet" href="/expense-form.css?v=37">
+
+<%
+  if (typeof detail === 'undefined') detail = {};
+  if (typeof budgetMonth === 'undefined') budgetMonth = '';
+  if (typeof returnMonth === 'undefined') returnMonth = null;
+  if (typeof budgetMonthLabel === 'undefined') budgetMonthLabel = budgetMonth;
+  if (typeof availableCategories === 'undefined') availableCategories = [];
+  if (typeof hasOverallBudget === 'undefined') hasOverallBudget = false;
+  if (typeof monthOptions === 'undefined') monthOptions = [];
+
+  var currentMonthName = budgetMonthLabel.split(' ')[0] || 'this month';
+
+  function formatMoney(value) {
+    var num = Number(value);
+    if (Number.isNaN(num)) return '$0';
+    if (num % 1 === 0) return '$' + num.toLocaleString();
+    return '$' + num.toFixed(2);
+  }
+
+  function formatMoneySigned(value) {
+    var num = Number(value);
+    if (Number.isNaN(num)) return '-$0.00';
+    return '-$' + Math.abs(num).toFixed(2);
+  }
+%>
+
+<div class="everything-detail-page spb-page--everything-else">
+  <style>
+    .everything-date-group[hidden],
+    .everything-date-group--hidden,
+    .everything-transaction-row[hidden],
+    .everything-transaction-row--hidden {
+      display: none !important;
+    }
+  </style>
+  <header class="everything-header">
+    <div class="everything-title-group">
+      <a href="<%= returnMonth ? '/budget?month=' + encodeURIComponent(returnMonth) : '/budget' %>" class="everything-back" aria-label="Back to budgets">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <div class="everything-header__text">
+        <div class="everything-title-row">
+          <h1 class="everything-title">Everything else</h1>
+          <div class="everything-month-picker">
+            <input
+              type="month"
+              id="everythingElseMonth"
+              class="everything-month-picker__input"
+              value="<%= budgetMonth %>"
+              list="everythingElseMonthList"
+              aria-label="Select month to view"
+              <% if (returnMonth) { %>data-return-month="<%= returnMonth %>"<% } %>
+            >
+            <datalist id="everythingElseMonthList">
+              <% monthOptions.forEach(function(opt) { %>
+              <option value="<%= opt.value %>" label="<%= opt.label %>"></option>
+              <% }); %>
+            </datalist>
+          </div>
+        </div>
+        <p class="everything-total">Total: <%= formatMoneySigned(detail.totalAmount || 0) %></p>
+      </div>
+    </div>
+    <button type="button" class="everything-plus-btn" id="openAddBudget" aria-label="Add a budget">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+
+  <div class="everything-content-column">
+      <div class="everything-search-wrap">
+      <span class="everything-search-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      </span>
+      <input type="search" id="everythingElseSearch" class="everything-search" placeholder="Search transactions by title, merchant, amount, category or notes" autocomplete="off">
+    </div>
+
+    <section class="everything-transactions-card" aria-label="Unbudgeted transactions">
+      <% if (!(detail.dateGroups || []).length) { %>
+        <p class="everything-empty" id="everythingElseEmpty">No unbudgeted transactions found for <%= budgetMonthLabel %>.</p>
+      <% } else { %>
+      <div id="everythingElseGroups">
+        <% (detail.dateGroups || []).forEach(function(group) { %>
+        <div class="everything-date-group" data-date-group="<%= group.date %>">
+          <header class="everything-date-header">
+            <span class="everything-date-label"><%= group.dateLabel %></span>
+            <span class="everything-date-total" data-original-total="<%= group.dayTotal %>"><%= formatMoneySigned(group.dayTotal) %></span>
+          </header>
+          <% group.transactions.forEach(function(tx) { %>
+          <button type="button"
+                  class="everything-transaction-row js-transaction-detail-trigger"
+                  data-expense-id="<%= tx.id %>"
+                  data-expense-date="<%= tx.date %>"
+                  data-amount="<%= tx.amount %>"
+                  data-title="<%= tx.description %>"
+                  data-merchant-name="<%= tx.merchantName || '' %>"
+                  data-category="<%= tx.categoryDisplayName %>"
+                  data-category-id="<%= tx.categoryId %>"
+                  data-category-icon="<%= tx.categoryIcon || '' %>"
+                  data-category-icon-image="<%= tx.categoryIconImage || '' %>"
+                  data-category-color="<%= tx.categoryColor || '' %>"
+                  data-category-is-custom="<%= tx.categoryIsCustom ? '1' : '0' %>"
+                  data-notes="<%= tx.notes || '' %>"
+                  data-excluded-from-budget="<%= (tx.isExcludedFromBudget || tx.isExcludedFromAllBudget) ? '1' : '0' %>"
+                  data-excluded-from-all-budget="<%= (tx.isExcludedFromBudget || tx.isExcludedFromAllBudget) ? '1' : '0' %>"
+                  data-has-receipt="<%= (tx.imagePath && String(tx.imagePath).trim()) ? '1' : '0' %>"
+                  data-image-path="<%= (tx.imagePath && String(tx.imagePath).trim()) ? String(tx.imagePath).trim() : '' %>">
+            <span class="everything-transaction-icon">
+              <%- include('partials/category-icon', { catName: tx.categoryDisplayName, catIcon: tx.categoryIcon, catIconImage: tx.categoryIconImage, catColor: tx.categoryColor, catIsCustom: tx.categoryIsCustom, catSize: 'sm' }) %>
+            </span>
+            <span class="everything-transaction-body">
+              <span class="everything-transaction-title-row">
+                <span class="everything-transaction-title"><%= tx.description %></span>
+                <% if (tx.imagePath && String(tx.imagePath).trim()) { %>
+                <span class="everything-transaction-receipt" aria-label="Receipt attached" title="Receipt attached">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8.5 12.5l7.2-7.2a3 3 0 114.2 4.2l-8.4 8.4a4.5 4.5 0 01-6.4-6.4l9-9a6 6 0 018.5 8.5l-9.2 9.2a7.5 7.5 0 01-10.6-10.6l8.5-8.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <% } %>
+              </span>
+              <% if (tx.merchantName) { %>
+              <span class="everything-transaction-merchant"><%= tx.merchantName %></span>
+              <% } %>
+              <span class="everything-transaction-meta">
+                <span class="everything-cash-badge"><%= tx.accountLabel %></span>
+                <span class="everything-transaction-dot" aria-hidden="true">&bull;</span>
+                <span class="everything-transaction-category"><%= tx.categoryDisplayName %></span>
+              </span>
+            </span>
+            <span class="everything-transaction-amount"><%= formatMoneySigned(tx.amount) %></span>
+          </button>
+          <% }); %>
+        </div>
+        <% }); %>
+      </div>
+      <p class="everything-empty everything-empty--filter" id="everythingElseFilterEmpty" hidden>No transactions match your search.</p>
+      <% } %>
+    </section>
+  </div>
+</div>
+
+<%- include('partials/add-budget-modal', { availableCategories: availableCategories, budgetMonth: budgetMonth, budgetMonthLabel: budgetMonthLabel, currentMonthName: currentMonthName, hasOverallBudget: hasOverallBudget }) %>
+
+<%- include('partials/transaction-detail-modal') %>
+
+<%- include('partials/transaction-category-picker-modal', {
+  customCategories: typeof customCategories !== 'undefined' ? customCategories : [],
+  generalCategories: typeof generalCategories !== 'undefined' ? generalCategories : []
+}) %>
+
+<script id="budgetPageData" type="application/json"><%- JSON.stringify({ budgetMonth: budgetMonth, availableCategories: availableCategories, currentMonthName: currentMonthName }) %></script>
+<script src="/js/budget-notifications.js?v=9"></script>
+<script src="/js/modal-scroll.js?v=3"></script>
+<script src="/js/transaction-search.js?v=3"></script>
+<script src="/js/transaction-category-header-images.js?v=2"></script>
+<script src="/js/expense-upload.js?v=5"></script>
+<script src="/js/transaction-detail-modal.js?v=35"></script>
+<script src="/js/category-colours.js"></script>
+<script src="/js/picker-create-category.js?v=2"></script>
+<script src="/js/category-picker-helpers.js?v=1"></script>
+<script src="/js/transaction-category-picker.js?v=5"></script>
+<script src="/js/budget.js?v=27"></script>
+<script src="/js/budget-everything-else.js?v=14"></script>
+
+<%- include('partials/footer') %>

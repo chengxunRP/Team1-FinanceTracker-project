@@ -1,0 +1,82 @@
+<%- include('../partials/header') %>
+
+<div style="display:flex;flex-direction:column;gap:1.25rem;width:100%;max-width:none;">
+
+  <!-- Page header -->
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+    <div class="page-header" style="margin-bottom:0;">
+      <a href="/expenses" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem;font-weight:600;color:var(--text-muted);text-decoration:none;margin-bottom:0.5rem;"
+         onmouseover="this.style.color='var(--blue-mid)'" onmouseout="this.style.color='var(--text-muted)'">
+        <svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back to Expenses
+      </a>
+      <span class="eyebrow">Expense Detail</span>
+      <h1>Record</h1>
+    </div>
+    <div style="display:flex;gap:0.65rem;">
+      <a href="/expenses/<%= expense.id %>/edit" class="btn btn--sm" style="background:var(--blue-light);color:var(--blue);border:1px solid transparent;">
+        <svg viewBox="0 0 24 24" fill="none" width="13" height="13" style="margin-right:0.3rem" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Edit
+      </a>
+      <form method="POST" action="/expenses/<%= expense.id %>" style="display:inline;"
+            data-confirm
+            data-confirm-title="Are you sure?"
+            data-confirm-message="This cannot be undone."
+            data-confirm-action-text="Delete"
+            data-confirm-type="danger">
+        <input type="hidden" name="_method" value="DELETE">
+        <button type="submit" class="btn btn--sm" style="background:var(--danger-light);color:var(--danger);border:1px solid transparent;cursor:pointer;font-family:inherit;">
+          <svg viewBox="0 0 24 24" fill="none" width="13" height="13" style="margin-right:0.3rem" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Delete
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Detail card -->
+  <div class="card-panel" style="max-width:560px;border-left:4px solid <%= expense.category.color %>;">
+
+    <!-- Category badge -->
+    <div class="expense-cat-pill expense-cat-pill--detail" style="--cat-color:<%= expense.category.color %>;margin-bottom:1rem;">
+      <%- include('../partials/category-icon', { catName: expense.category.displayName || expense.category.name, catIcon: expense.category.icon, catIconImage: expense.category.iconImage, catColor: expense.category.color, catSize: 'md' }) %>
+      <%= expense.category.displayName || expense.category.name %>
+    </div>
+
+    <!-- Title -->
+    <h2 style="margin:0 0 0.5rem;font-size:1.45rem;font-weight:800;letter-spacing:-0.03em;color:var(--text);"><%= expense.title %></h2>
+    <% if (expense.merchantName) { %>
+      <p style="margin:0 0 0.75rem;font-size:0.95rem;font-weight:600;color:var(--text-muted);"><%= expense.merchantName %></p>
+    <% } %>
+
+    <!-- Amount -->
+    <div style="font-size:2.5rem;font-weight:800;letter-spacing:-0.04em;color:var(--blue-mid);margin-bottom:0.65rem;line-height:1.1;"><%= formatSGD(expense.amount) %></div>
+
+    <!-- Expense image -->
+    <div class="expense-detail-image-wrap">
+      <%- include('../partials/expense-thumb', {
+        expenseTitle: expense.title,
+        imagePath: expense.imagePath,
+        thumbSize: 'lg'
+      }) %>
+    </div>
+
+    <!-- Date -->
+    <div style="display:inline-flex;align-items:center;gap:0.45rem;font-size:0.875rem;color:var(--text-muted);margin-bottom:<%= expense.notes ? '1.25rem' : '0' %>;">
+      <svg viewBox="0 0 24 24" fill="none" width="15" height="15" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      <%= new Date(expense.date + 'T00:00:00').toLocaleDateString('en-SG', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) %>
+    </div>
+
+    <!-- Notes -->
+    <% if (expense.notes) { %>
+      <div style="border-top:1px solid var(--border-soft);padding-top:1.15rem;margin-top:0.5rem;">
+        <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);display:block;margin-bottom:0.4rem;">Notes</span>
+        <p style="margin:0;font-size:0.9rem;color:var(--text-muted);line-height:1.6;"><%= expense.notes %></p>
+      </div>
+    <% } %>
+
+  </div>
+
+</div>
+
+<script src="/js/expense-nav.js"></script>
+<%- include('../partials/footer') %>

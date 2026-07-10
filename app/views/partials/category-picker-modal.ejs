@@ -1,0 +1,82 @@
+<%
+  var cpmInstance = (typeof pickerInstance !== 'undefined' && pickerInstance) ? pickerInstance : 'expense';
+  var cpmMode = (typeof pickerMode !== 'undefined' && pickerMode) ? pickerMode : 'expense';
+  var cpmNested = (typeof nestedOverlay !== 'undefined') ? Boolean(nestedOverlay) : (cpmInstance === 'txn');
+  var cpmOverlayId = cpmInstance === 'txn' ? 'txnCategoryOverlay' : 'expenseCategoryOverlay';
+  var cpmTitleId = cpmInstance === 'txn' ? 'txnCategoryTitle' : 'expenseCategoryTitle';
+  var cpmCloseId = cpmInstance === 'txn' ? 'closeTxnCategoryPicker' : 'closeExpenseCategoryPicker';
+  var cpmSearchId = cpmInstance === 'txn' ? 'txnCategorySearch' : 'expenseCategorySearch';
+
+  var pickerSelectedId = '';
+  if (typeof selectedCategoryId !== 'undefined' && selectedCategoryId) {
+    pickerSelectedId = String(selectedCategoryId);
+  } else {
+    var pickerExpense = (typeof expense !== 'undefined' && expense && typeof expense === 'object') ? expense : {};
+    if (pickerExpense.categoryId) {
+      pickerSelectedId = String(pickerExpense.categoryId);
+    } else if (pickerExpense.category_id) {
+      pickerSelectedId = String(pickerExpense.category_id);
+    } else if (pickerExpense.categoryID) {
+      pickerSelectedId = String(pickerExpense.categoryID);
+    }
+  }
+
+  var pickerCustom = (typeof customCategories !== 'undefined' && Array.isArray(customCategories))
+    ? customCategories
+    : [];
+  var pickerGeneral = (typeof generalCategories !== 'undefined' && Array.isArray(generalCategories))
+    ? generalCategories
+    : [];
+
+  if (!pickerCustom.length && !pickerGeneral.length) {
+    var pickerCategories = (typeof categories !== 'undefined' && Array.isArray(categories)) ? categories : [];
+    pickerCustom = pickerCategories.filter(function(c) {
+      return c.isCustom || Number(c.is_custom) === 1;
+    });
+    pickerGeneral = pickerCategories.filter(function(c) {
+      return !(c.isCustom || Number(c.is_custom) === 1);
+    });
+  }
+%>
+<div class="spb-modal-overlay<%= cpmNested ? ' spb-modal-overlay--nested' : '' %> expense-category-overlay pocketguard-style-overlay" id="<%= cpmOverlayId %>" hidden>
+  <div class="spb-modal pocketguard-style-modal" role="dialog" aria-labelledby="<%= cpmTitleId %>" aria-modal="true">
+    <div id="<%= cpmInstance %>CategoryPickerStep">
+      <header class="spb-modal__header">
+        <h2 class="spb-modal__title" id="<%= cpmTitleId %>">Choose category</h2>
+        <button type="button" class="spb-modal__close" id="<%= cpmCloseId %>" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <div class="spb-modal__search" id="<%= cpmInstance %>CategorySearchWrap">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        <input type="search" id="<%= cpmSearchId %>" placeholder="Search category" autocomplete="off">
+      </div>
+
+      <div class="spb-modal__body pocketguard-style-modal-body">
+        <% if (cpmMode !== 'budget') {
+          var cpmCurrentSectionId = cpmInstance === 'txn' ? 'txnCurrentCategorySection' : 'expenseCurrentCategorySection';
+          var cpmCurrentListId = cpmInstance === 'txn' ? 'txnCurrentCategoryList' : 'expenseCurrentCategoryList';
+        %>
+        <section class="spb-modal__section sw-cat-picker-current" id="<%= cpmCurrentSectionId %>" hidden>
+          <h3 class="spb-modal__section-title">Current category</h3>
+          <ul class="spb-category-list" id="<%= cpmCurrentListId %>"></ul>
+        </section>
+        <% } %>
+        <%- include('shared-category-picker-lists', {
+          pickerMode: cpmMode,
+          customCategories: pickerCustom,
+          generalCategories: pickerGeneral,
+          selectedCategoryId: pickerSelectedId
+        }) %>
+      </div>
+    </div>
+
+    <% if (cpmMode !== 'budget') { %>
+    <%- include('picker-create-category-step', { pickerPrefix: cpmInstance }) %>
+    <% } %>
+  </div>
+</div>
+<% if (cpmMode !== 'budget') { %>
+<%- include('picker-choose-colour-modal', { pickerPrefix: cpmInstance }) %>
+<% } %>
