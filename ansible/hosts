@@ -1,0 +1,48 @@
+# =============================================================
+# SpendWise Finance Tracker — Ansible Inventory
+# =============================================================
+# Replace 192.0.2.3 with your actual server IP.
+# For local DEVASC VM testing, 192.0.2.3 is the dummy0 interface
+# (same as used in Lab 7.4.8).
+#
+# This playbook uses 'become: yes' (sudo). Since ansible_ssh_pass is set
+# above but sudo isn't assumed to use the same password automatically,
+# run ansible-playbook with --ask-become-pass, OR uncomment the line
+# below to bake the sudo password into this file (fine for local/lab use,
+# not recommended for anything production-facing):
+# ansible_become_pass=yourpassword
+# =============================================================
+
+[spendwise]
+192.0.2.3 ansible_ssh_user=devasc ansible_ssh_pass=Cisco123!
+
+# To add more servers, list them here:
+# 10.0.0.5 ansible_ssh_user=ubuntu ansible_ssh_pass=yourpassword
+
+[spendwise:vars]
+# Docker image (published to Docker Hub by your Jenkins pipeline)
+docker_image=chengxun123/spendwise-app:2.0
+
+# Container name (matches Jenkinsfile)
+container_name=spendwise-container
+
+# App port
+app_port=3000
+
+# MySQL settings
+# NOTE: db_host is NOT set here — the playbook resolves it automatically
+# from the MySQL container's IP address (fixes Linux compatibility).
+db_user=finance_user
+db_password=password123
+db_name=finance_tracker
+db_port=3306
+
+# SMTP settings for budget email alerts (Profile -> Email Budget Notifications)
+smtp_host=smtp.gmail.com
+smtp_port=587
+smtp_secure=false
+smtp_user=your-sender-email@gmail.com
+smtp_from=spendWise <your-sender-email@gmail.com>
+
+# App base URL used for absolute links in budget alert emails
+app_base_url=http://192.0.2.3:3000
