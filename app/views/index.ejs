@@ -80,7 +80,13 @@
           <h2 class="dash-card-title">This Month</h2>
           <span class="dash-card-subtitle">Current period spending</span>
         </div>
-        <button type="button" class="dash-card-menu" aria-label="This month options">&#8943;</button>
+        <div class="dash-card-menu-wrap">
+          <button type="button" class="dash-card-menu" aria-label="This month options" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+          <ul class="dash-card-menu-dropdown" hidden>
+            <li><button type="button" class="dash-card-menu-item" data-action="navigate" data-href="/budget">View Budget Details</button></li>
+            <li><button type="button" class="dash-card-menu-item" data-action="refresh">Refresh</button></li>
+          </ul>
+        </div>
       </div>
       <div class="dash-period-body">
         <div class="dash-donut" id="dashDonutThis" style="--used: <%= summary.percentageUsed %>;" aria-hidden="true">
@@ -103,7 +109,13 @@
           <h2 class="dash-card-title">Last Month</h2>
           <span class="dash-card-subtitle">Previous period spending</span>
         </div>
-        <button type="button" class="dash-card-menu" aria-label="Last month options">&#8943;</button>
+        <div class="dash-card-menu-wrap">
+          <button type="button" class="dash-card-menu" aria-label="Last month options" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+          <ul class="dash-card-menu-dropdown" hidden>
+            <li><button type="button" class="dash-card-menu-item" data-action="navigate" data-href="/budget">View Budget Details</button></li>
+            <li><button type="button" class="dash-card-menu-item" data-action="refresh">Refresh</button></li>
+          </ul>
+        </div>
       </div>
       <div class="dash-period-body">
         <div class="dash-donut dash-donut--muted" id="dashDonutLast" style="--used: 0;" aria-hidden="true">
@@ -123,7 +135,13 @@
     <article class="dash-card dash-highlight-card">
       <div class="dash-card-head">
         <h2 class="dash-card-title">Top Category</h2>
-        <button type="button" class="dash-card-menu" aria-label="Top category options">&#8943;</button>
+        <div class="dash-card-menu-wrap">
+          <button type="button" class="dash-card-menu" aria-label="Top category options" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+          <ul class="dash-card-menu-dropdown" hidden>
+            <li><button type="button" class="dash-card-menu-item" data-action="navigate" data-href="/categories">View All Categories</button></li>
+            <li><button type="button" class="dash-card-menu-item" data-action="refresh">Refresh</button></li>
+          </ul>
+        </div>
       </div>
       <div class="dash-highlight-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V10M8 19V5M12 19V12M16 19V8M20 19V3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
@@ -141,7 +159,12 @@
           <h2 class="dash-card-title">Spending Trend</h2>
           <span class="dash-card-subtitle">Monthly spend over the last 6 months</span>
         </div>
-        <button type="button" class="dash-card-menu" aria-label="Spending trend options">&#8943;</button>
+        <div class="dash-card-menu-wrap">
+          <button type="button" class="dash-card-menu" aria-label="Spending trend options" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+          <ul class="dash-card-menu-dropdown" hidden>
+            <li><button type="button" class="dash-card-menu-item" data-action="refresh">Refresh</button></li>
+          </ul>
+        </div>
       </div>
       <div class="dash-line-chart">
         <svg viewBox="0 0 440 130" id="dashTrendSvg" role="img" aria-label="Spending trend chart"></svg>
@@ -154,7 +177,12 @@
           <h2 class="dash-card-title">Last 7 Days</h2>
           <span class="dash-card-subtitle">Daily spending for the period</span>
         </div>
-        <button type="button" class="dash-card-menu" aria-label="Last 7 days options">&#8943;</button>
+        <div class="dash-card-menu-wrap">
+          <button type="button" class="dash-card-menu" aria-label="Last 7 days options" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+          <ul class="dash-card-menu-dropdown" hidden>
+            <li><button type="button" class="dash-card-menu-item" data-action="refresh">Refresh</button></li>
+          </ul>
+        </div>
       </div>
       <div class="dash-bar-chart" id="dashBarChart" role="img" aria-label="Daily spending bar chart"></div>
     </article>
@@ -167,7 +195,13 @@
           <h2 class="dash-card-title">Budget Progress</h2>
           <span class="dash-card-subtitle">Spending breakdown by category</span>
         </div>
-        <button type="button" class="dash-card-menu" aria-label="Budget progress options">&#8943;</button>
+        <div class="dash-card-menu-wrap">
+          <button type="button" class="dash-card-menu" aria-label="Budget progress options" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+          <ul class="dash-card-menu-dropdown" hidden>
+            <li><button type="button" class="dash-card-menu-item" data-action="navigate" data-href="/categories">Manage Categories</button></li>
+            <li><button type="button" class="dash-card-menu-item" data-action="navigate" data-href="/budget">Edit Budget</button></li>
+          </ul>
+        </div>
       </div>
       <div class="dash-budget-list" id="dashBudgetList"></div>
     </article>
@@ -178,7 +212,13 @@
           <h2 class="dash-card-title">Recent Transactions</h2>
           <span class="dash-card-subtitle">All expenses in the selected period</span>
         </div>
-        <button type="button" class="dash-card-menu" aria-label="Transactions options">&#8943;</button>
+        <div class="dash-card-menu-wrap">
+          <button type="button" class="dash-card-menu" aria-label="Transactions options" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+          <ul class="dash-card-menu-dropdown" hidden>
+            <li><button type="button" class="dash-card-menu-item" data-action="navigate" data-href="/expenses">View All Expenses</button></li>
+            <li><button type="button" class="dash-card-menu-item" data-action="navigate" data-href="/expenses/new">Add Expense</button></li>
+          </ul>
+        </div>
       </div>
       <ul class="dash-txn-list" id="dashTxnList"></ul>
     </article>
@@ -191,7 +231,13 @@
           <h2 class="dash-card-title">Cash Flow Summary</h2>
           <span class="dash-card-subtitle">Budget vs. actual spending for the period</span>
         </div>
-        <button type="button" class="dash-card-menu" aria-label="Cash flow options">&#8943;</button>
+        <div class="dash-card-menu-wrap">
+          <button type="button" class="dash-card-menu" aria-label="Cash flow options" aria-haspopup="true" aria-expanded="false">&#8943;</button>
+          <ul class="dash-card-menu-dropdown" hidden>
+            <li><button type="button" class="dash-card-menu-item" data-action="navigate" data-href="/budget">View Budget Alerts</button></li>
+            <li><button type="button" class="dash-card-menu-item" data-action="refresh">Refresh</button></li>
+          </ul>
+        </div>
       </div>
       <div class="dash-cashflow-metrics">
         <div class="dash-cashflow-metric">

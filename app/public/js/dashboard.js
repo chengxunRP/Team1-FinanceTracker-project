@@ -554,12 +554,53 @@
     });
   }
 
+  function closeAllCardMenus(except) {
+    document.querySelectorAll(".dash-card-menu-dropdown").forEach(function (menu) {
+      if (menu === except) return;
+      menu.hidden = true;
+      var btn = menu.previousElementSibling;
+      if (btn) btn.classList.remove("is-open");
+      if (btn) btn.setAttribute("aria-expanded", "false");
+    });
+  }
+
   function initCardMenus() {
-    document.querySelectorAll(".dash-card-menu").forEach(function (btn) {
+    document.querySelectorAll(".dash-card-menu-wrap").forEach(function (wrap) {
+      var btn = wrap.querySelector(".dash-card-menu");
+      var menu = wrap.querySelector(".dash-card-menu-dropdown");
+      if (!btn || !menu) return;
+
       btn.addEventListener("click", function (event) {
         event.stopPropagation();
-        window.alert("More options coming soon.");
+        var isOpen = !menu.hidden;
+        closeAllCardMenus();
+        menu.hidden = isOpen;
+        btn.classList.toggle("is-open", !isOpen);
+        btn.setAttribute("aria-expanded", String(!isOpen));
       });
+
+      menu.addEventListener("click", function (event) {
+        var item = event.target.closest(".dash-card-menu-item");
+        if (!item) return;
+        event.stopPropagation();
+        closeAllCardMenus();
+
+        var action = item.getAttribute("data-action");
+        if (action === "navigate") {
+          var href = item.getAttribute("data-href");
+          if (href) window.location.href = href;
+        } else if (action === "refresh") {
+          renderDashboard(currentMonthKey);
+        }
+      });
+    });
+
+    document.addEventListener("click", function () {
+      closeAllCardMenus();
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") closeAllCardMenus();
     });
   }
 
