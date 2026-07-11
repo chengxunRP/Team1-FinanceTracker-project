@@ -1,3 +1,4 @@
+// Purchase Checker form draft — saves item name/price/category in localStorage (not MySQL) until user submits.
 (function () {
   "use strict";
 

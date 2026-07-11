@@ -1,3 +1,5 @@
+// Monthly Budget Setup + Rollover — MySQL reads/writes for category budgets and All Categories Budget.
+// Every query uses requireUserId() so each logged-in user only sees and changes their own rows.
 const db = require("./config/db");
 const {
   getCategoryBudgetStatus,
@@ -15,6 +17,8 @@ const {
 const { getCategoryImageUrl } = require("./categoryImageHelpers");
 const { requireUserId } = require("./userScope");
 
+// "Don't count" flags on expenses: category budgets ignore is_excluded_from_budget;
+// All Categories Budget ignores is_excluded_from_all_budget.
 const CATEGORY_BUDGET_COUNTED_EXPENSE_WHERE =
   "AND COALESCE(is_excluded_from_budget, 0) = 0";
 const ALL_BUDGET_COUNTED_EXPENSE_WHERE =
@@ -43,11 +47,22 @@ function normalizeBudgetMonth(value) {
   if (!value || !/^\d{4}-\d{2}$/.test(String(value))) {
     return getCurrentBudgetMonth();
   }
-  const [, monthNum] = String(value).split("-").map(Number);
-  if (!monthNum || monthNum < 1 || monthNum > 12) {
+  const parts = String(value).split("-");
+  const year = Number(parts[0]);
+  const monthNum = Number(parts[1]);
+  const minYear = 1900;
+  const maxYear = 2100;
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(monthNum) ||
+    year < minYear ||
+    year > maxYear ||
+    monthNum < 1 ||
+    monthNum > 12
+  ) {
     return getCurrentBudgetMonth();
   }
-  return String(value);
+  return `${year}-${String(monthNum).padStart(2, "0")}`;
 }
 
 function getBudgetStartMonthFromCreatedAt(createdAt) {
@@ -500,6 +515,8 @@ function computeRolloverAmount(
   }
 }
 
+// Connects base budget + rollover carry → available budget, then spent/remaining/overspent.
+// availableBudget = baseBudget + rollover (positive adds room; negative reduces next month).
 function buildBudgetAmounts(baseBudget, actual, rolloverEnabled, rolloverAmount) {
   const rollover = rolloverEnabled ? Number(rolloverAmount || 0) : 0;
   const availableBudget = Number(baseBudget) + rollover;
@@ -662,6 +679,8 @@ function mapOverallBudgetCalculation(calc) {
   };
 }
 
+// Creates one per-category budget for the logged-in user.
+// Duplicate check: if this category already has a visible budget for the month, reject instead of inserting twice.
 async function createCategoryBudget(
   categoryId,
   amount,
@@ -952,6 +971,7 @@ async function setCategoryBudgets(budgetMonth, budgetsByCategoryId) {
   }
 }
 
+// Sums counted expenses per category for one budget month (user_id + date range + Don't count filter).
 async function getSpendingTotalsByCategoryId(budgetMonth) {
   if (!budgetMonth) return {};
 
@@ -1133,6 +1153,7 @@ async function getCategoryMonthlyTotalsFromDb(categoryId) {
   return totals;
 }
 
+// Builds Spending & Budgets cards: base limit, rollover into this month, spent, remaining, status.
 async function getBudgetRows(budgetMonth, categories, spendingByCategoryId) {
   const budgets = await getActiveCategoryBudgets();
   const month = normalizeBudgetMonth(budgetMonth);
@@ -1263,6 +1284,7 @@ function getEverythingElseData(
   budgetedCategoryIds,
   actualSpendingByCategoryId
 ) {
+  // Everything Else = total spending in categories that have no budget set for this month.
   const budgetedIds = new Set(budgetedCategoryIds.map(String));
 
   let totalAmount = 0;
@@ -2193,6 +2215,8 @@ async function getTotalMonthSpending(budgetMonth) {
   return Number(rows[0].total) || 0;
 }
 
+// All Categories Budget (overall monthly cap) — separate from the sum of category budgets.
+// Used by Spending & Budgets, Purchase Checker, and FinBot when an overall limit exists.
 async function getOverallBudgetSectionData(budgetMonth) {
   const active = await getActiveOverallMonthlyBudget();
   if (!active) return null;

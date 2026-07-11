@@ -1,3 +1,5 @@
+// HTML + plain-text bodies for budget alert emails.
+// APP_BASE_URL from .env builds the "Open Spending & Budgets" button link in the email.
 const path = require("path");
 const fs = require("fs");
 const budgetStore = require("./budgetStore");
@@ -47,6 +49,7 @@ function getSeverityStyle(alert) {
 }
 
 function getAppBaseUrl() {
+  // Public site URL for email links — set APP_BASE_URL in app/.env (e.g. http://localhost:3000).
   const raw =
     process.env.APP_BASE_URL ||
     process.env.APP_URL ||

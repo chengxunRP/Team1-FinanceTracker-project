@@ -1,4 +1,5 @@
-// Groq API helper for FinBot (Feature 8)
+// Groq API for FinBot — sends system prompt (finance context) + recent chat + user question.
+// GROQ_API_KEY is loaded from .env; if missing, chatbotHelpers uses rule-based fallback instead.
 require("./envConfig");
 
 const https = require("https");
@@ -101,6 +102,7 @@ function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabe
   ].join("\n");
 }
 
+// Packs category budgets, All Transactions totals, expenses, and alerts into the Groq system prompt.
 function buildSystemPrompt(
   summary,
   financeSnapshot,

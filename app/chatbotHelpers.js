@@ -1,5 +1,5 @@
-// FinBot rule-based replies (Feature 8)
-
+// FinBot Finance Chatbot — rule-based answers when Groq is off; Groq AI when GROQ_API_KEY is in .env.
+// All replies use the logged-in user's MySQL finance data (same source as Spending & Budgets).
 const { hasGroqApiKey } = require("./envConfig");
 const { getGroqReply } = require("./groqService");
 const {
@@ -636,6 +636,7 @@ function isBudgetedCategorySpendQuestion(text) {
   );
 }
 
+// Rule-based reply engine: purchase checks, budget summaries, improvement tips (no external API).
 function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, liveSummary, expenses) {
   const text = (message || "").trim().toLowerCase();
   const highestCategory = financeSnapshot.highestCategory || "—";
@@ -839,6 +840,7 @@ function getWelcomeMessage() {
   return "Hi, I'm FinBot. I can help you understand your spending, budgets, and whether a purchase is safe.";
 }
 
+// Entry point for POST /chatbot: try Groq with finance context + recent messages; fall back to rules.
 async function getFinBotReply(
   message,
   summary,

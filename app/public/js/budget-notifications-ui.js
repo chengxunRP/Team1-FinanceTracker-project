@@ -1,3 +1,4 @@
+// Builds stable alert IDs for the banner UI (must match server-side IDs for dismiss to work).
 (function () {
   "use strict";
 

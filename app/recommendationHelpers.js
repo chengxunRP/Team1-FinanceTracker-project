@@ -1,5 +1,5 @@
-// Smart Spending Recommendation helpers (Feature 7)
-
+// Purchase Checker (Smart Purchase Checker) — compares a hypothetical item against real budgets.
+// Does not save the item to MySQL; only reads the logged-in user's expenses and budget rows.
 const { getStandardCategoryName } = require("./categoryHelpers");
 const { buildBudgetSummary } = require("./budgetHelpers");
 
@@ -42,6 +42,8 @@ function validateItemInput(itemName, itemPrice, category) {
   };
 }
 
+// Respects "Don't count": category budgets skip is_excluded_from_budget;
+// All Categories checks skip is_excluded_from_all_budget.
 function isExpenseCountedForPurchaseCheck(expense, useAllBudgetCounting) {
   if (!expense) return false;
   if (useAllBudgetCounting) {
@@ -258,6 +260,9 @@ function buildCategoryBudgetSummary(categoryRow) {
   return buildBudgetSummary(budget, [], spent);
 }
 
+// Main Purchase Checker decision: safe / risky / not recommended.
+// budgetMode "overall" = All Categories Budget exists; "category-only" = check selected category only;
+// "none" = no usable budget (no fake totals from summing categories).
 function getSpendingRecommendation(summary, expenses, item, options) {
   const purchaseOptions = options || {};
   const hasOverallBudget =

@@ -1,3 +1,5 @@
+// In-app budget alert dismiss — stored in browser localStorage only (does not stop backend emails).
+// Dismiss IDs include user + month + category + severity so alerts can reappear after spending changes.
 ;(function () {
   "use strict";
 

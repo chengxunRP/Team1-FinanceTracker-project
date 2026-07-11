@@ -181,6 +181,7 @@ function handleExpenseAuthError(req, res, error) {
   return false;
 }
 
+// Runs after expense add/update/delete — schedules budget email check for the affected month/category.
 function triggerBudgetAlerts(req, budgetMonth, affectedCategoryId) {
   const userId = getCurrentUserId(req);
   const month = budgetMonth ? String(budgetMonth).slice(0, 7) : null;
@@ -336,8 +337,8 @@ async function loadPickerCategoryData() {
   };
 }
 
-// POST /expenses/purchase-check
-// Returns a structured recommendation for a prospective purchase (JSON).
+// POST /expenses/purchase-check — JSON API used from Add Expense flow (not the main /recommendation page).
+// Flow: read price/category → load user's month budgets → getSpendingRecommendation → return JSON.
 router.post('/purchase-check', async (req, res) => {
   try {
     const itemName = String(req.body.itemName || req.body.name || '').trim();

@@ -915,8 +915,16 @@
 
 .everything-month-picker {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   margin: 0;
+}
+
+.everything-month-picker__error {
+  margin: 0.25rem 0 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #b91c1c;
 }
 
 .everything-month-picker__input {

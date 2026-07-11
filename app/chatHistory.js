@@ -1,5 +1,5 @@
-// FinBot chat history stored in MySQL (chat_sessions + chat_messages)
-
+// FinBot chat persistence — one session per user in chat_sessions; messages in chat_messages.
+// user_id on every query keeps each user's conversation isolated from other accounts.
 const db = require("./config/db");
 const { getRequestUserId } = require("./requestUserContext");
 const { requireUserId } = require("./userScope");
@@ -11,6 +11,7 @@ function createWelcomeMessage(welcomeText) {
 async function getOrCreateSession(sessionId) {
   const userId = getRequestUserId() || requireUserId();
 
+  // chat_sessions: find existing row for this user, or create user-{id} session.
   const [existingByUser] = await db.query(
     "SELECT id FROM chat_sessions WHERE user_id = ? LIMIT 1",
     [userId]

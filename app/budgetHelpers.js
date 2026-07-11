@@ -1,4 +1,5 @@
-// Budget calculation and validation helpers (Feature 4)
+// Shared budget math used by Spending & Budgets, in-app alerts, emails, and Purchase Checker.
+// "Don't count" expenses are skipped via is_excluded_from_budget / is_excluded_from_all_budget flags.
 
 function isExpenseCountedForBudget(expense) {
   if (!expense) return true;
@@ -55,6 +56,8 @@ function toBudgetCents(value) {
   return Math.round((Number(value) || 0) * 100);
 }
 
+// Turns spent vs budget into warning (80–99%), reached (100%), or exceeded (>100%).
+// Same thresholds drive in-app banners and email alert severity.
 function getBudgetUsageState(spent, budget) {
   const spentCents = toBudgetCents(spent);
   const budgetCents = toBudgetCents(budget);

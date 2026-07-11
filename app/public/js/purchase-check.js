@@ -1,3 +1,4 @@
+// Purchase check from Add Expense page — calls POST /expenses/purchase-check and renders JSON result.
 (function(){
   'use strict';
 

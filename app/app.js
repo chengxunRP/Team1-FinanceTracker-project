@@ -118,6 +118,7 @@ app.use("/budget", requireLogin);
 app.use("/chatbot", requireLogin);
 app.use("/savings-goals", requireLogin);
 
+// After a budget or expense mutation, queue an email check (does not run on GET /budget refresh).
 function triggerBudgetAlertEmail(req, budgetMonth, affectedCategoryId) {
   const userId = getCurrentUserId(req);
   const month = budgetMonth
@@ -143,6 +144,7 @@ function triggerBudgetAlertEmail(req, budgetMonth, affectedCategoryId) {
   });
 }
 
+// Loads everything Spending & Budgets needs: category rows, Everything Else, All Categories, in-app alerts.
 async function getBudgetPageData(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()
@@ -203,6 +205,7 @@ async function getBudgetPageData(budgetMonth) {
   const budgetedCategoryIds = monthBudgets
     .filter((b) => budgetStore.isBudgetActiveForMonth(b, month))
     .map((b) => b.categoryId);
+  // Everything Else = spending in categories that do not have a budget this month (unbudgeted transactions).
   const everythingElse = budgetStore.getEverythingElseData(
     categories,
     budgetedCategoryIds,
@@ -359,6 +362,7 @@ app.get("/home", async (req, res) => {
   }
 });
 
+// Purchase Checker page data: finance snapshot, category budget rows, and picker categories for the form.
 async function loadPurchaseCheckerData(formValues) {
   const live = await financeHelpers.getPurchaseCheckerFinanceSummary();
   const pickerData = await expenseStore.getCategoriesForPicker();
@@ -406,6 +410,7 @@ function renderRecommendationPage(res, locals) {
 }
 
 app.get("/recommendation", requireLogin, async (req, res) => {
+  // GET Purchase Checker: load budgets and render the form (no purchase calculation yet).
   try {
     const data = await loadPurchaseCheckerData();
     renderRecommendationPage(res, data);
@@ -426,6 +431,7 @@ app.get("/recommendation", requireLogin, async (req, res) => {
 });
 
 app.post("/recommendation", requireLogin, async (req, res) => {
+  // POST Purchase Checker: validate item → load user budgets/expenses → compute recommendation → render result.
   const { itemName, itemPrice, category } = req.body;
 
   try {
@@ -483,6 +489,7 @@ app.post("/recommendation", requireLogin, async (req, res) => {
 });
 
 app.get("/budget", async (req, res) => {
+  // Spending & Budgets: month comes from ?month=YYYY-MM in the URL (defaults to current month).
   try {
     const selectedMonth = budgetStore.normalizeBudgetMonth(
       req.query.month || budgetStore.getCurrentBudgetMonth()
@@ -738,6 +745,7 @@ app.post("/budget/setup", async (req, res) => {
 });
 
 app.post("/budget/add", async (req, res) => {
+  // Add Budget modal: create one category budget → save to MySQL → optionally trigger email alert check.
   const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
   const { categoryId, amount, rolloverEnabled } = req.body;
   const validation = validateCategoryBudgetAmount(amount);
@@ -793,6 +801,7 @@ app.post("/budget/add", async (req, res) => {
 });
 
 app.post("/budget/add-overall", async (req, res) => {
+  // Creates or updates the All Categories Budget (overall monthly spending cap for the user).
   const { amount, rolloverEnabled, monthFromUrl } = req.body;
   const validation = validateCategoryBudgetAmount(amount);
 
@@ -1359,6 +1368,7 @@ async function loadFinBotLiveSummary(budgetMonth) {
 }
 
 app.get("/chatbot", async (req, res) => {
+  // FinBot page: load latest finance snapshot + chat history from MySQL for this user only.
   try {
     const liveSummary = await loadFinBotLiveSummary();
     const sessionId = getSessionId(req, res);
@@ -1428,6 +1438,7 @@ app.post("/chatbot/clear", async (req, res) => {
 });
 
 app.post("/chatbot", async (req, res) => {
+  // FinBot message flow: save user message → build finance context → Groq or rule-based reply → save bot message.
   const wantsJson =
     req.is("application/json") ||
     String(req.get("Accept") || "").includes("application/json");

@@ -2,9 +2,57 @@
   "use strict";
 
   var monthInput = document.getElementById("everythingElseMonth");
+  var monthError = document.getElementById("everythingElseMonthError");
+
+  function getCurrentMonthValue() {
+    if (!monthInput) return "";
+    return monthInput.getAttribute("data-current-month") || monthInput.value || "";
+  }
+
+  var MIN_BUDGET_YEAR = 1900;
+  var MAX_BUDGET_YEAR = 2100;
+  var MONTH_DEBOUNCE_MS = 500;
+  var monthDebounceTimer = null;
+
+  function isValidBudgetMonth(value) {
+    if (!value || !/^\d{4}-\d{2}$/.test(value)) return false;
+    var parts = value.split("-");
+    var year = Number(parts[0]);
+    var monthNum = Number(parts[1]);
+    if (!Number.isFinite(year) || !Number.isFinite(monthNum)) return false;
+    if (year < MIN_BUDGET_YEAR || year > MAX_BUDGET_YEAR) return false;
+    if (monthNum < 1 || monthNum > 12) return false;
+    return true;
+  }
+
+  function showMonthError() {
+    if (!monthError || !monthInput) return;
+    monthError.hidden = false;
+    monthInput.setAttribute("aria-invalid", "true");
+  }
+
+  function hideMonthError() {
+    if (!monthError || !monthInput) return;
+    monthError.hidden = true;
+    monthInput.removeAttribute("aria-invalid");
+  }
+
   if (monthInput) {
+    function clearMonthDebounce() {
+      if (monthDebounceTimer) {
+        clearTimeout(monthDebounceTimer);
+        monthDebounceTimer = null;
+      }
+    }
+
     function navigateToMonth(month) {
-      if (!month || !/^\d{4}-\d{2}$/.test(month)) return;
+      if (!isValidBudgetMonth(month)) {
+        showMonthError();
+        monthInput.value = getCurrentMonthValue();
+        return;
+      }
+      hideMonthError();
+      if (month === getCurrentMonthValue()) return;
       var returnMonth = monthInput.getAttribute("data-return-month") || "";
       var url =
         "/budget/everything-else?month=" + encodeURIComponent(month);
@@ -14,14 +62,43 @@
       window.location.href = url;
     }
 
-    monthInput.addEventListener("change", function () {
-      navigateToMonth(monthInput.value);
+    function scheduleMonthNavigation() {
+      clearMonthDebounce();
+      monthDebounceTimer = setTimeout(function () {
+        monthDebounceTimer = null;
+        var value = monthInput.value;
+
+        if (!isValidBudgetMonth(value)) {
+          if (/^\d{4}-\d{2}$/.test(value)) {
+            showMonthError();
+            monthInput.value = getCurrentMonthValue();
+          }
+          return;
+        }
+
+        navigateToMonth(value);
+      }, MONTH_DEBOUNCE_MS);
+    }
+
+    monthInput.addEventListener("input", function () {
+      if (isValidBudgetMonth(monthInput.value)) {
+        hideMonthError();
+      }
+      scheduleMonthNavigation();
     });
 
     monthInput.addEventListener("keydown", function (event) {
       if (event.key === "Enter") {
         event.preventDefault();
+        clearMonthDebounce();
         navigateToMonth(monthInput.value);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        clearMonthDebounce();
+        monthInput.value = getCurrentMonthValue();
+        hideMonthError();
       }
     });
   }
@@ -194,7 +271,7 @@
 
     var expense = detail.expense;
     var fieldsChanged = detail.fieldsChanged || [];
-    var pageMonth = monthInput ? monthInput.value : "";
+    var pageMonth = getCurrentMonthValue();
 
     if (fieldsChanged.indexOf("isExcludedFromBudget") !== -1) {
       return;

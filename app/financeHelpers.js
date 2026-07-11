@@ -310,8 +310,8 @@ async function getRecommendationBudgetSummary(budgetMonth) {
 }
 
 /**
- * Purchase Checker + purchase-check API — overall budget from All Categories Budget only.
- * Category budgets are separate checks, not summed as Monthly Budget.
+ * Purchase Checker finance snapshot — overall budget comes from All Categories Budget only.
+ * Category budget totals are returned separately; they are NOT summed to fake a monthly cap.
  */
 async function getPurchaseCheckerFinanceSummary(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(

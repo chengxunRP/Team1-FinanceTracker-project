@@ -1,3 +1,4 @@
+// FinBot chat UI — sends user messages to POST /chatbot (JSON), displays Groq or rule-based replies.
 (function () {
   var messagesEl = document.getElementById("finbotMessages");
   var inputForm = document.getElementById("finbotChatForm");

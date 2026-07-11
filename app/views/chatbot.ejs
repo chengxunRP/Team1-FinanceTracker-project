@@ -1,5 +1,6 @@
 <%- include('partials/header') %>
 
+<%# FinBot page — messages from chat_messages; finance snapshot loaded on every POST for fresh totals. %>
 <%
   if (typeof groqAvailable === 'undefined') {
     groqAvailable = false;

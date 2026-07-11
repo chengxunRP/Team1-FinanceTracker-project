@@ -1,5 +1,27 @@
 /* Add / Edit Expense — PocketGuard-style transaction form */
 
+/* Expenses page header — primary Add Expense CTA only */
+.expenses-header-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.58rem 1.15rem;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.expenses-header-add-btn svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .expenses-header-add-btn {
+    padding: 0.52rem 1rem;
+    font-size: 0.88rem;
+  }
+}
+
 .expense-txn {
   width: 100%;
   max-width: 520px;

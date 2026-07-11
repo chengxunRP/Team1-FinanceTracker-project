@@ -1,3 +1,4 @@
+// Spending & Budgets page — Add Budget modal posts to /budget/add or /budget/add-overall.
 (function () {
   "use strict";
 

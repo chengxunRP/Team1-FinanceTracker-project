@@ -1,5 +1,6 @@
 <%- include('partials/header') %>
 
+<%# Purchase Checker page — form posts to POST /recommendation; result uses recommendationHelpers on the server. %>
 <%
   var spcFormValues = (typeof formValues !== 'undefined' && formValues) ? formValues : {};
   var spcPickerCategories = (typeof pickerCategories !== 'undefined' && Array.isArray(pickerCategories)) ? pickerCategories : [];

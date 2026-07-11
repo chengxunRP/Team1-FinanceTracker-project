@@ -1,5 +1,5 @@
-// Load app/.env before any Groq code runs (Feature 8)
-
+// Loads app/.env before Groq or SMTP code runs.
+// GROQ_API_KEY, SMTP_*, and APP_BASE_URL must live in .env — never commit real secrets to git.
 const path = require("path");
 const fs = require("fs");
 

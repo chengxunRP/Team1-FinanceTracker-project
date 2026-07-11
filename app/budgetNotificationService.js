@@ -1,4 +1,5 @@
-// In-app budget alerts — same rows and thresholds as Spending & Budgets (no extra DB tables).
+// In-app budget alerts — reuses the same spent/budget rows as Spending & Budgets (no extra DB tables).
+// Warning = 80% to below 100%; reached = exactly 100%; exceeded = above 100%.
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
 const { getBudgetUsageState } = require("./budgetHelpers");
@@ -12,6 +13,7 @@ function formatMoney(value) {
   return "$" + num.toFixed(2);
 }
 
+// Maps spent/budget into warning, reached, or exceeded presentation for one budget row.
 function buildAlertPresentation(name, spent, budget, scope) {
   const usage = getBudgetUsageState(spent, budget);
   if (usage.state !== "warning" && usage.state !== "reached" && usage.state !== "exceeded") {
@@ -54,6 +56,7 @@ function buildAlertPresentation(name, spent, budget, scope) {
   };
 }
 
+// Stable alert IDs include user + month + category/overall + severity so dismiss can target one banner.
 function buildOverallNotification(overallBudgetSection, budgetMonth) {
   if (!overallBudgetSection || !overallBudgetSection.card) return null;
 
@@ -123,6 +126,7 @@ function sortCategoryAlerts(categoryAlerts) {
   });
 }
 
+// Shows only the first few category alerts; "View more" reveals the rest in the browser.
 function buildNotificationDisplay(overallAlert, categoryAlerts) {
   const sortedCategoryAlerts = sortCategoryAlerts(categoryAlerts);
   const visibleCategoryAlerts = sortedCategoryAlerts.slice(

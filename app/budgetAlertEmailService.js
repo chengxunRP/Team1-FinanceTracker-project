@@ -1,3 +1,6 @@
+// Email Budget Notifications — sends SMTP alerts after real budget/expense changes, not on page refresh.
+// SMTP_USER is the sender account; the recipient comes from the logged-in user's email (or alert_email).
+// Credentials are read from .env via envConfig — never hardcoded in source.
 require("./envConfig");
 
 const db = require("./config/db");
@@ -54,6 +57,7 @@ function resolveAlertEmail(user) {
 }
 
 async function getUserAlertProfile(userId) {
+  // users table: load email, optional alert_email, and email_alerts_enabled for this user only.
   const [rows] = await db.query(
     `SELECT id, name, email, alert_email, email_alerts_enabled
      FROM users WHERE id = ?`,
@@ -76,11 +80,13 @@ function buildAlertKey(alert) {
   return alertId.slice(0, 64) || "unknown";
 }
 
+// Dedupe key = category/overall + severity so the same warning is not emailed twice in one month.
 function buildAlertDedupeKey(alert) {
   return `${buildAlertKey(alert)}:${alert.level}`;
 }
 
 async function getAlreadySentAlertKeys(userId, budgetMonth) {
+  // budget_email_alert_logs: which alert_key + severity was already emailed for this user/month.
   const [rows] = await db.query(
     `SELECT alert_key, severity
      FROM budget_email_alert_logs
@@ -95,6 +101,7 @@ function filterNewAlerts(alerts, sentKeys) {
   return alerts.filter((alert) => !sentKeys.has(buildAlertDedupeKey(alert)));
 }
 
+// Only write to the log after sendMail succeeds — failed sends can be retried on the next mutation.
 async function recordSentAlerts(userId, budgetMonth, alerts) {
   if (!alerts.length) return;
 
@@ -264,6 +271,7 @@ async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {})
   });
 }
 
+// Called from expense/budget mutation routes — runs after the DB change, not when a page is opened.
 function scheduleBudgetAlertCheck(userId, budgetMonth, meta = {}) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()

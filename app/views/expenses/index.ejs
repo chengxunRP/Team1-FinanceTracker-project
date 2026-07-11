@@ -2,7 +2,7 @@
 
 <link rel="stylesheet" href="/spb.css?v=45">
 <link rel="stylesheet" href="/modal-shell.css?v=5">
-<link rel="stylesheet" href="/expense-form.css?v=37">
+<link rel="stylesheet" href="/expense-form.css?v=38">
 
 <%
   if (typeof hasAnyExpenses === 'undefined') hasAnyExpenses = false;
@@ -26,13 +26,9 @@
       <h1>Expenses</h1>
       <p>Track, filter and manage all your spending records.</p>
     </div>
-    <div style="display:flex;gap:0.65rem;flex-shrink:0;">
-      <a href="/categories" class="btn btn--sm" style="background:var(--white);color:var(--text-muted);border:1px solid var(--border-soft);">
-        <svg viewBox="0 0 24 24" fill="none" width="14" height="14" style="margin-right:0.3rem" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.75"/></svg>
-        Categories
-      </a>
-      <button type="button" class="btn btn--primary btn--sm js-open-add-expense">
-        <svg viewBox="0 0 24 24" fill="none" width="14" height="14" style="margin-right:0.3rem" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"/></svg>
+    <div style="display:flex;flex-shrink:0;">
+      <button type="button" class="btn btn--primary expenses-header-add-btn js-open-add-expense">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16" style="margin-right:0.35rem" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"/></svg>
         Add Expense
       </button>
     </div>
