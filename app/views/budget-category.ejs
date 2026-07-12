@@ -319,7 +319,7 @@
               <% } %>
             </span>
             <span class="spb-transaction-item__meta">
-              <span class="spb-transaction-item__tag">CASH</span>
+              <span class="spb-transaction-item__tag"><%= tx.categoryDisplayName || tx.category || cat.displayName || cat.name || 'CASH' %></span>
             </span>
             <span class="spb-transaction-item__amount"><%= formatMoneySigned(tx.amount) %></span>
             <svg class="spb-transaction-item__chevron" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
