@@ -58,6 +58,9 @@ function getAppBaseUrl() {
   return String(raw).trim().replace(/\/$/, "");
 }
 
+// Build the "Open Spending & Budgets" link for the email.
+// Uses APP_BASE_URL from .env and adds ?month=YYYY-MM so the button opens
+// the Budget page for the same month as the alert. This file does not send email.
 function buildBudgetPageUrl(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(budgetMonth);
   const budgetUrl = new URL("/budget", `${getAppBaseUrl()}/`);
@@ -254,6 +257,10 @@ function buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts) {
 </html>`;
 }
 
+// Build the complete budget alert email content (subject, plain text and HTML).
+// Puts the newly triggered alert first and may list other active alerts below.
+// Returns the object that sendBudgetAlertEmail() passes to Nodemailer.
+// No SMTP sending happens in this file.
 function buildBudgetAlertEmail(user, budgetMonth, newAlerts, otherActiveAlerts) {
   const iconAttachment = getSpendWiseIconAttachment();
   const attachments = iconAttachment ? [iconAttachment] : [];

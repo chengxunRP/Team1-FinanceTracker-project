@@ -72,6 +72,7 @@
       .forEach(formatBotBubbleText);
   }
 
+  // Add the user's message as a chat bubble on the page before waiting for the server.
   function appendUserBubble(text) {
     var article = document.createElement("article");
     article.className = "finbot-bubble finbot-bubble--user";
@@ -90,6 +91,7 @@
     scrollToBottom();
   }
 
+  // Add FinBot's reply as a chat bubble after the server responds.
   function appendBotBubble(text) {
     var article = document.createElement("article");
     article.className = "finbot-bubble finbot-bubble--assistant";
@@ -109,6 +111,7 @@
     scrollToBottom();
   }
 
+  // Show "FinBot is thinking..." while the POST /chatbot request is in progress.
   function showTypingIndicator() {
     removeTypingIndicator();
 
@@ -214,6 +217,10 @@
     setLoading(false);
   }
 
+  // Send one FinBot question to the server and display the reply.
+  // Validates the text, disables the form to avoid duplicate requests, POSTs JSON
+  // to /chatbot, then adds FinBot's reply bubble and re-enables the form.
+  // If the request fails, shows a friendly error bubble instead.
   function submitMessage(messageText) {
     if (isSubmitting) return;
 
@@ -250,6 +257,7 @@
         appendBotBubble(data.reply || "");
       })
       .catch(function (err) {
+        // Ignore intentional cancels; otherwise show an error bubble to the user.
         if (err && err.name === "AbortError") return;
         showErrorBubble();
       })

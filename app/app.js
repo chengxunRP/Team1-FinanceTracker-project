@@ -144,7 +144,11 @@ function triggerBudgetAlertEmail(req, budgetMonth, affectedCategoryId) {
   });
 }
 
-// Loads everything Spending & Budgets needs: category rows, Everything Else, All Categories, in-app alerts.
+// Load everything the Spending & Budgets page needs for the selected month.
+// Reads the month (YYYY-MM), then loads this user's categories, expenses,
+// category_budgets rows, and the optional All Categories Budget from
+// overall_monthly_budgets. Calculates spending, rollover, remaining amounts
+// and in-app alerts, then returns the object that budget.ejs renders as cards.
 async function getBudgetPageData(budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()
@@ -488,8 +492,10 @@ app.post("/recommendation", requireLogin, async (req, res) => {
   }
 });
 
+// GET /budget — open the Spending & Budgets page for the logged-in user.
+// Reads ?month=YYYY-MM (or the current month), calls getBudgetPageData(),
+// and passes the completed rows, totals and alerts into budget.ejs.
 app.get("/budget", async (req, res) => {
-  // Spending & Budgets: month comes from ?month=YYYY-MM in the URL (defaults to current month).
   try {
     const selectedMonth = budgetStore.normalizeBudgetMonth(
       req.query.month || budgetStore.getCurrentBudgetMonth()
@@ -744,8 +750,13 @@ app.post("/budget/setup", async (req, res) => {
   }
 });
 
+// POST /budget/add — create one category budget from the Add Budget form.
+// Receives categoryId, amount, month and rollover from the request body.
+// Validates the amount, checks the category exists, and blocks a second active
+// budget for the same category. Saves into category_budgets with the logged-in
+// user_id so users cannot see each other's budgets. After saving, starts the
+// email-alert check and returns JSON so the browser can reload the same month.
 app.post("/budget/add", async (req, res) => {
-  // Add Budget modal: create one category budget → save to MySQL → optionally trigger email alert check.
   const budgetMonth = req.body.budgetMonth || budgetStore.getCurrentBudgetMonth();
   const { categoryId, amount, rolloverEnabled } = req.body;
   const validation = validateCategoryBudgetAmount(amount);
@@ -800,8 +811,12 @@ app.post("/budget/add", async (req, res) => {
   }
 });
 
+// POST /budget/add-overall — create or update the All Categories Budget.
+// The user chooses "All Transactions" and enters one total monthly limit.
+// The amount is validated, then stored in overall_monthly_budgets for this user.
+// This is separate from category_budgets and is NOT the sum of category budgets.
+// After saving, the email-alert check runs for the selected month.
 app.post("/budget/add-overall", async (req, res) => {
-  // Creates or updates the All Categories Budget (overall monthly spending cap for the user).
   const { amount, rolloverEnabled, monthFromUrl } = req.body;
   const validation = validateCategoryBudgetAmount(amount);
 
@@ -1362,13 +1377,18 @@ async function getChatbotUserContext(req, month) {
   return { currency, savingsGoalSummary };
 }
 
-/** Same MySQL load as GET /budget, mapped for FinBot snapshot + answers. */
+// Reload this user's latest Budget-page numbers for FinBot.
+// Reuses getBudgetPageData() / getLiveFinanceSummary() so FinBot sees the same
+// expenses, category budgets, overall budget and alerts as the Budget page,
+// instead of old or fixed sample values.
 async function loadFinBotLiveSummary(budgetMonth) {
   return getLiveFinanceSummary(budgetMonth, getBudgetPageData);
 }
 
+// GET /chatbot — open FinBot for the logged-in user.
+// Loads the live finance summary and this user's chat history from MySQL,
+// then renders chatbot.ejs with suggested questions and the message form.
 app.get("/chatbot", async (req, res) => {
-  // FinBot page: load latest finance snapshot + chat history from MySQL for this user only.
   try {
     const liveSummary = await loadFinBotLiveSummary();
     const sessionId = getSessionId(req, res);
@@ -1426,6 +1446,8 @@ app.get("/chatbot", async (req, res) => {
   }
 });
 
+// POST /chatbot/clear — delete this user's stored chat_messages and start again
+// with the welcome message. Only clears the logged-in user's conversation.
 app.post("/chatbot/clear", async (req, res) => {
   try {
     const sessionId = getSessionId(req, res);
@@ -1437,8 +1459,11 @@ app.post("/chatbot/clear", async (req, res) => {
   }
 });
 
+// POST /chatbot — answer one FinBot question for the logged-in user.
+// Flow: receive the message → reload latest finance data → save the user message
+// in chat_messages → load recent history → call getFinBotReply() (Groq or fallback)
+// → save FinBot's answer → return JSON to finbot-chat.js (or re-render the page).
 app.post("/chatbot", async (req, res) => {
-  // FinBot message flow: save user message → build finance context → Groq or rule-based reply → save bot message.
   const wantsJson =
     req.is("application/json") ||
     String(req.get("Accept") || "").includes("application/json");

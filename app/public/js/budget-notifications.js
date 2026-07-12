@@ -1,5 +1,4 @@
-// In-app budget alert dismiss — stored in browser localStorage only (does not stop backend emails).
-// Dismiss IDs include user + month + category + severity so alerts can reappear after spending changes.
+// In-app budget alerts on the page: dismiss, localStorage, and View More / Show Fewer.
 ;(function () {
   "use strict";
 
@@ -7,6 +6,9 @@
   var VISIBLE_LIMIT = 2;
   console.log("budget-notifications.js loaded v9");
 
+  // Save and read dismissed alert IDs in the browser's localStorage.
+  // Refreshing the page keeps dismissed alerts hidden. This does not delete
+  // the expense or budget, and it does not stop email alerts from being sent.
   function readDismissedIds() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -250,6 +252,9 @@
     }
   }
 
+  // Control how many alerts are visible at once.
+  // Only the first few alerts show; View More / Show Fewer reveals or hides the rest.
+  // This only changes what the user sees — it does not change budgets or emails.
   function applyBudgetAlertDisplayState(root) {
     var sections = [];
 
@@ -337,6 +342,8 @@
     });
   }
 
+  // When the user clicks Dismiss, hide that alert and save its stable ID in localStorage
+  // so it stays hidden after a refresh. The underlying budget and expense are unchanged.
   document.addEventListener("click", function (event) {
     var dismissButton = event.target.closest(".js-dismiss-budget-alert");
     if (dismissButton) {

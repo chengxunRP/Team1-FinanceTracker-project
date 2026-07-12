@@ -9,11 +9,10 @@ function roundMoney(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
-/**
- * Build FinBot snapshot fields from the same objects the /budget page uses.
- * pageData = getBudgetPageData(month)
- * overallBudgetSection = budgetStore.getOverallBudgetSectionData(month)
- */
+// Convert Budget-page data into a smaller finance summary for FinBot.
+// Reuses category budgets, All Categories Budget, spending, remaining amounts,
+// alerts and highest category from getBudgetPageData(). FinBot then answers
+// using the same latest numbers the user sees on the Budget page.
 function buildLiveFinanceSummaryFromBudgetPage(pageData, overallBudgetSection) {
   const month = pageData.budgetMonth;
   const categoryRows = Array.isArray(pageData.categoryRows) ? pageData.categoryRows : [];
@@ -157,10 +156,9 @@ function buildLiveFinanceSummaryFromBudgetPage(pageData, overallBudgetSection) {
   };
 }
 
-/**
- * Load the same MySQL data as GET /budget, then map it for FinBot.
- * loadBudgetPageData must be the app's getBudgetPageData (injected to avoid circular requires).
- */
+// Load the logged-in user's latest expenses and budgets for FinBot.
+// Calls the same Budget-page loader, then buildLiveFinanceSummaryFromBudgetPage(),
+// so answers stay consistent with Spending & Budgets and avoid fixed sample values.
 async function getLiveFinanceSummary(budgetMonth, loadBudgetPageData) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()

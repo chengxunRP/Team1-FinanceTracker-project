@@ -13,7 +13,10 @@ function formatMoney(value) {
   return "$" + num.toFixed(2);
 }
 
-// Maps spent/budget into warning, reached, or exceeded presentation for one budget row.
+// Build the title, message, detail text and severity for one budget alert.
+// Receives one calculated budget (name, spent, available). Calls getBudgetUsageState()
+// to decide warning / reached / exceeded. Includes whether it is a category budget
+// or the All Categories Budget. Returns null when usage is still safe (no banner needed).
 function buildAlertPresentation(name, spent, budget, scope) {
   const usage = getBudgetUsageState(spent, budget);
   if (usage.state !== "warning" && usage.state !== "reached" && usage.state !== "exceeded") {
@@ -153,6 +156,10 @@ function buildNotificationDisplay(overallAlert, categoryAlerts) {
   };
 }
 
+// Build the full in-app alert list for the Budget page and email service.
+// Receives category budget rows and All Categories Budget data, creates an alert
+// for every budget at warning, reached or exceeded, sorts them (danger first),
+// and returns the final list that budget.ejs and the email service use.
 function buildBudgetNotifications(categoryRows, overallBudgetSection, budgetMonth) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()

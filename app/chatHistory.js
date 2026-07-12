@@ -8,10 +8,11 @@ function createWelcomeMessage(welcomeText) {
   return { sender: "bot", text: welcomeText };
 }
 
+// Find or create the chat_sessions row owned by the logged-in user.
+// Every conversation is linked with user_id so different users never share history.
 async function getOrCreateSession(sessionId) {
   const userId = getRequestUserId() || requireUserId();
 
-  // chat_sessions: find existing row for this user, or create user-{id} session.
   const [existingByUser] = await db.query(
     "SELECT id FROM chat_sessions WHERE user_id = ? LIMIT 1",
     [userId]
@@ -29,6 +30,9 @@ async function getOrCreateSession(sessionId) {
   return result.insertId;
 }
 
+// Load this user's messages from chat_messages (oldest to newest).
+// Recent history lets FinBot understand follow-up questions. If the chat is empty,
+// inserts the welcome message first so the page always has a starting bot line.
 async function getChatHistory(sessionId, welcomeText) {
   const dbSessionId = await getOrCreateSession(sessionId);
 
@@ -53,6 +57,8 @@ async function getChatHistory(sessionId, welcomeText) {
   return [welcome];
 }
 
+// Save one user or FinBot message into chat_messages for this logged-in user.
+// Stored messages are loaded again on the next question so follow-ups work.
 async function addChatMessage(sessionId, sender, text, welcomeText) {
   const dbSessionId = await getOrCreateSession(sessionId);
 
@@ -77,6 +83,8 @@ async function addChatMessage(sessionId, sender, text, welcomeText) {
   return getChatHistory(sessionId, welcomeText);
 }
 
+// Delete chat_messages for the current user only, then insert a fresh welcome message.
+// Other users' chat history is not affected because the session is tied to user_id.
 async function clearChatHistory(sessionId, welcomeText) {
   const dbSessionId = await getOrCreateSession(sessionId);
 

@@ -473,6 +473,11 @@ async function ensureRolloverOverridesTable() {
  * walking forward from budget start with recursive carry when rollover is ON.
  * rolloverOverrides: { 'YYYY-MM': amount } — incoming rollover for that month only.
  */
+// Calculate how much unused (or overspent) money from earlier months enters the selected month.
+// Starts at the category budget's first month, loads spending for each month from expenses,
+// and finds the ending balance (available − spent). A positive balance increases the next
+// month's available budget; a negative balance reduces it. Returns the rollover amount
+// that should be added when showing the selected month.
 function computeRolloverAmount(
   budgetEntry,
   targetMonth,
@@ -515,8 +520,11 @@ function computeRolloverAmount(
   }
 }
 
-// Connects base budget + rollover carry → available budget, then spent/remaining/overspent.
-// availableBudget = baseBudget + rollover (positive adds room; negative reduces next month).
+// Combine base budget and rollover into the amounts shown on one budget card.
+// Formula: available budget = base budget + rollover.
+// Remaining = available budget − spent. Positive remaining means money is left;
+// negative means overspending. Percentage used is spent ÷ available budget.
+// Returns base, available, spent, remaining, used % and overspent flags for the UI.
 function buildBudgetAmounts(baseBudget, actual, rolloverEnabled, rolloverAmount) {
   const rollover = rolloverEnabled ? Number(rolloverAmount || 0) : 0;
   const availableBudget = Number(baseBudget) + rollover;
@@ -562,6 +570,10 @@ function getBudgetMonthNavigation(selectedMonth, startMonth) {
   };
 }
 
+// Calculate rollover into the selected month for the All Categories Budget.
+// Works like computeRolloverAmount, but uses the overall_monthly_budgets limit
+// and total counted spending for each month. Unused money increases next month's
+// available amount; overspending reduces it. Reset months use overall_budget_rollover_resets.
 function computeOverallRolloverIntoMonth(
   baseBudget,
   startMonth,
@@ -679,8 +691,10 @@ function mapOverallBudgetCalculation(calc) {
   };
 }
 
-// Creates one per-category budget for the logged-in user.
-// Duplicate check: if this category already has a visible budget for the month, reject instead of inserting twice.
+// Insert or reactivate one row in category_budgets for the logged-in user.
+// Receives categoryId, amount, rollover setting and month. Stores user_id so
+// each user's budgets stay separate. Rejects if that category already has an
+// active budget for the month. Returns the saved budget details for the caller.
 async function createCategoryBudget(
   categoryId,
   amount,
@@ -850,6 +864,9 @@ async function getRolloverOverridesForBudget(budgetEntry) {
   return map[String(budgetEntry.id)] || {};
 }
 
+// Stop category rollover from carrying into the selected month only.
+// Writes a row into budget_rollover_overrides so the previous ending balance
+// is ignored from that month onward. The category budget itself is not deleted.
 async function resetRolloverForMonth(categoryId, budgetMonth) {
   const isRecurring = await usesRecurringBudgetSchema();
   if (!isRecurring) {
@@ -1153,7 +1170,11 @@ async function getCategoryMonthlyTotalsFromDb(categoryId) {
   return totals;
 }
 
-// Builds Spending & Budgets cards: base limit, rollover into this month, spent, remaining, status.
+// Calculate one display row for every active category budget this month.
+// Loads category_budgets for the logged-in user, matches each with spending from
+// expenses (Don't-count items excluded), applies rollover, then calculates remaining
+// or overspent amounts, percentage used and alert state. The completed rows are
+// passed to budget.ejs and shown as the category budget cards.
 async function getBudgetRows(budgetMonth, categories, spendingByCategoryId) {
   const budgets = await getActiveCategoryBudgets();
   const month = normalizeBudgetMonth(budgetMonth);
@@ -2009,6 +2030,9 @@ async function getOverallRolloverResetsForBudget(overallBudgetId) {
   }
 }
 
+// Stop All Categories rollover from carrying into the selected month only.
+// Saves a reset in overall_budget_rollover_resets so the previous carried balance
+// is ignored for that month. The overall_monthly_budgets row itself is not deleted.
 async function resetOverallRolloverForMonth(budgetMonth) {
   const existing = await getActiveOverallMonthlyBudget();
   if (!existing) {
@@ -2062,6 +2086,9 @@ async function undoOverallResetRolloverForMonth(budgetMonth) {
   }
 }
 
+// Create or update the user-created All Categories Budget in overall_monthly_budgets.
+// Stores one total monthly spending limit for the logged-in user (user_id isolation).
+// This is separate from category_budgets and is not calculated by adding category budgets.
 async function saveOverallMonthlyBudget(amount, rolloverEnabled = false) {
   const existing = await getActiveOverallMonthlyBudget();
   const rolloverValue = rolloverEnabled ? 1 : 0;
@@ -2215,8 +2242,10 @@ async function getTotalMonthSpending(budgetMonth) {
   return Number(rows[0].total) || 0;
 }
 
-// All Categories Budget (overall monthly cap) — separate from the sum of category budgets.
-// Used by Spending & Budgets, Purchase Checker, and FinBot when an overall limit exists.
+// Load the All Categories Budget card data for the selected month.
+// Reads overall_monthly_budgets for this user, sums counted expenses for the month,
+// applies overall rollover, then calculates remaining or overspent amounts.
+// Returns the object shown on the Spending & Budgets All Categories card.
 async function getOverallBudgetSectionData(budgetMonth) {
   const active = await getActiveOverallMonthlyBudget();
   if (!active) return null;

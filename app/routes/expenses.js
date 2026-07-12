@@ -181,7 +181,10 @@ function handleExpenseAuthError(req, res, error) {
   return false;
 }
 
-// Runs after expense add/update/delete — schedules budget email check for the affected month/category.
+// Called after an expense is added, edited or deleted.
+// Passes the affected month and category to the Budget Email service so alerts
+// can be recalculated. Connects the Expense feature to Budget Alerts.
+// The expense itself remains stored in the expenses table.
 function triggerBudgetAlerts(req, budgetMonth, affectedCategoryId) {
   const userId = getCurrentUserId(req);
   const month = budgetMonth ? String(budgetMonth).slice(0, 7) : null;

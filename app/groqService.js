@@ -10,6 +10,9 @@ const GROQ_API_HOST = "api.groq.com";
 const GROQ_API_PATH = "/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.1-8b-instant";
 
+// Format recent user and FinBot messages for the Groq request.
+// Keeps them in order so Groq can understand follow-up questions such as
+// "what about last month?" based on the earlier conversation.
 function buildConversationContext(recentMessages) {
   const list = Array.isArray(recentMessages) ? recentMessages : [];
   if (!list.length) {
@@ -24,6 +27,9 @@ function buildConversationContext(recentMessages) {
   return ["Recent chat history (most recent 20):", ...recent].join("\n");
 }
 
+// Pack the user's current finance numbers into text for Groq.
+// Includes expenses, category budgets, All Categories Budget, remaining amounts,
+// alerts, highest spending category and Everything Else spending for the month.
 function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabel, liveSummary, userContext) {
   const currency = (userContext && userContext.currency) || "USD";
   const expenseLines = expenses
@@ -102,7 +108,10 @@ function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabe
   ].join("\n");
 }
 
-// Packs category budgets, All Transactions totals, expenses, and alerts into the Groq system prompt.
+// Build the full system prompt sent to Groq.
+// Instructs Groq to use only the supplied finance data, keep category budgets
+// separate from the All Categories Budget, follow warning / reached / exceeded
+// rules, avoid inventing transactions, and give simple financial advice.
 function buildSystemPrompt(
   summary,
   financeSnapshot,
@@ -183,6 +192,9 @@ function postGroqChat(body, apiKey) {
   });
 }
 
+// Send the completed prompt to the Groq API and return the generated reply text.
+// Reads GROQ_API_KEY from .env for the request only — never logs or prints the key.
+// The reply is returned to chatbotHelpers.js for saving and display.
 async function getGroqReply(
   userMessage,
   summary,

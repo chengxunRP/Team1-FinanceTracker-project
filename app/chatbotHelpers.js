@@ -114,6 +114,9 @@ function normalizeMessage(message) {
   return String(message || "").trim().toLowerCase();
 }
 
+// Detect clearly unrelated questions (weather, jokes, sports, etc.).
+// Those are redirected back to finance topics. Normal finance follow-up
+// questions are still allowed through to Groq or the built-in fallback.
 function isClearlyOffTopicMessage(message) {
   const text = normalizeMessage(message);
   return CLEARLY_OFF_TOPIC_KEYWORDS.some(function (keyword) {
@@ -636,7 +639,10 @@ function isBudgetedCategorySpendQuestion(text) {
   );
 }
 
-// Rule-based reply engine: purchase checks, budget summaries, improvement tips (no external API).
+// Built-in (rule-based) FinBot replies when Groq is unavailable or fails.
+// Reads the supplied finance summary and can answer about spending, remaining
+// budget, highest category, overspending and simple purchase questions without
+// calling the Groq API.
 function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, liveSummary, expenses) {
   const text = (message || "").trim().toLowerCase();
   const highestCategory = financeSnapshot.highestCategory || "—";
@@ -840,7 +846,10 @@ function getWelcomeMessage() {
   return "Hi, I'm FinBot. I can help you understand your spending, budgets, and whether a purchase is safe.";
 }
 
-// Entry point for POST /chatbot: try Groq with finance context + recent messages; fall back to rules.
+// Choose how to answer a FinBot question for the logged-in user.
+// Checks greetings and clearly off-topic messages first. If a Groq API key exists,
+// finance data and recent chat history are passed to Groq. If Groq fails or is
+// missing, buildFinBotReply() provides a usable built-in answer instead.
 async function getFinBotReply(
   message,
   summary,

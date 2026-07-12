@@ -80,13 +80,16 @@ function buildAlertKey(alert) {
   return alertId.slice(0, 64) || "unknown";
 }
 
-// Dedupe key = category/overall + severity so the same warning is not emailed twice in one month.
+// Build a unique key so the same alert is not emailed twice in one month.
+// Combines overall-or-category id with the severity (warning / danger).
+// Used together with user_id and budget_month when reading budget_email_alert_logs.
 function buildAlertDedupeKey(alert) {
   return `${buildAlertKey(alert)}:${alert.level}`;
 }
 
+// Read budget_email_alert_logs for this user and month.
+// Returns the set of alert keys already emailed so they can be skipped.
 async function getAlreadySentAlertKeys(userId, budgetMonth) {
-  // budget_email_alert_logs: which alert_key + severity was already emailed for this user/month.
   const [rows] = await db.query(
     `SELECT alert_key, severity
      FROM budget_email_alert_logs
@@ -101,7 +104,9 @@ function filterNewAlerts(alerts, sentKeys) {
   return alerts.filter((alert) => !sentKeys.has(buildAlertDedupeKey(alert)));
 }
 
-// Only write to the log after sendMail succeeds — failed sends can be retried on the next mutation.
+// Insert successfully sent alerts into budget_email_alert_logs.
+// Called only after Nodemailer send succeeds, so a failed send can be retried
+// next time. Prevents the same warning or exceeded email from being repeated.
 async function recordSentAlerts(userId, budgetMonth, alerts) {
   if (!alerts.length) return;
 
@@ -116,6 +121,9 @@ async function recordSentAlerts(userId, budgetMonth, alerts) {
   }
 }
 
+// Send one budget alert email with Nodemailer.
+// Checks email_alerts_enabled on the users row, chooses alert_email or normal email
+// as the recipient, then sends the subject/text/html built by the template file.
 async function sendBudgetAlertEmail(user, emailContent) {
   if (!user || !Number(user.email_alerts_enabled)) {
     return { sent: false, skipReason: "email_alerts_enabled off" };
@@ -147,6 +155,10 @@ async function sendBudgetAlertEmail(user, emailContent) {
   }
 }
 
+// Main email-alert flow after a budget or expense change.
+// Loads the user from users, checks email_alerts_enabled, chooses the recipient,
+// calculates current active alerts, reads budget_email_alert_logs to remove ones
+// already sent, builds and sends the email, then records successes in the log.
 async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {}) {
   const budgetMonth = budgetStore.normalizeBudgetMonth(
     budgetMonthInput || budgetStore.getCurrentBudgetMonth()
@@ -271,7 +283,9 @@ async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {})
   });
 }
 
-// Called from expense/budget mutation routes — runs after the DB change, not when a page is opened.
+// Start the email alert check after a budget or expense is saved.
+// Runs maybeSendBudgetAlertsForUser in the background so the HTTP response is not delayed.
+// Opening or refreshing a Budget page (GET) does not call this function.
 function scheduleBudgetAlertCheck(userId, budgetMonth, meta = {}) {
   const month = budgetStore.normalizeBudgetMonth(
     budgetMonth || budgetStore.getCurrentBudgetMonth()

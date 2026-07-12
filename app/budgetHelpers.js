@@ -56,8 +56,11 @@ function toBudgetCents(value) {
   return Math.round((Number(value) || 0) * 100);
 }
 
-// Turns spent vs budget into warning (80–99%), reached (100%), or exceeded (>100%).
-// Same thresholds drive in-app banners and email alert severity.
+// Decide whether a budget is safe, warning, reached or exceeded.
+// Receives spent and budget amounts, converts both to cents to avoid decimal
+// comparison errors, then returns: below 80% = safe, 80% to below 100% = warning,
+// exactly 100% = reached, above budget = exceeded. The returned state is used by
+// in-app alert banners, email alerts and status labels on the Budget pages.
 function getBudgetUsageState(spent, budget) {
   const spentCents = toBudgetCents(spent);
   const budgetCents = toBudgetCents(budget);
