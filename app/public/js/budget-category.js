@@ -39,16 +39,16 @@
   }
 
   function formatMoney(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return "$0";
-    if (num % 1 === 0) return "$" + num.toLocaleString();
-    return "$" + num.toFixed(2);
+    return window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.formatMoney(value)
+      : ("$" + Number(value || 0).toFixed(2));
   }
 
   function formatMoneySigned(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return "-$0.00";
-    return "-$" + Math.abs(num).toFixed(2);
+    var num = Math.abs(Number(value) || 0);
+    return window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.formatMoneySigned(-num)
+      : ("-$" + num.toFixed(2));
   }
 
   function isTxExcluded(tx) {
@@ -201,10 +201,7 @@
   }
 
   function formatChartMoney(value) {
-    var num = Number(value);
-    if (Number.isNaN(num) || num <= 0) return "$0";
-    if (num % 1 === 0) return "$" + num.toLocaleString();
-    return "$" + num.toFixed(2);
+    return formatMoney(value);
   }
 
   function getMonthTotalsFromTransactions() {

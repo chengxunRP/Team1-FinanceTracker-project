@@ -1430,15 +1430,23 @@ function isBudgetMonthAfter(a, b) {
 }
 
 function formatChartAmount(amount) {
+  const currencyService = require("./currencyService");
+  const { getRequestCurrency } = require("./requestUserContext");
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
   const num = Number(amount) || 0;
-  if (num <= 0) return "$0";
-  if (num >= 1000) {
-    const k = num / 1000;
-    const text = k.toFixed(2).replace(/\.?0+$/, "");
-    return "-$" + text + "k";
+  try {
+    if (num <= 0) return currencyService.formatFromBase(0, code);
+    return currencyService.formatFromBaseSigned(-Math.abs(num), code);
+  } catch (error) {
+    if (num <= 0) return "$0";
+    if (num >= 1000) {
+      const k = num / 1000;
+      const text = k.toFixed(2).replace(/\.?0+$/, "");
+      return "-$" + text + "k";
+    }
+    if (num % 1 === 0) return "-$" + num.toLocaleString();
+    return "-$" + num.toFixed(2);
   }
-  if (num % 1 === 0) return "-$" + num.toLocaleString();
-  return "-$" + num.toFixed(2);
 }
 
 function buildYearSpans(slots) {

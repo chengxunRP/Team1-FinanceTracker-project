@@ -306,33 +306,36 @@ function validateCategoryBudgetAmount(amount) {
 }
 
 function getCategoryStatusMessage(remaining, spent, budget) {
+  const currencyService = require("./currencyService");
+  const { getRequestCurrency } = require("./requestUserContext");
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+
+  function formatStatusMoney(value) {
+    try {
+      return currencyService.formatFromBase(value, code);
+    } catch (error) {
+      return currencyService.formatFromBase(value, currencyService.BASE_CURRENCY);
+    }
+  }
+
   if (spent !== undefined && spent !== null && budget !== undefined && budget !== null) {
     const usage = getBudgetUsageState(spent, budget);
     if (usage.state === "exceeded") {
       const overspent = (usage.spentCents - usage.budgetCents) / 100;
-      const text =
-        overspent % 1 === 0
-          ? "$" + overspent.toLocaleString()
-          : "$" + overspent.toFixed(2);
-      return text + " overspent";
+      return formatStatusMoney(overspent) + " overspent";
     }
 
     const left = Math.max((usage.budgetCents - usage.spentCents) / 100, 0);
-    const leftText = left % 1 === 0 ? "$" + left.toLocaleString() : "$" + left.toFixed(2);
-    return leftText + " left to spend";
+    return formatStatusMoney(left) + " left to spend";
   }
 
   const num = Number(remaining) || 0;
 
   if (num < 0) {
-    const overspent = Math.abs(num);
-    const text =
-      overspent % 1 === 0 ? "$" + overspent.toLocaleString() : "$" + overspent.toFixed(2);
-    return text + " overspent";
+    return formatStatusMoney(Math.abs(num)) + " overspent";
   }
 
-  const leftText = num % 1 === 0 ? "$" + num.toLocaleString() : "$" + num.toFixed(2);
-  return leftText + " left to spend";
+  return formatStatusMoney(num) + " left to spend";
 }
 
 const {

@@ -24,7 +24,7 @@
         </span>
         <span class="dash-stat-label">Monthly Budget</span>
       </div>
-      <span class="dash-stat-value dash-stat-value--blue" id="dashStatBudget">$<%= summary.monthlyBudget %></span>
+      <span class="dash-stat-value dash-stat-value--blue" id="dashStatBudget"><%= formatMoney(summary.monthlyBudget) %></span>
       <span class="dash-stat-caption">Current limit</span>
     </a>
 
@@ -35,7 +35,7 @@
         </span>
         <span class="dash-stat-label">Spent This Month</span>
       </div>
-      <span class="dash-stat-value dash-stat-value--red" id="dashStatSpent">$<%= summary.totalSpent %></span>
+      <span class="dash-stat-value dash-stat-value--red" id="dashStatSpent"><%= formatMoney(summary.totalSpent) %></span>
       <span class="dash-stat-sub" id="dashStatExpenseCount"><%= typeof monthExpenseCount !== 'undefined' ? monthExpenseCount : 0 %> expense<%= (typeof monthExpenseCount !== 'undefined' ? monthExpenseCount : 0) === 1 ? '' : 's' %> · <%= typeof budgetMonthLabel !== 'undefined' ? budgetMonthLabel : 'This month' %></span>
     </article>
 
@@ -46,7 +46,7 @@
         </span>
         <span class="dash-stat-label">Remaining</span>
       </div>
-      <span class="dash-stat-value dash-stat-value--green" id="dashStatRemaining">$<%= summary.remainingBudget %></span>
+      <span class="dash-stat-value dash-stat-value--green" id="dashStatRemaining"><%= formatMoney(summary.remainingBudget) %></span>
       <span class="dash-stat-caption">Available to spend</span>
     </a>
 
@@ -69,7 +69,7 @@
         <span class="dash-stat-label">Top Category This Month</span>
       </div>
       <span class="dash-stat-value dash-stat-value--sm" id="dashStatTopCategory"><%= financeSnapshot.highestCategory %></span>
-      <span class="dash-stat-sub" id="dashStatTopAmount">$<%= financeSnapshot.highestCategoryAmount %> spent</span>
+      <span class="dash-stat-sub" id="dashStatTopAmount"><%= formatMoney(financeSnapshot.highestCategoryAmount) %> spent</span>
     </article>
   </section>
 
@@ -96,9 +96,9 @@
           </div>
         </div>
         <ul class="dash-period-stats">
-          <li><span>Budget</span><strong id="dashThisBudget">$<%= summary.monthlyBudget %></strong></li>
-          <li><span>Spent</span><strong class="dash-val-red" id="dashThisSpent">$<%= summary.totalSpent %></strong></li>
-          <li><span>Remaining</span><strong class="dash-val-green" id="dashThisRemaining">$<%= summary.remainingBudget %></strong></li>
+          <li><span>Budget</span><strong id="dashThisBudget"><%= formatMoney(summary.monthlyBudget) %></strong></li>
+          <li><span>Spent</span><strong class="dash-val-red" id="dashThisSpent"><%= formatMoney(summary.totalSpent) %></strong></li>
+          <li><span>Remaining</span><strong class="dash-val-green" id="dashThisRemaining"><%= formatMoney(summary.remainingBudget) %></strong></li>
         </ul>
       </div>
     </article>
@@ -126,7 +126,7 @@
         </div>
         <ul class="dash-period-stats">
           <li><span>Budget</span><strong id="dashLastBudget">Not set</strong></li>
-          <li><span>Spent</span><strong class="dash-val-red" id="dashLastSpent">$0</strong></li>
+          <li><span>Spent</span><strong class="dash-val-red" id="dashLastSpent"><%= formatMoney(0) %></strong></li>
           <li><span>Remaining</span><strong class="dash-val-green" id="dashLastRemaining">N/A</strong></li>
         </ul>
       </div>
@@ -147,7 +147,7 @@
         <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V10M8 19V5M12 19V12M16 19V8M20 19V3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
       </div>
       <p class="dash-highlight-name" id="dashTopName"><%= financeSnapshot.highestCategory %></p>
-      <p class="dash-highlight-value dash-val-red" id="dashTopSpent">$<%= financeSnapshot.highestCategoryAmount %> spent</p>
+      <p class="dash-highlight-value dash-val-red" id="dashTopSpent"><%= formatMoney(financeSnapshot.highestCategoryAmount) %> spent</p>
       <p class="dash-highlight-note">Highest spending category for the selected month.</p>
     </article>
   </section>
@@ -245,21 +245,21 @@
             <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v14M5 8l5-5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="dash-cashflow-metric__label">Monthly Budget</span>
-          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashIncome">$<%= summary.monthlyBudget %></span>
+          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashIncome"><%= formatMoney(summary.monthlyBudget) %></span>
         </div>
         <div class="dash-cashflow-metric">
           <span class="dash-cashflow-metric__icon dash-cashflow-metric__icon--red" aria-hidden="true">
             <svg viewBox="0 0 20 20" fill="none"><path d="M10 17V3M5 12l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="dash-cashflow-metric__label">Total Expenses</span>
-          <span class="dash-cashflow-metric__value dash-val-red" id="dashCashExpenses">$<%= summary.totalSpent %></span>
+          <span class="dash-cashflow-metric__value dash-val-red" id="dashCashExpenses"><%= formatMoney(summary.totalSpent) %></span>
         </div>
         <div class="dash-cashflow-metric dash-cashflow-metric--total">
           <span class="dash-cashflow-metric__icon dash-cashflow-metric__icon--blue" aria-hidden="true">
             <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M7.5 10.5l1.5 1.5 3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="dash-cashflow-metric__label">Net Remaining</span>
-          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashRemaining">$<%= summary.remainingBudget %></span>
+          <span class="dash-cashflow-metric__value dash-val-green" id="dashCashRemaining"><%= formatMoney(summary.remainingBudget) %></span>
         </div>
       </div>
     </article>

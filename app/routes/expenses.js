@@ -15,8 +15,29 @@ const {
 const { isExpenseCountedForBudget } = require('../budgetHelpers');
 const { requireLogin, getCurrentUserId } = require('../authHelpers');
 const { scheduleBudgetAlertCheck } = require('../budgetAlertEmailService');
+const currencyService = require('../currencyService');
+const { getRequestCurrency } = require('../requestUserContext');
 
 router.use(requireLogin);
+
+function preferredAmountToBase(amountPreferred) {
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+  return currencyService.convertToBase(amountPreferred, code);
+}
+
+function withPreferredAmountDisplay(expense) {
+  if (!expense || typeof expense !== 'object') return expense;
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+  let amountPreferred = expense.amountPreferred;
+  if (amountPreferred == null || amountPreferred === '') {
+    try {
+      amountPreferred = currencyService.convertFromBase(expense.amount, code);
+    } catch (error) {
+      amountPreferred = expense.amount;
+    }
+  }
+  return { ...expense, amountPreferred };
+}
 
 function wantsJsonRequest(req) {
   return (
@@ -96,7 +117,7 @@ function mapExpenseSaveError(error) {
     error.code === 'ER_WARN_DATA_OUT_OF_RANGE' &&
     /amount/i.test(String(error.sqlMessage || ''))
   ) {
-    const msg = 'Amount is too large. Maximum is $99,999,999.99.';
+    const msg = 'Amount is too large.';
     return { message: msg, fieldErrors: { amount: msg } };
   }
   return {
@@ -140,10 +161,18 @@ function respondAddExpenseFailure(req, res, options = {}) {
       generalCategories: [],
     }))
     .then((pickerData) => {
+      const body = expenseBody || {};
+      const expense = {
+        ...body,
+        amountPreferred:
+          body.amountPreferred != null && body.amountPreferred !== ''
+            ? body.amountPreferred
+            : body.amount,
+      };
       res.status(status).render('expenses/form', {
         pageTitle: 'Add Expense',
         activePage: 'expenses',
-        expense: expenseBody || {},
+        expense,
         categories: pickerData.categories,
         customCategories: pickerData.customCategories,
         generalCategories: pickerData.generalCategories,
@@ -284,7 +313,12 @@ function redirectWithBudgetAlertReset(res, url, meta) {
 }
 
 function formatSGD(amount) {
-  return '$' + Number(amount).toFixed(2);
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+  try {
+    return currencyService.formatFromBase(amount, code);
+  } catch (error) {
+    return currencyService.formatFromBase(amount, currencyService.BASE_CURRENCY);
+  }
 }
 
 function expenseToJson(expense) {
@@ -545,7 +579,7 @@ router.post('/', uploadExpenseImage, async (req, res) => {
     await store.addExpense({
       title: title.trim(),
       merchantName,
-      amount: parseFloat(amount),
+      amount: preferredAmountToBase(parseFloat(amount)),
       categoryId,
       date,
       notes: (notes || '').trim(),
@@ -607,7 +641,7 @@ router.get('/:id/edit', async (req, res) => {
     if (!raw) return res.redirect('/expenses');
     res.render('expenses/form', {
       pageTitle: 'Edit Expense', activePage: 'expenses',
-      expense: raw,
+      expense: withPreferredAmountDisplay(raw),
       categories: pickerData.categories,
       customCategories: pickerData.customCategories,
       generalCategories: pickerData.generalCategories,
@@ -648,7 +682,12 @@ async function handleExpenseUpdate(req, res) {
     }));
     return res.render('expenses/form', {
       pageTitle: 'Edit Expense', activePage: 'expenses',
-      expense: { ...req.body, id: req.params.id, imagePath: existing.imagePath || '' },
+      expense: {
+        ...req.body,
+        id: req.params.id,
+        imagePath: existing.imagePath || '',
+        amountPreferred: amount,
+      },
       categories: pickerData.categories,
       customCategories: pickerData.customCategories,
       generalCategories: pickerData.generalCategories,
@@ -670,7 +709,7 @@ async function handleExpenseUpdate(req, res) {
     await store.updateExpense(req.params.id, {
       title: title.trim(),
       merchantName,
-      amount: parseFloat(amount),
+      amount: preferredAmountToBase(parseFloat(amount)),
       categoryId,
       date,
       notes: (notes || '').trim(),
@@ -702,7 +741,12 @@ async function handleExpenseUpdate(req, res) {
     res.status(500).render('expenses/form', {
       pageTitle: 'Edit Expense',
       activePage: 'expenses',
-      expense: { ...req.body, id: req.params.id, imagePath: expenseImagePath || '' },
+      expense: {
+        ...req.body,
+        id: req.params.id,
+        imagePath: expenseImagePath || '',
+        amountPreferred: req.body.amount,
+      },
       categories: pickerData.categories,
       customCategories: pickerData.customCategories,
       generalCategories: pickerData.generalCategories,
@@ -764,7 +808,10 @@ router.post('/:id/update-amount', async (req, res) => {
       return res.status(400).json({ success: false, error: amountCheck.error });
     }
 
-    const saved = await store.updateExpenseAmount(req.params.id, amountCheck.amount);
+    const saved = await store.updateExpenseAmount(
+      req.params.id,
+      preferredAmountToBase(amountCheck.amount)
+    );
     if (!saved) {
       return res.status(404).json({ success: false, error: 'Expense not found.' });
     }

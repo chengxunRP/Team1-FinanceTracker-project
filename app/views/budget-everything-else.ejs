@@ -12,19 +12,6 @@
   if (typeof monthOptions === 'undefined') monthOptions = [];
 
   var currentMonthName = budgetMonthLabel.split(' ')[0] || 'this month';
-
-  function formatMoney(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return '$0';
-    if (num % 1 === 0) return '$' + num.toLocaleString();
-    return '$' + num.toFixed(2);
-  }
-
-  function formatMoneySigned(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return '-$0.00';
-    return '-$' + Math.abs(num).toFixed(2);
-  }
 %>
 
 <div class="everything-detail-page spb-page--everything-else">
@@ -69,7 +56,7 @@
             >Enter a valid month in YYYY-MM format.</p>
           </div>
         </div>
-        <p class="everything-total">Total: <%= formatMoneySigned(detail.totalAmount || 0) %></p>
+        <p class="everything-total">Total: <%= formatMoneySigned(-Math.abs(Number(detail.totalAmount || 0) || 0)) %></p>
       </div>
     </div>
     <button type="button" class="everything-plus-btn" id="openAddBudget" aria-label="Add a budget">
@@ -94,7 +81,7 @@
         <div class="everything-date-group" data-date-group="<%= group.date %>">
           <header class="everything-date-header">
             <span class="everything-date-label"><%= group.dateLabel %></span>
-            <span class="everything-date-total" data-original-total="<%= group.dayTotal %>"><%= formatMoneySigned(group.dayTotal) %></span>
+            <span class="everything-date-total" data-original-total="<%= group.dayTotal %>"><%= formatMoneySigned(-Math.abs(Number(group.dayTotal) || 0)) %></span>
           </header>
           <% group.transactions.forEach(function(tx) { %>
           <button type="button"
@@ -136,7 +123,7 @@
                 <span class="everything-transaction-category"><%= tx.categoryDisplayName %></span>
               </span>
             </span>
-            <span class="everything-transaction-amount"><%= formatMoneySigned(tx.amount) %></span>
+            <span class="everything-transaction-amount"><%= formatMoneySigned(-Math.abs(Number(tx.amount) || 0)) %></span>
           </button>
           <% }); %>
         </div>

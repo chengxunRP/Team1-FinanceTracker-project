@@ -77,10 +77,21 @@ function getPurchaseStatusLabel(level) {
   return "Safe";
 }
 
+function formatCheckMoney(amountBase) {
+  const currencyService = require("./currencyService");
+  const { getRequestCurrency } = require("./requestUserContext");
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+  try {
+    return currencyService.formatFromBase(amountBase, code);
+  } catch (error) {
+    return currencyService.formatFromBase(amountBase, currencyService.BASE_CURRENCY);
+  }
+}
+
 function getPurchaseAdviceText(impact) {
   if (impact.level === "not_recommended") {
     if (impact.itemPrice > impact.remainingBudget) {
-      return `This item costs more than your remaining $${impact.remainingBudget}. I would not recommend this purchase.`;
+      return `This item costs more than your remaining ${formatCheckMoney(impact.remainingBudget)}. I would not recommend this purchase.`;
     }
 
     return `This would push you to ${impact.percentAfter}% of your budget, which is overspending. I would not recommend this purchase.`;
@@ -102,14 +113,14 @@ function buildPurchaseCheckReply(summary, itemPrice) {
     `Status: ${status}`,
     "",
     "Current situation:",
-    `- Monthly budget: $${impact.monthlyBudget}`,
-    `- Current spent: $${impact.totalSpent}`,
-    `- Current remaining: $${impact.remainingBudget}`,
+    `- Monthly budget: ${formatCheckMoney(impact.monthlyBudget)}`,
+    `- Current spent: ${formatCheckMoney(impact.totalSpent)}`,
+    `- Current remaining: ${formatCheckMoney(impact.remainingBudget)}`,
     "",
     "After purchase:",
-    `- Item price: $${impact.itemPrice}`,
-    `- New total spent: $${impact.spendingAfter}`,
-    `- Remaining after purchase: $${impact.remainingAfter}`,
+    `- Item price: ${formatCheckMoney(impact.itemPrice)}`,
+    `- New total spent: ${formatCheckMoney(impact.spendingAfter)}`,
+    `- Remaining after purchase: ${formatCheckMoney(impact.remainingAfter)}`,
     `- Budget used after purchase: ${impact.percentAfter}%`,
     "",
     "Advice:",
@@ -123,12 +134,12 @@ function buildSpendingAdviceReply(summary, financeSnapshot) {
 
   return [
     "Summary:",
-    `- You have spent $${summary.totalSpent} out of $${summary.monthlyBudget}.`,
-    `- You have $${summary.remainingBudget} remaining.`,
+    `- You have spent ${formatCheckMoney(summary.totalSpent)} out of ${formatCheckMoney(summary.monthlyBudget)}.`,
+    `- You have ${formatCheckMoney(summary.remainingBudget)} remaining.`,
     `- You have used ${summary.percentageUsed}% of your budget.`,
     "",
     "Main insight:",
-    `${category} is your highest spending category at $${categoryAmount}.`,
+    `${category} is your highest spending category at ${formatCheckMoney(categoryAmount)}.`,
     "",
     "Advice:",
     `- Reduce ${category} spending first because it is your highest category.`,
@@ -140,19 +151,20 @@ function buildSpendingAdviceReply(summary, financeSnapshot) {
 function buildSavingTipsReply(summary, financeSnapshot) {
   const category = financeSnapshot.highestCategory;
   const categoryAmount = financeSnapshot.highestCategoryAmount;
+  const sampleCut = categoryAmount > 40 ? 20 : 10;
 
   return [
     "Summary:",
-    `- You have spent $${summary.totalSpent} out of $${summary.monthlyBudget}.`,
-    `- You have $${summary.remainingBudget} remaining.`,
+    `- You have spent ${formatCheckMoney(summary.totalSpent)} out of ${formatCheckMoney(summary.monthlyBudget)}.`,
+    `- You have ${formatCheckMoney(summary.remainingBudget)} remaining.`,
     `- You have used ${summary.percentageUsed}% of your budget.`,
     "",
     "Main insight:",
-    `${category} is your highest spending category at $${categoryAmount}.`,
+    `${category} is your highest spending category at ${formatCheckMoney(categoryAmount)}.`,
     "",
     "Advice:",
-    `- Reduce ${category} spending first — for example, cut one $${categoryAmount > 40 ? 20 : 10} non-essential ${category} purchase this week.`,
-    `- Set a weekly cap on ${category} so you keep your remaining $${summary.remainingBudget}.`,
+    `- Reduce ${category} spending first — for example, cut one ${formatCheckMoney(sampleCut)} non-essential ${category} purchase this week.`,
+    `- Set a weekly cap on ${category} so you keep your remaining ${formatCheckMoney(summary.remainingBudget)}.`,
     "- Avoid purchases that push you above the 80% warning level.",
   ].join("\n");
 }

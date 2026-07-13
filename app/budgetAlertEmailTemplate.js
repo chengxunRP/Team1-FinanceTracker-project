@@ -3,7 +3,7 @@
 const path = require("path");
 const fs = require("fs");
 const budgetStore = require("./budgetStore");
-const { formatBudgetNotificationMoney } = require("./budgetNotificationService");
+const currencyService = require("./currencyService");
 
 const SPENDWISE_LOGO_CID = "spendwise-logo";
 const ICON_PATH = path.join(__dirname, "public", "favicon.svg");
@@ -85,16 +85,25 @@ function getSpendWiseIconAttachment() {
   };
 }
 
-function formatAlertDetail(alert) {
-  return `${formatBudgetNotificationMoney(alert.spent)} spent of ${formatBudgetNotificationMoney(alert.budget)} (${alert.usedPct}% used)`;
+function formatEmailMoney(value, currency) {
+  const code = currency || currencyService.BASE_CURRENCY;
+  try {
+    return currencyService.formatFromBase(value, code);
+  } catch (error) {
+    return currencyService.formatFromBase(value, currencyService.BASE_CURRENCY);
+  }
 }
 
-function renderMainAlertTextBlock(alert, index) {
+function formatAlertDetail(alert, currency) {
+  return `${formatEmailMoney(alert.spent, currency)} spent of ${formatEmailMoney(alert.budget, currency)} (${alert.usedPct}% used)`;
+}
+
+function renderMainAlertTextBlock(alert, index, currency) {
   const prefix = index > 0 ? "\n" : "";
   return (
     `${prefix}${alert.title}\n` +
     `${alert.message}\n` +
-    `${formatAlertDetail(alert)}`
+    `${formatAlertDetail(alert, currency)}`
   );
 }
 
@@ -105,7 +114,7 @@ function renderOtherAlertTextLine(alert) {
   return `- ${alert.name} ${stateLabel} (${alert.usedPct}% used)`;
 }
 
-function buildBudgetAlertPlainText(user, budgetMonth, newAlerts, otherActiveAlerts) {
+function buildBudgetAlertPlainText(user, budgetMonth, newAlerts, otherActiveAlerts, currency) {
   const monthLabel = budgetStore.formatBudgetMonthLabel(budgetMonth);
   const lines = [
     `Hi ${user.name || "there"},`,
@@ -118,7 +127,7 @@ function buildBudgetAlertPlainText(user, budgetMonth, newAlerts, otherActiveAler
   ];
 
   newAlerts.forEach((alert, index) => {
-    lines.push(renderMainAlertTextBlock(alert, index).trim());
+    lines.push(renderMainAlertTextBlock(alert, index, currency).trim());
     lines.push("");
   });
 
@@ -138,11 +147,11 @@ function buildBudgetAlertPlainText(user, budgetMonth, newAlerts, otherActiveAler
   return lines.join("\n");
 }
 
-function renderAlertCardHtml(alert, compact) {
+function renderAlertCardHtml(alert, compact, currency) {
   const style = getSeverityStyle(alert);
   const title = escapeHtml(alert.title);
   const message = escapeHtml(alert.message);
-  const detail = escapeHtml(formatAlertDetail(alert));
+  const detail = escapeHtml(formatAlertDetail(alert, currency));
   const badge = escapeHtml(style.label);
   const padding = compact ? "14px 16px" : "18px 20px";
   const titleSize = compact ? "15px" : "18px";
@@ -169,7 +178,7 @@ function renderAlertCardHtml(alert, compact) {
   `;
 }
 
-function buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts) {
+function buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts, currency) {
   const monthLabel = escapeHtml(budgetStore.formatBudgetMonthLabel(budgetMonth));
   const userName = escapeHtml(user.name || "there");
   const budgetUrl = escapeHtml(buildBudgetPageUrl(budgetMonth));
@@ -178,14 +187,14 @@ function buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts) {
       ? "New budget alert triggered"
       : `${newAlerts.length} new budget alerts triggered`;
 
-  const mainCards = newAlerts.map((alert) => renderAlertCardHtml(alert, false)).join("");
+  const mainCards = newAlerts.map((alert) => renderAlertCardHtml(alert, false, currency)).join("");
   const otherSection = otherActiveAlerts.length
     ? `
       <div style="border-top:1px solid #e5e7eb;margin-top:8px;padding-top:20px;">
         <div style="font:700 15px/1.4 Arial,Helvetica,sans-serif;color:#374151;margin:0 0 12px 0;">
           Other active budget alerts
         </div>
-        ${otherActiveAlerts.map((alert) => renderAlertCardHtml(alert, true)).join("")}
+        ${otherActiveAlerts.map((alert) => renderAlertCardHtml(alert, true, currency)).join("")}
       </div>
     `
     : "";
@@ -261,15 +270,19 @@ function buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts) {
 // Puts the newly triggered alert first and may list other active alerts below.
 // Returns the object that sendBudgetAlertEmail() passes to Nodemailer.
 // No SMTP sending happens in this file.
-function buildBudgetAlertEmail(user, budgetMonth, newAlerts, otherActiveAlerts) {
+async function buildBudgetAlertEmail(user, budgetMonth, newAlerts, otherActiveAlerts) {
   const iconAttachment = getSpendWiseIconAttachment();
   const attachments = iconAttachment ? [iconAttachment] : [];
   const actionUrl = buildBudgetPageUrl(budgetMonth);
+  const currency =
+    user && user.id
+      ? await currencyService.getUserCurrency(user.id)
+      : currencyService.BASE_CURRENCY;
 
   return {
     subject: buildEmailSubject(newAlerts),
-    text: buildBudgetAlertPlainText(user, budgetMonth, newAlerts, otherActiveAlerts),
-    html: buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts),
+    text: buildBudgetAlertPlainText(user, budgetMonth, newAlerts, otherActiveAlerts, currency),
+    html: buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts, currency),
     attachments,
     actionUrl,
   };

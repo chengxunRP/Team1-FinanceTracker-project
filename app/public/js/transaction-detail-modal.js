@@ -108,7 +108,9 @@
   function formatAmount(value) {
     var num = Number(value);
     if (Number.isNaN(num)) return "—";
-    return "-$" + Math.abs(num).toFixed(2);
+    return window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.formatMoneySigned(-Math.abs(num))
+      : ("-$" + Math.abs(num).toFixed(2));
   }
 
   function formatHeaderLabel(title, merchantName) {
@@ -827,7 +829,11 @@
     if (fieldName === "date") return expense.date || "";
     if (fieldName === "amount") {
       var num = Number(expense.amount);
-      return Number.isNaN(num) ? "" : String(Math.abs(num));
+      if (Number.isNaN(num)) return "";
+      var preferred = window.SwCurrencyFormat
+        ? window.SwCurrencyFormat.convertFromBase(Math.abs(num))
+        : Math.abs(num);
+      return String(preferred);
     }
     if (fieldName === "title") return expense.title || "";
     if (fieldName === "merchant") {

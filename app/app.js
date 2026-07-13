@@ -59,6 +59,25 @@ function getCustomCategoryIconMarkup(icon, size) {
   return getIconMarkup(icon, size || "md");
 }
 
+function convertCategoryBudgetInputsToBase(budgetsByCategoryId, preferredCurrency) {
+  const code = preferredCurrency || currencyService.BASE_CURRENCY;
+  const converted = {};
+  Object.keys(budgetsByCategoryId || {}).forEach((categoryId) => {
+    const raw = budgetsByCategoryId[categoryId];
+    if (raw === undefined || raw === null || String(raw).trim() === "") {
+      converted[categoryId] = raw;
+      return;
+    }
+    const amount = Number(raw);
+    if (Number.isNaN(amount)) {
+      converted[categoryId] = raw;
+      return;
+    }
+    converted[categoryId] = currencyService.convertToBase(amount, code);
+  });
+  return converted;
+}
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -86,9 +105,51 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 * 24 }, // 1 day
 }));
 
-const { userContextMiddleware } = require("./requestUserContext");
+const { userContextMiddleware, setRequestCurrency } = require("./requestUserContext");
 const { requireLogin, getCurrentUserId } = require("./authHelpers");
+const currencyService = require("./currencyService");
 app.use(userContextMiddleware);
+
+// Load this user's preferred currency and attach shared money formatters for every EJS page.
+app.use(async function preferredCurrencyMiddleware(req, res, next) {
+  try {
+    const userId = req.session && req.session.userId ? req.session.userId : null;
+    const currency = userId
+      ? await currencyService.getUserCurrency(userId)
+      : currencyService.BASE_CURRENCY;
+    const formatters = currencyService.createFormatters(currency);
+
+    setRequestCurrency(formatters.currencyCode);
+    res.locals.preferredCurrency = formatters.currencyCode;
+    res.locals.baseCurrency = formatters.baseCurrency;
+    res.locals.currencyRateFromBase = formatters.rateFromBase;
+    res.locals.formatMoney = formatters.formatMoney;
+    res.locals.formatMoneySigned = formatters.formatMoneySigned;
+    res.locals.convertFromBase = formatters.convertFromBase;
+    res.locals.convertToBase = formatters.convertToBase;
+    res.locals.currencyConfig = {
+      code: formatters.currencyCode,
+      base: formatters.baseCurrency,
+      rateFromBase: formatters.rateFromBase,
+    };
+  } catch (error) {
+    console.error("preferredCurrencyMiddleware failed:", error.message || error);
+    const fallback = currencyService.createFormatters(currencyService.BASE_CURRENCY);
+    res.locals.preferredCurrency = fallback.currencyCode;
+    res.locals.baseCurrency = fallback.baseCurrency;
+    res.locals.currencyRateFromBase = fallback.rateFromBase;
+    res.locals.formatMoney = fallback.formatMoney;
+    res.locals.formatMoneySigned = fallback.formatMoneySigned;
+    res.locals.convertFromBase = fallback.convertFromBase;
+    res.locals.convertToBase = fallback.convertToBase;
+    res.locals.currencyConfig = {
+      code: fallback.currencyCode,
+      base: fallback.baseCurrency,
+      rateFromBase: fallback.rateFromBase,
+    };
+  }
+  next();
+});
 
 // --- expense-nav script middleware ---
 app.use(function(req, res, next) {
@@ -100,6 +161,18 @@ app.use(function(req, res, next) {
     locals.getCategoryVisual = getCategoryVisual;
     locals.getCustomCategoryIconMarkup = getCustomCategoryIconMarkup;
     locals.currentUser = (req.session && req.session.userId) ? { id: req.session.userId, name: req.session.userName } : null;
+    if (typeof locals.formatMoney !== "function" && typeof res.locals.formatMoney === "function") {
+      locals.formatMoney = res.locals.formatMoney;
+    }
+    if (typeof locals.formatMoneySigned !== "function" && typeof res.locals.formatMoneySigned === "function") {
+      locals.formatMoneySigned = res.locals.formatMoneySigned;
+    }
+    if (!locals.preferredCurrency && res.locals.preferredCurrency) {
+      locals.preferredCurrency = res.locals.preferredCurrency;
+    }
+    if (!locals.currencyConfig && res.locals.currencyConfig) {
+      locals.currencyConfig = res.locals.currencyConfig;
+    }
     var _cb = cb || function(err, str) {
       if (err) return next(err);
       res.send(str);
@@ -367,23 +440,55 @@ app.get("/home", async (req, res) => {
 });
 
 // Purchase Checker page data: finance snapshot, category budget rows, and picker categories for the form.
+function resolvePurchaseCheckerCategory(formValues, pickerCategories) {
+  const values = formValues && typeof formValues === "object" ? formValues : {};
+  const categories = Array.isArray(pickerCategories) ? pickerCategories : [];
+  const submittedId =
+    values.categoryId !== undefined && values.categoryId !== null && String(values.categoryId).trim() !== ""
+      ? String(values.categoryId).trim()
+      : "";
+  const submittedName = values.category ? String(values.category).trim() : "";
+
+  if (submittedId) {
+    const byId = categories.find((cat) => String(cat.id) === submittedId);
+    if (byId) {
+      return {
+        categoryId: String(byId.id),
+        categoryName: byId.displayName || byId.name,
+        category: byId,
+      };
+    }
+  }
+
+  // Fallback only when ID is missing/invalid — never invent a default category.
+  if (submittedName) {
+    const byName = categories.find(
+      (cat) =>
+        (cat.displayName || cat.name) === submittedName || cat.name === submittedName
+    );
+    if (byName) {
+      return {
+        categoryId: String(byName.id),
+        categoryName: byName.displayName || byName.name,
+        category: byName,
+      };
+    }
+  }
+
+  return {
+    categoryId: "",
+    categoryName: submittedName,
+    category: null,
+  };
+}
+
 async function loadPurchaseCheckerData(formValues) {
   const live = await financeHelpers.getPurchaseCheckerFinanceSummary();
   const pickerData = await expenseStore.getCategoriesForPicker();
   const allCategories = pickerData.all || [];
 
   const values = formValues && typeof formValues === "object" ? formValues : {};
-  let selectedCategoryId = values.categoryId ? String(values.categoryId) : "";
-  const selectedCategoryName = values.category ? String(values.category).trim() : "";
-
-  if (!selectedCategoryId && selectedCategoryName) {
-    const match = allCategories.find(
-      (cat) =>
-        (cat.displayName || cat.name) === selectedCategoryName ||
-        cat.name === selectedCategoryName
-    );
-    if (match) selectedCategoryId = String(match.id);
-  }
+  const resolved = resolvePurchaseCheckerCategory(values, allCategories);
 
   return {
     summary: live.summary,
@@ -396,8 +501,13 @@ async function loadPurchaseCheckerData(formValues) {
     pickerCategories: allCategories,
     customCategories: pickerData.customCategories || [],
     generalCategories: pickerData.generalCategories || [],
-    selectedCategoryId,
-    formValues: values,
+    selectedCategoryId: resolved.categoryId,
+    resolvedCategory: resolved.category,
+    formValues: {
+      ...values,
+      categoryId: resolved.categoryId,
+      category: resolved.categoryName || values.category || "",
+    },
     budgetMonthLabel: live.budgetMonthLabel,
   };
 }
@@ -436,44 +546,68 @@ app.get("/recommendation", requireLogin, async (req, res) => {
 
 app.post("/recommendation", requireLogin, async (req, res) => {
   // POST Purchase Checker: validate item → load user budgets/expenses → compute recommendation → render result.
-  const { itemName, itemPrice, category } = req.body;
+  const { itemName, itemPrice, category, categoryId } = req.body;
+  const formSeed = { itemName, itemPrice, category, categoryId };
 
   try {
-    const validation = validateItemInput(itemName, itemPrice, category);
+    const data = await loadPurchaseCheckerData(formSeed);
+    const resolvedCategoryName =
+      (data.formValues && data.formValues.category) || String(category || "").trim();
 
-    if (!validation.valid) {
-      const invalidData = await loadPurchaseCheckerData({
-        itemName,
-        itemPrice,
-        category,
-      });
+    if (!data.selectedCategoryId || !resolvedCategoryName) {
       return renderRecommendationPage(res, {
-        ...invalidData,
-        errors: validation.errors,
-        formValues: { itemName, itemPrice, category },
+        ...data,
+        errors: ["Please select a category."],
+        formValues: data.formValues || formSeed,
       });
     }
 
-    const data = await loadPurchaseCheckerData({
-      itemName,
-      itemPrice,
-      category,
-    });
+    const validation = validateItemInput(itemName, itemPrice, resolvedCategoryName);
+
+    if (!validation.valid) {
+      return renderRecommendationPage(res, {
+        ...data,
+        errors: validation.errors,
+        formValues: data.formValues || formSeed,
+      });
+    }
+
+    let itemPriceBase;
+    try {
+      itemPriceBase = currencyService.convertToBase(
+        validation.itemPrice,
+        res.locals.preferredCurrency || currencyService.BASE_CURRENCY
+      );
+    } catch (error) {
+      return renderRecommendationPage(res, {
+        ...data,
+        errors: ["Unable to convert the purchase price right now. Please try again."],
+        formValues: data.formValues || formSeed,
+      });
+    }
+
     const recommendation = getSpendingRecommendation(
       data.recommendationSummary || data.summary,
       data.expenses,
       {
-      itemName: validation.itemName,
-      itemPrice: validation.itemPrice,
-      category: validation.category,
-    },
+        itemName: validation.itemName,
+        itemPrice: itemPriceBase,
+        // Always use the validated picker category name, not a raw browser string.
+        category: resolvedCategoryName,
+      },
       financeHelpers.buildPurchaseCheckOptions(data)
     );
 
     renderRecommendationPage(res, {
       ...data,
       recommendation,
-      formValues: { itemName, itemPrice, category },
+      selectedCategoryId: data.selectedCategoryId,
+      formValues: {
+        itemName: validation.itemName,
+        itemPrice,
+        category: resolvedCategoryName,
+        categoryId: data.selectedCategoryId,
+      },
     });
   } catch (error) {
     console.error("Purchase checker error:", error);
@@ -484,10 +618,10 @@ app.post("/recommendation", requireLogin, async (req, res) => {
       pickerCategories: [],
       customCategories: [],
       generalCategories: [],
-      selectedCategoryId: "",
+      selectedCategoryId: categoryId ? String(categoryId) : "",
       budgetMonthLabel: "",
       errors: ["Unable to check this purchase. Please try again."],
-      formValues: { itemName, itemPrice, category },
+      formValues: formSeed,
     });
   }
 });
@@ -551,7 +685,24 @@ app.post("/budget", async (req, res) => {
       });
     }
 
-    await budgetStore.setMonthlyBudget(validation.budget);
+    let amountBase;
+    try {
+      amountBase = currencyService.convertToBase(
+        validation.budget,
+        res.locals.preferredCurrency || currencyService.BASE_CURRENCY
+      );
+    } catch (error) {
+      return res.status(503).render("budget", {
+        pageTitle: "Budget",
+        activePage: "budget",
+        ...current,
+        budgetMonth,
+        errors: ["Unable to convert the budget amount right now. Please try again."],
+        formValues: { monthlyBudget: budgetInput },
+      });
+    }
+
+    await budgetStore.setMonthlyBudget(amountBase);
     triggerBudgetAlertEmail(req, budgetMonth);
     const updated = await getBudgetPageData(budgetMonth);
 
@@ -605,7 +756,13 @@ app.post("/budget/categories", async (req, res) => {
       }
     });
 
-    await budgetStore.setCategoryBudgets(budgetMonth, budgetsByCategoryId);
+    await budgetStore.setCategoryBudgets(
+      budgetMonth,
+      convertCategoryBudgetInputsToBase(
+        budgetsByCategoryId,
+        res.locals.preferredCurrency
+      )
+    );
     triggerBudgetAlertEmail(req, budgetMonth);
     const updated = await getBudgetPageData(budgetMonth);
 
@@ -699,7 +856,25 @@ app.post("/budget/setup", async (req, res) => {
       });
     }
 
-    await budgetStore.setMonthlyBudget(validation.budget);
+    let amountBase;
+    try {
+      amountBase = currencyService.convertToBase(
+        validation.budget,
+        res.locals.preferredCurrency || currencyService.BASE_CURRENCY
+      );
+    } catch (error) {
+      return res.status(503).render("budget-setup", {
+        pageTitle: "Budget Setup",
+        activePage: "budget",
+        ...pageData,
+        budgetMonth,
+        errors: ["Unable to convert the budget amount right now. Please try again."],
+        successMessage: "",
+        formValues: { monthlyBudget: budgetInput },
+      });
+    }
+
+    await budgetStore.setMonthlyBudget(amountBase);
 
     let categories;
     try {
@@ -718,7 +893,13 @@ app.post("/budget/setup", async (req, res) => {
     });
 
     if (Object.keys(budgetsByCategoryId).length > 0) {
-      await budgetStore.setCategoryBudgets(budgetMonth, budgetsByCategoryId);
+      await budgetStore.setCategoryBudgets(
+        budgetMonth,
+        convertCategoryBudgetInputsToBase(
+          budgetsByCategoryId,
+          res.locals.preferredCurrency
+        )
+      );
     }
     triggerBudgetAlertEmail(req, budgetMonth);
 
@@ -769,6 +950,18 @@ app.post("/budget/add", async (req, res) => {
     return res.status(400).json({ errors: validation.errors });
   }
 
+  let amountBase;
+  try {
+    amountBase = currencyService.convertToBase(
+      validation.budget,
+      res.locals.preferredCurrency || currencyService.BASE_CURRENCY
+    );
+  } catch (error) {
+    return res.status(503).json({
+      errors: ["Unable to convert the budget amount right now. Please try again."],
+    });
+  }
+
   try {
     const categories = await expenseStore.getCategories();
     const category = categories.find((cat) => String(cat.id) === String(categoryId));
@@ -792,7 +985,7 @@ app.post("/budget/add", async (req, res) => {
 
     await budgetStore.createCategoryBudget(
       categoryId,
-      validation.budget,
+      amountBase,
       Boolean(rolloverEnabled),
       selectedMonth,
       categories
@@ -824,9 +1017,21 @@ app.post("/budget/add-overall", async (req, res) => {
     return res.status(400).json({ errors: validation.errors });
   }
 
+  let amountBase;
+  try {
+    amountBase = currencyService.convertToBase(
+      validation.budget,
+      res.locals.preferredCurrency || currencyService.BASE_CURRENCY
+    );
+  } catch (error) {
+    return res.status(503).json({
+      errors: ["Unable to convert the budget amount right now. Please try again."],
+    });
+  }
+
   try {
     await budgetStore.saveOverallMonthlyBudget(
-      validation.budget,
+      amountBase,
       Boolean(rolloverEnabled)
     );
     triggerBudgetAlertEmail(req);
@@ -981,8 +1186,20 @@ app.post("/budget/all-categories", async (req, res) => {
     return res.status(400).json({ errors: validation.errors });
   }
 
+  let amountBase;
   try {
-    await budgetStore.updateOverallMonthlyBudgetAmount(validation.budget);
+    amountBase = currencyService.convertToBase(
+      validation.budget,
+      res.locals.preferredCurrency || currencyService.BASE_CURRENCY
+    );
+  } catch (error) {
+    return res.status(503).json({
+      errors: ["Unable to convert the budget amount right now. Please try again."],
+    });
+  }
+
+  try {
+    await budgetStore.updateOverallMonthlyBudgetAmount(amountBase);
     triggerBudgetAlertEmail(req, budgetMonth);
     res.json({
       success: true,
@@ -1255,10 +1472,22 @@ app.post("/budget/categories/:id", async (req, res) => {
     return res.status(400).json({ errors: validation.errors });
   }
 
+  let amountBase;
+  try {
+    amountBase = currencyService.convertToBase(
+      validation.budget,
+      res.locals.preferredCurrency || currencyService.BASE_CURRENCY
+    );
+  } catch (error) {
+    return res.status(503).json({
+      errors: ["Unable to convert the budget amount right now. Please try again."],
+    });
+  }
+
   try {
     await budgetStore.updateCategoryBudget(
       categoryId,
-      validation.budget,
+      amountBase,
       rolloverEnabled === undefined ? undefined : Boolean(rolloverEnabled)
     );
     triggerBudgetAlertEmail(req, budgetMonth);
@@ -1353,13 +1582,13 @@ function renderChatbotPage(res, liveSummary, messages, groqAiMode, inputText, bo
 
 async function getChatbotUserContext(req, month) {
   const userId = getCurrentUserId(req);
-  let currency = "USD";
+  let currency = currencyService.BASE_CURRENCY;
   let savingsGoalSummary = "No savings goal data available.";
 
   try {
     const [rows] = await db.query("SELECT currency FROM users WHERE id = ? LIMIT 1", [userId]);
     if (rows.length && rows[0].currency) {
-      currency = String(rows[0].currency);
+      currency = currencyService.normalizeCurrencyCode(rows[0].currency) || currencyService.BASE_CURRENCY;
     }
   } catch (error) {
     console.error("Chatbot currency lookup failed:", error);
@@ -1368,7 +1597,9 @@ async function getChatbotUserContext(req, month) {
   try {
     const goal = await savingsGoalStore.getGoalForMonth(month);
     if (goal) {
-      savingsGoalSummary = `${goal.goalName}: ${goal.currentAmount}/${goal.targetAmount} saved (${goal.progressPercent}% complete)`;
+      const saved = currencyService.formatFromBase(goal.currentAmount, currency);
+      const target = currencyService.formatFromBase(goal.targetAmount, currency);
+      savingsGoalSummary = `${goal.goalName}: ${saved} / ${target} saved (${goal.progressPercent}% complete)`;
     }
   } catch (error) {
     console.error("Chatbot savings goal lookup failed:", error);

@@ -14,7 +14,8 @@ const {
   isBudgetAlertExplanationQuestion,
 } = require("./purchaseCheckHelpers");
 const recommendationHelpers = require("./recommendationHelpers");
-const { roundMoney } = require("./financeSummaryService");
+const currencyService = require("./currencyService");
+const { getRequestCurrency } = require("./requestUserContext");
 
 const SUGGESTED_QUESTIONS = [
   "How much have I spent this month?",
@@ -260,7 +261,7 @@ function getBudgetStressCategories(categoryRows) {
 function formatCategoryStress(row) {
   const name = row.displayName || row.name;
   if (row.overspent) {
-    return `${name} (exceeded: $${money(row.actual)} of $${money(row.availableBudget)})`;
+    return `${name} (exceeded: ${money(row.actual)} of ${money(row.availableBudget)})`;
   }
   if (row.budgetReached || row.statusKey === "reached") {
     return `${name} (reached: 100% used)`;
@@ -273,17 +274,17 @@ function buildImprovementAdviceReply(fields, liveSummary, financeSnapshot, month
   const lines = [`Yes. Based on your current budget${monthNote}, here is what I suggest:`, ""];
 
   if (fields.hasAllTransactionsBudget) {
-    if (Number(fields.allRemaining) < 0) {
+    if (fields.allRemainingNum < 0) {
       lines.push(
-        `- Your All Categories Budget is overspent by $${money(Math.abs(Number(fields.allRemaining)))} ($${fields.allSpent} of $${fields.allBudget}).`
+        `- Your All Categories Budget is overspent by ${money(Math.abs(fields.allRemainingNum))} (${fields.allSpent} of ${fields.allBudget}).`
       );
     } else if (Number(fields.allPct) >= 100) {
       lines.push(
-        `- Your All Categories Budget is fully used ($${fields.allSpent} of $${fields.allBudget}, 100% used).`
+        `- Your All Categories Budget is fully used (${fields.allSpent} of ${fields.allBudget}, 100% used).`
       );
     } else if (Number(fields.allPct) >= 80) {
       lines.push(
-        `- Your All Categories Budget is at ${fields.allPct}% ($${fields.allSpent} of $${fields.allBudget}, $${fields.allRemaining} left).`
+        `- Your All Categories Budget is at ${fields.allPct}% (${fields.allSpent} of ${fields.allBudget}, ${fields.allRemaining} left).`
       );
     }
   }
@@ -297,10 +298,10 @@ function buildImprovementAdviceReply(fields, liveSummary, financeSnapshot, month
     );
   } else if (financeSnapshot.highestCategory && financeSnapshot.highestCategory !== "—") {
     lines.push(
-      `- Your highest spending category is ${financeSnapshot.highestCategory} ($${money(financeSnapshot.highestCategoryAmount)}). Review that area first.`
+      `- Your highest spending category is ${financeSnapshot.highestCategory} (${money(financeSnapshot.highestCategoryAmount)}). Review that area first.`
     );
   } else {
-    lines.push(`- You spent $${fields.allSpent} across all transactions${monthNote}.`);
+    lines.push(`- You spent ${fields.allSpent} across all transactions${monthNote}.`);
   }
 
   lines.push("", "Advice:");
@@ -312,10 +313,10 @@ function buildImprovementAdviceReply(fields, liveSummary, financeSnapshot, month
     );
   }
   lines.push("- Use Don't Count only for transactions that should not affect your budget totals.");
-  if (fields.hasAllTransactionsBudget && Number(fields.allRemaining) > 0) {
-    lines.push(`- Protect your remaining $${fields.allRemaining} in All Categories Budget.`);
-  } else if (fields.hasCategoryBudgets && Number(fields.catRemaining) > 0) {
-    lines.push(`- Protect your remaining $${fields.catRemaining} across category budgets.`);
+  if (fields.hasAllTransactionsBudget && fields.allRemainingNum > 0) {
+    lines.push(`- Protect your remaining ${fields.allRemaining} in All Categories Budget.`);
+  } else if (fields.hasCategoryBudgets && fields.catRemainingNum > 0) {
+    lines.push(`- Protect your remaining ${fields.catRemaining} across category budgets.`);
   }
 
   return lines.join("\n");
@@ -329,10 +330,10 @@ function buildCategoryReduceReply(liveSummary, monthNote) {
     const lines = [
       `Start with ${name}${monthNote}.`,
       top.overspent
-        ? `It is over budget at $${money(top.actual)} of $${money(top.availableBudget)} (${top.usedPct}% used).`
+        ? `It is over budget at ${money(top.actual)} of ${money(top.availableBudget)} (${top.usedPct}% used).`
         : top.budgetReached || top.statusKey === "reached"
-          ? `It has reached 100% of its budget ($${money(top.actual)} of $${money(top.availableBudget)}).`
-          : `It is at ${top.usedPct}% of its budget ($${money(top.actual)} of $${money(top.availableBudget)}).`,
+          ? `It has reached 100% of its budget (${money(top.actual)} of ${money(top.availableBudget)}).`
+          : `It is at ${top.usedPct}% of its budget (${money(top.actual)} of ${money(top.availableBudget)}).`,
       "",
       "Advice:",
       `- Cut one non-essential ${name} purchase this week.`,
@@ -349,7 +350,7 @@ function buildCategoryReduceReply(liveSummary, monthNote) {
   const topSpent = money(liveSummary.topCategorySpent || 0);
   if (topName !== "—" && Number(liveSummary.topCategorySpent) > 0) {
     return [
-      `No category budget is over its limit${monthNote}, but your highest spending category is ${topName} ($${topSpent}).`,
+      `No category budget is over its limit${monthNote}, but your highest spending category is ${topName} (${topSpent}).`,
       "",
       "Advice:",
       `- Review ${topName} purchases first if you want to reduce spending.`,
@@ -365,12 +366,12 @@ function buildSavingAdviceReply(fields, liveSummary, financeSnapshot, monthNote)
 
   if (fields.hasAllTransactionsBudget) {
     lines.push(
-      `- All Categories Budget remaining: $${fields.allRemaining} ($${fields.allSpent} spent of $${fields.allBudget}).`
+      `- All Categories Budget remaining: ${fields.allRemaining} (${fields.allSpent} spent of ${fields.allBudget}).`
     );
   }
   if (fields.hasCategoryBudgets) {
     lines.push(
-      `- Category budgets remaining: $${fields.catRemaining} ($${fields.catSpent} spent of $${fields.catBudget}).`
+      `- Category budgets remaining: ${fields.catRemaining} (${fields.catSpent} spent of ${fields.catBudget}).`
     );
   }
 
@@ -378,7 +379,7 @@ function buildSavingAdviceReply(fields, liveSummary, financeSnapshot, monthNote)
   if (stressed.length) {
     lines.push(`- Cut back in ${stressed[0].displayName || stressed[0].name} first.`);
   } else if (financeSnapshot.highestCategory && financeSnapshot.highestCategory !== "—") {
-    lines.push(`- Your largest spending category is ${financeSnapshot.highestCategory} ($${money(financeSnapshot.highestCategoryAmount)}).`);
+    lines.push(`- Your largest spending category is ${financeSnapshot.highestCategory} (${money(financeSnapshot.highestCategoryAmount)}).`);
   }
 
   lines.push(
@@ -394,7 +395,7 @@ function buildBudgetHealthReply(fields, monthNote) {
 
   if (fields.hasAllTransactionsBudget) {
     const allStatus =
-      Number(fields.allRemaining) < 0
+      fields.allRemainingNum < 0
         ? "over budget"
         : Number(fields.allPct) >= 100
           ? "fully used"
@@ -402,13 +403,13 @@ function buildBudgetHealthReply(fields, monthNote) {
             ? "in warning zone"
             : "on track";
     lines.push(
-      `- All Categories Budget: ${allStatus} ($${fields.allSpent} of $${fields.allBudget}, $${fields.allRemaining} left).`
+      `- All Categories Budget: ${allStatus} (${fields.allSpent} of ${fields.allBudget}, ${fields.allRemaining} left).`
     );
   }
 
   if (fields.hasCategoryBudgets) {
     const catStatus =
-      Number(fields.catRemaining) < 0
+      fields.catRemainingNum < 0
         ? "over budget"
         : Number(fields.catPct) >= 100
           ? "fully used"
@@ -416,12 +417,12 @@ function buildBudgetHealthReply(fields, monthNote) {
             ? "in warning zone"
             : "on track";
     lines.push(
-      `- Category budgets: ${catStatus} ($${fields.catSpent} of $${fields.catBudget}, $${fields.catRemaining} left).`
+      `- Category budgets: ${catStatus} (${fields.catSpent} of ${fields.catBudget}, ${fields.catRemaining} left).`
     );
   }
 
   if (!fields.hasAllTransactionsBudget && !fields.hasCategoryBudgets) {
-    lines.push(`- No budgets are set yet. You spent $${fields.allSpent} across all transactions.`);
+    lines.push(`- No budgets are set yet. You spent ${fields.allSpent} across all transactions.`);
   }
 
   return lines.join("\n");
@@ -438,7 +439,7 @@ function buildBudgetAlertExplanationReply(liveSummary, monthNote) {
 
   if (liveSummary.hasAllTransactionsBudget && Number(liveSummary.allTransactionsPctUsed) >= 80) {
     lines.push(
-      `- All Categories Budget: ${liveSummary.allTransactionsPctUsed}% used ($${money(liveSummary.allTransactionsSpent)} of $${money(liveSummary.allTransactionsBudget)}).`
+      `- All Categories Budget: ${liveSummary.allTransactionsPctUsed}% used (${money(liveSummary.allTransactionsSpent)} of ${money(liveSummary.allTransactionsBudget)}).`
     );
   }
 
@@ -449,7 +450,7 @@ function buildBudgetAlertExplanationReply(liveSummary, monthNote) {
         ? "reached"
         : "warning";
     lines.push(
-      `- ${row.displayName || row.name}: ${state} (${row.usedPct}% used, $${money(row.actual)} of $${money(row.availableBudget)}).`
+      `- ${row.displayName || row.name}: ${state} (${row.usedPct}% used, ${money(row.actual)} of ${money(row.availableBudget)}).`
     );
   });
 
@@ -458,8 +459,12 @@ function buildBudgetAlertExplanationReply(liveSummary, monthNote) {
 }
 
 function money(value) {
-  const num = roundMoney(value);
-  return num % 1 === 0 ? String(num) : num.toFixed(2);
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+  try {
+    return currencyService.formatFromBase(value, code);
+  } catch (error) {
+    return currencyService.formatFromBase(value, currencyService.BASE_CURRENCY);
+  }
 }
 
 function liveFields(liveSummary, summary) {
@@ -487,12 +492,14 @@ function liveFields(liveSummary, summary) {
     allSpent: money(allSpent),
     allBudget: money(allBudget),
     allRemaining: money(allRemaining),
+    allRemainingNum: Number(allRemaining) || 0,
     allPct: ls.allTransactionsPctUsed != null
       ? ls.allTransactionsPctUsed
       : summary.percentageUsed,
     catBudget: money(catBudget),
     catSpent: money(catSpent),
     catRemaining: money(catRemaining),
+    catRemainingNum: Number(catRemaining) || 0,
     catPct: ls.categoryBudgetPctUsed || 0,
     everythingElse: money(ls.everythingElseTotal || 0),
     expenseCount: ls.expenseCountThisMonth || 0,
@@ -501,12 +508,12 @@ function liveFields(liveSummary, summary) {
   };
 }
 
-function formatRemainingPhrase(amountStr) {
-  const amount = Number(amountStr);
-  if (amount < 0) {
-    return `$${money(Math.abs(amount))} over`;
+function formatRemainingPhrase(amount) {
+  const num = Number(amount);
+  if (num < 0) {
+    return `${money(Math.abs(num))} over`;
   }
-  return `$${amountStr} left`;
+  return `${money(num)} left`;
 }
 
 function buildRemainingReply(fields, monthNote) {
@@ -514,33 +521,33 @@ function buildRemainingReply(fields, monthNote) {
 
   if (fields.hasAllTransactionsBudget) {
     lines.push(
-      `- All Transactions: ${formatRemainingPhrase(fields.allRemaining)} ($${fields.allSpent} of $${fields.allBudget})`
+      `- All Transactions: ${formatRemainingPhrase(fields.allRemainingNum)} (${fields.allSpent} of ${fields.allBudget})`
     );
   }
 
   if (fields.hasCategoryBudgets) {
     const catPhrase =
-      Number(fields.catRemaining) < 0
-        ? `you are $${money(Math.abs(Number(fields.catRemaining)))} over`
-        : `$${fields.catRemaining} left`;
+      fields.catRemainingNum < 0
+        ? `you are ${money(Math.abs(fields.catRemainingNum))} over`
+        : `${fields.catRemaining} left`;
     lines.push(
-      `- Category budgets: ${catPhrase} ($${fields.catSpent} of $${fields.catBudget} budgeted)`
+      `- Category budgets: ${catPhrase} (${fields.catSpent} of ${fields.catBudget} budgeted)`
     );
   }
 
   if (!fields.hasAllTransactionsBudget && !fields.hasCategoryBudgets) {
-    return `I could not find a budget for this month yet. You spent $${fields.allSpent} across all transactions${monthNote}.`;
+    return `I could not find a budget for this month yet. You spent ${fields.allSpent} across all transactions${monthNote}.`;
   }
 
   if (fields.hasAllTransactionsBudget && fields.hasCategoryBudgets) {
     const allLeft =
-      Number(fields.allRemaining) < 0
-        ? `You are $${money(Math.abs(Number(fields.allRemaining)))} over your All Transactions budget.`
-        : `You have $${fields.allRemaining} left in your All Transactions budget.`;
+      fields.allRemainingNum < 0
+        ? `You are ${money(Math.abs(fields.allRemainingNum))} over your All Transactions budget.`
+        : `You have ${fields.allRemaining} left in your All Transactions budget.`;
     const catLeft =
-      Number(fields.catRemaining) < 0
-        ? `For normal category budgets, you are $${money(Math.abs(Number(fields.catRemaining)))} over.`
-        : `For normal category budgets, you have $${fields.catRemaining} left.`;
+      fields.catRemainingNum < 0
+        ? `For normal category budgets, you are ${money(Math.abs(fields.catRemainingNum))} over.`
+        : `For normal category budgets, you have ${fields.catRemaining} left.`;
     return `${allLeft} ${catLeft}`;
   }
 
@@ -552,28 +559,28 @@ function buildBudgetSummaryReply(fields, highestCategory, highestCategoryAmount,
 
   if (fields.hasCategoryBudgets) {
     lines.push("Category Budgets:");
-    lines.push(`- Budgeted: $${fields.catBudget}`);
-    lines.push(`- Spent in budgeted categories: $${fields.catSpent}`);
-    lines.push(`- Remaining: $${fields.catRemaining}`);
+    lines.push(`- Budgeted: ${fields.catBudget}`);
+    lines.push(`- Spent in budgeted categories: ${fields.catSpent}`);
+    lines.push(`- Remaining: ${fields.catRemaining}`);
     lines.push(
-      `- Top budgeted category: ${fields.topBudgetedName} ($${fields.topBudgetedSpent})`
+      `- Top budgeted category: ${fields.topBudgetedName} (${fields.topBudgetedSpent})`
     );
     lines.push("");
   }
 
   lines.push("All Transactions:");
   if (fields.hasAllTransactionsBudget) {
-    lines.push(`- Available budget: $${fields.allBudget}`);
+    lines.push(`- Available budget: ${fields.allBudget}`);
   } else {
     lines.push("- Available budget: not set");
   }
-  lines.push(`- Total spent: $${fields.allSpent}`);
+  lines.push(`- Total spent: ${fields.allSpent}`);
   if (fields.hasAllTransactionsBudget) {
-    lines.push(`- Remaining: $${fields.allRemaining}`);
+    lines.push(`- Remaining: ${fields.allRemaining}`);
   }
-  lines.push(`- Everything Else: $${fields.everythingElse}`);
+  lines.push(`- Everything Else: ${fields.everythingElse}`);
   lines.push(
-    `- Top category overall: ${highestCategory} ($${money(highestCategoryAmount)})`
+    `- Top category overall: ${highestCategory} (${money(highestCategoryAmount)})`
   );
 
   if (!fields.hasCategoryBudgets && !fields.hasAllTransactionsBudget) {
@@ -586,7 +593,7 @@ function buildBudgetSummaryReply(fields, highestCategory, highestCategoryAmount,
 
 function buildOverspendingReply(fields, monthNote) {
   if (!fields.hasBudget) {
-    return `You spent $${fields.allSpent} across all transactions${monthNote}. I could not find a budget for this month yet.`;
+    return `You spent ${fields.allSpent} across all transactions${monthNote}. I could not find a budget for this month yet.`;
   }
 
   const lines = [];
@@ -594,31 +601,31 @@ function buildOverspendingReply(fields, monthNote) {
   if (fields.hasAllTransactionsBudget) {
     if (fields.allPct >= 100) {
       lines.push(
-        `Yes — you are over your All Transactions budget${monthNote} ($${fields.allSpent} of $${fields.allBudget}, ${fields.allPct}% used).`
+        `Yes — you are over your All Transactions budget${monthNote} (${fields.allSpent} of ${fields.allBudget}, ${fields.allPct}% used).`
       );
     } else if (fields.allPct >= 80) {
       lines.push(
-        `You are close to overspending on All Transactions${monthNote} ($${fields.allSpent} of $${fields.allBudget}, $${fields.allRemaining} left, ${fields.allPct}% used).`
+        `You are close to overspending on All Transactions${monthNote} (${fields.allSpent} of ${fields.allBudget}, ${fields.allRemaining} left, ${fields.allPct}% used).`
       );
     } else {
       lines.push(
-        `You are not close to overspending on All Transactions${monthNote} ($${fields.allSpent} of $${fields.allBudget}, $${fields.allRemaining} left).`
+        `You are not close to overspending on All Transactions${monthNote} (${fields.allSpent} of ${fields.allBudget}, ${fields.allRemaining} left).`
       );
     }
   }
 
   if (fields.hasCategoryBudgets) {
-    if (Number(fields.catRemaining) < 0) {
+    if (fields.catRemainingNum < 0) {
       lines.push(
-        `For normal category budgets, you are $${money(Math.abs(Number(fields.catRemaining)))} over ($${fields.catSpent} of $${fields.catBudget}).`
+        `For normal category budgets, you are ${money(Math.abs(fields.catRemainingNum))} over (${fields.catSpent} of ${fields.catBudget}).`
       );
     } else if (fields.catPct >= 80) {
       lines.push(
-        `For normal category budgets, you have $${fields.catRemaining} left ($${fields.catSpent} of $${fields.catBudget}, ${fields.catPct}% used).`
+        `For normal category budgets, you have ${fields.catRemaining} left (${fields.catSpent} of ${fields.catBudget}, ${fields.catPct}% used).`
       );
     } else if (!fields.hasAllTransactionsBudget) {
       lines.push(
-        `You are not close to overspending on category budgets${monthNote} ($${fields.catSpent} of $${fields.catBudget}, $${fields.catRemaining} left).`
+        `You are not close to overspending on category budgets${monthNote} (${fields.catSpent} of ${fields.catBudget}, ${fields.catRemaining} left).`
       );
     }
   }
@@ -662,20 +669,30 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
 
     if (hasRemainingBase) {
       return [
-        `If your current remaining budget is $${money(currentRemaining)}${monthNote}, spending $${money(spendAmount)} would leave $${money(afterSpend)} for this month.`,
-        `Saving $${money(saveAmount)} next month does not increase this month's remaining budget, but it does improve next month's savings by $${money(saveAmount)}.`,
+        `If your current remaining budget is ${money(currentRemaining)}${monthNote}, spending ${money(spendAmount)} would leave ${money(afterSpend)} for this month.`,
+        `Saving ${money(saveAmount)} next month does not increase this month's remaining budget, but it does improve next month's savings by ${money(saveAmount)}.`,
       ].join("\n\n");
     }
 
     return [
-      `I can calculate this with an assumption: if you currently have $X remaining${monthNote}, then after spending $${money(spendAmount)} you would have X - $${money(spendAmount)} left.`,
-      `Saving $${money(saveAmount)} next month helps next month's savings, not this month's remaining budget.`,
+      `I can calculate this with an assumption: if you currently have $X remaining${monthNote}, then after spending ${money(spendAmount)} you would have X - ${money(spendAmount)} left.`,
+      `Saving ${money(saveAmount)} next month helps next month's savings, not this month's remaining budget.`,
       "To give an exact number, set an All Categories Budget so I can read your current remaining amount.",
     ].join("\n\n");
   }
 
   // Purchase checks use All Transactions remaining by default (summary.primary).
-  const itemPrice = extractItemPrice(message);
+  // Prices typed in chat are in the user's preferred currency; convert to base USD first.
+  const itemPricePreferred = extractItemPrice(message);
+  let itemPrice = itemPricePreferred;
+  if (itemPricePreferred != null) {
+    try {
+      const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+      itemPrice = currencyService.convertToBase(itemPricePreferred, code);
+    } catch (error) {
+      itemPrice = itemPricePreferred;
+    }
+  }
   if (itemPrice != null && isPurchaseQuestion(message)) {
     if (!fields.hasAllTransactionsBudget) {
       const lines = [
@@ -684,7 +701,7 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
       ];
       if (fields.hasCategoryBudgets) {
         lines.push(
-          `You have category budgets totaling $${fields.catBudget}, but that is not the same as an overall monthly budget.`
+          `You have category budgets totaling ${fields.catBudget}, but that is not the same as an overall monthly budget.`
         );
         lines.push(
           "Select a category with a budget on the Purchase Checker page for a category-specific check."
@@ -710,14 +727,14 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
       lines.push(`Status: ${rec.result}`);
       lines.push("");
       lines.push("Current situation:");
-      lines.push(`- Monthly budget: $${summary.monthlyBudget}`);
-      lines.push(`- Current spent: $${summary.totalSpent}`);
-      lines.push(`- Current remaining: $${summary.remainingBudget}`);
+      lines.push(`- Monthly budget: ${money(summary.monthlyBudget)}`);
+      lines.push(`- Current spent: ${money(summary.totalSpent)}`);
+      lines.push(`- Current remaining: ${money(summary.remainingBudget)}`);
       lines.push("");
       lines.push("After purchase:");
-      lines.push(`- Item price: $${rec.itemPrice}`);
-      lines.push(`- New total spent: $${rec.analysis.newTotalSpent}`);
-      lines.push(`- Remaining after purchase: $${rec.analysis.newRemainingBudget}`);
+      lines.push(`- Item price: ${money(rec.itemPrice)}`);
+      lines.push(`- New total spent: ${money(rec.analysis.newTotalSpent)}`);
+      lines.push(`- Remaining after purchase: ${money(rec.analysis.newRemainingBudget)}`);
       lines.push(`- Budget used after purchase: ${rec.analysis.newPercentageUsed}%`);
       lines.push("");
       lines.push("Advice:");
@@ -775,9 +792,9 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
 
   if (isBudgetedCategorySpendQuestion(text)) {
     if (!fields.hasCategoryBudgets) {
-      return `You do not have any normal category budgets set${monthNote}. Total spending across all transactions is $${fields.allSpent}.`;
+      return `You do not have any normal category budgets set${monthNote}. Total spending across all transactions is ${fields.allSpent}.`;
     }
-    return `You spent $${fields.catSpent} in categories that have budgets${monthNote}.`;
+    return `You spent ${fields.catSpent} in categories that have budgets${monthNote}.`;
   }
 
   if (
@@ -810,7 +827,7 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
     }
     return [
       `Top category${monthNote}:`,
-      `${highestCategory} is your highest spending category at $${money(highestCategoryAmount)}.`,
+      `${highestCategory} is your highest spending category at ${money(highestCategoryAmount)}.`,
       "",
       "Advice:",
       `- Review your ${highestCategory} purchases first.`,
@@ -819,7 +836,7 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
   }
 
   if (text.includes("spent") || text.includes("spend") || text.includes("spending")) {
-    return `You spent $${fields.allSpent} in total this month across all transactions${monthNote}.`;
+    return `You spent ${fields.allSpent} in total this month across all transactions${monthNote}.`;
   }
 
   if (text.includes("reduce spending") || text.includes("save")) {
@@ -838,7 +855,7 @@ function buildFinBotReply(message, summary, financeSnapshot, budgetMonthLabel, l
     '- "How much budget do I have left?"',
     '- "Can I buy a $50 item?"',
     "",
-    `You spent $${fields.allSpent} across all transactions${monthNote}.`,
+    `You spent ${fields.allSpent} across all transactions${monthNote}.`,
   ].join("\n");
 }
 

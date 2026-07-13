@@ -3,10 +3,11 @@ const router = express.Router();
 const db = require('../config/db');
 const financeHelpers = require('../financeHelpers');
 const { requireLogin } = require('../authHelpers');
+const currencyService = require('../currencyService');
 
 router.use(requireLogin);
 
-const CURRENCIES = ['USD', 'SGD', 'MYR', 'EUR', 'GBP', 'JPY', 'AUD'];
+const CURRENCIES = currencyService.SUPPORTED_CURRENCIES;
 const USER_FIELDS =
   'id, name, email, monthly_income, currency, default_budget, email_alerts_enabled';
 
@@ -28,8 +29,28 @@ function parseEmailAlertsEnabled(value) {
   );
 }
 
-async function buildSummary() {
+function applyPreferredCurrencyLocals(res, preferredCurrency) {
+  const formatters = currencyService.createFormatters(preferredCurrency);
+  const { setRequestCurrency } = require('../requestUserContext');
+  setRequestCurrency(formatters.currencyCode);
+  res.locals.preferredCurrency = formatters.currencyCode;
+  res.locals.baseCurrency = formatters.baseCurrency;
+  res.locals.currencyRateFromBase = formatters.rateFromBase;
+  res.locals.formatMoney = formatters.formatMoney;
+  res.locals.formatMoneySigned = formatters.formatMoneySigned;
+  res.locals.convertFromBase = formatters.convertFromBase;
+  res.locals.convertToBase = formatters.convertToBase;
+  res.locals.currencyConfig = {
+    code: formatters.currencyCode,
+    base: formatters.baseCurrency,
+    rateFromBase: formatters.rateFromBase,
+  };
+  return formatters;
+}
+
+async function buildSummary(preferredCurrency) {
   const monthFinance = await financeHelpers.getDisplayMonthFinanceSummary();
+  const formatters = currencyService.createFormatters(preferredCurrency);
 
   return {
     budgetMonth: monthFinance.budgetMonth,
@@ -37,40 +58,64 @@ async function buildSummary() {
     spent: monthFinance.summary.totalSpent,
     remaining: monthFinance.summary.remainingBudget,
     percentUsed: monthFinance.summary.percentageUsed,
+    budgetDisplay: formatters.convertFromBase(monthFinance.summary.monthlyBudget),
+    spentDisplay: formatters.convertFromBase(monthFinance.summary.totalSpent),
+    remainingDisplay: formatters.convertFromBase(monthFinance.summary.remainingBudget),
   };
 }
 
-function buildRenderUser(row, income) {
-  return {
-    ...row,
-    income: income != null ? Number(income) : 0,
-  };
+async function loadProfileUser(userId) {
+  const [rows] = await db.query(`SELECT ${USER_FIELDS} FROM users WHERE id = ?`, [userId]);
+  return rows[0] || null;
+}
+
+function renderProfilePage(res, { user, preferredCurrency, errors, success }) {
+  applyPreferredCurrencyLocals(res, preferredCurrency);
+  return buildSummary(preferredCurrency).then((summary) => {
+    const formatters = currencyService.createFormatters(preferredCurrency);
+    const incomeBase = user.monthly_income != null ? Number(user.monthly_income) : 0;
+    summary.income = incomeBase;
+    summary.incomeDisplay = formatters.convertFromBase(incomeBase);
+    const defaultBudgetBase =
+      user.default_budget != null ? Number(user.default_budget) : null;
+
+    res.render('auth/profile', {
+      pageTitle: 'Profile Settings',
+      activePage: 'profile',
+      user: {
+        ...user,
+        default_budget_display:
+          defaultBudgetBase != null ? formatters.convertFromBase(defaultBudgetBase) : '',
+        monthly_income_display: formatters.convertFromBase(incomeBase),
+      },
+      currencies: CURRENCIES,
+      summary,
+      errors: errors || [],
+      success: Boolean(success),
+    });
+  });
 }
 
 // GET /profile — show the current user's summary + settings
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT ${USER_FIELDS} FROM users WHERE id = ?`,
-      [req.session.userId]
-    );
-
-    if (rows.length === 0) {
+    const user = await loadProfileUser(req.session.userId);
+    if (!user) {
       return res.redirect('/login');
     }
 
-    const user = rows[0];
-    const summary = await buildSummary();
-    summary.income = user.monthly_income != null ? Number(user.monthly_income) : 0;
+    const preferredCurrency =
+      currencyService.normalizeCurrencyCode(user.currency) || currencyService.BASE_CURRENCY;
+    const success =
+      req.query.saved === '1' ||
+      req.query.saved === 'true' ||
+      req.query.success === '1';
 
-    res.render('auth/profile', {
-      pageTitle: 'Profile Settings',
-      activePage: 'profile',
+    await renderProfilePage(res, {
       user,
-      currencies: CURRENCIES,
-      summary,
+      preferredCurrency,
       errors: [],
-      success: false,
+      success,
     });
   } catch (error) {
     console.error('Database error loading profile:', error);
@@ -78,7 +123,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /profile — update settings
+// POST /profile — update settings, then redirect so GET loads the new currency formatters
 router.post('/', async (req, res) => {
   const { name, monthlyIncome, currency, defaultBudget } = req.body;
   const emailAlertsEnabled = parseEmailAlertsEnabled(req.body.emailAlertsEnabled);
@@ -92,31 +137,61 @@ router.post('/', async (req, res) => {
     errors.push('Default budget must be a number.');
   }
 
-  const parsedMonthlyIncome = parseOptionalNumber(monthlyIncome);
-  const parsedDefaultBudget = parseOptionalNumber(defaultBudget);
+  const preferredCurrency = currencyService.normalizeCurrencyCode(currency);
+  if (!preferredCurrency) {
+    errors.push('Please choose a supported preferred currency.');
+  }
+
+  const parsedMonthlyIncomePreferred = parseOptionalNumber(monthlyIncome);
+  const parsedDefaultBudgetPreferred = parseOptionalNumber(defaultBudget);
 
   try {
+    const existing = await loadProfileUser(req.session.userId);
+    if (!existing) {
+      return res.redirect('/login');
+    }
+
+    // Form money fields were displayed in the currency saved before this request.
+    // Convert with that currency so changing only the dropdown does not rewrite base amounts.
+    const previousCurrency =
+      currencyService.normalizeCurrencyCode(existing.currency) || currencyService.BASE_CURRENCY;
+
+    let parsedMonthlyIncome = null;
+    let parsedDefaultBudget = null;
+    try {
+      if (parsedMonthlyIncomePreferred != null) {
+        parsedMonthlyIncome = currencyService.convertToBase(
+          parsedMonthlyIncomePreferred,
+          previousCurrency
+        );
+      }
+      if (parsedDefaultBudgetPreferred != null) {
+        parsedDefaultBudget = currencyService.convertToBase(
+          parsedDefaultBudgetPreferred,
+          previousCurrency
+        );
+      }
+    } catch (error) {
+      errors.push('Unable to convert money into the base currency right now.');
+    }
+
     if (errors.length) {
-      const [rows] = await db.query(
-        `SELECT ${USER_FIELDS} FROM users WHERE id = ?`,
-        [req.session.userId]
-      );
+      const draftCurrency = preferredCurrency || previousCurrency;
       const draftUser = {
-        ...rows[0],
+        ...existing,
         name,
         monthly_income: parsedMonthlyIncome,
-        currency,
+        monthly_income_display:
+          parsedMonthlyIncomePreferred != null ? parsedMonthlyIncomePreferred : '',
+        currency: draftCurrency,
         default_budget: parsedDefaultBudget,
+        default_budget_display:
+          parsedDefaultBudgetPreferred != null ? parsedDefaultBudgetPreferred : '',
         email_alerts_enabled: emailAlertsEnabled ? 1 : 0,
       };
-      const summary = await buildSummary();
-      summary.income = parsedMonthlyIncome != null ? Number(parsedMonthlyIncome) : 0;
-      return res.render('auth/profile', {
-        pageTitle: 'Profile Settings',
-        activePage: 'profile',
+      return renderProfilePage(res, {
         user: draftUser,
-        currencies: CURRENCIES,
-        summary,
+        preferredCurrency: draftCurrency,
         errors,
         success: false,
       });
@@ -129,7 +204,7 @@ router.post('/', async (req, res) => {
       [
         name.trim(),
         parsedMonthlyIncome,
-        currency || 'USD',
+        preferredCurrency,
         parsedDefaultBudget,
         emailAlertsEnabled ? 1 : 0,
         req.session.userId,
@@ -138,24 +213,8 @@ router.post('/', async (req, res) => {
 
     req.session.userName = name.trim();
 
-    const [rows] = await db.query(
-      `SELECT ${USER_FIELDS} FROM users WHERE id = ?`,
-      [req.session.userId]
-    );
-
-    const user = rows[0];
-    const summary = await buildSummary();
-    summary.income = user.monthly_income != null ? Number(user.monthly_income) : 0;
-
-    res.render('auth/profile', {
-      pageTitle: 'Profile Settings',
-      activePage: 'profile',
-      user,
-      currencies: CURRENCIES,
-      summary,
-      errors: [],
-      success: true,
-    });
+    // Post/Redirect/Get: next GET runs preferredCurrencyMiddleware against the updated row.
+    return res.redirect('/profile?saved=1');
   } catch (error) {
     console.error('Database error updating profile:', error);
     res.status(500).render('auth/profile', {
@@ -164,13 +223,28 @@ router.post('/', async (req, res) => {
       user: {
         id: req.session.userId,
         name,
-        monthly_income: parsedMonthlyIncome,
-        currency,
-        default_budget: parsedDefaultBudget,
+        monthly_income: null,
+        monthly_income_display:
+          parsedMonthlyIncomePreferred != null ? parsedMonthlyIncomePreferred : '',
+        currency: preferredCurrency || 'USD',
+        default_budget: null,
+        default_budget_display:
+          parsedDefaultBudgetPreferred != null ? parsedDefaultBudgetPreferred : '',
         email_alerts_enabled: emailAlertsEnabled ? 1 : 0,
       },
       currencies: CURRENCIES,
-      summary: { budgetMonth: '', income: 0, budget: 0, spent: 0, remaining: 0, percentUsed: 0 },
+      summary: {
+        budgetMonth: '',
+        income: 0,
+        incomeDisplay: 0,
+        budget: 0,
+        budgetDisplay: 0,
+        spent: 0,
+        spentDisplay: 0,
+        remaining: 0,
+        remainingDisplay: 0,
+        percentUsed: 0,
+      },
       errors: ['Unable to save changes right now. Please try again.'],
       success: false,
     });

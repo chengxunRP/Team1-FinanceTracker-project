@@ -254,7 +254,7 @@ async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {})
     return;
   }
 
-  const emailContent = buildBudgetAlertEmail(
+  const emailContent = await buildBudgetAlertEmail(
     user,
     budgetMonth,
     newAlerts,

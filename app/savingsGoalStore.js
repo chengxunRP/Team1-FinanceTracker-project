@@ -138,15 +138,30 @@ function validateSavingsGoalInput(body) {
   const errors = [];
   const goalNameInput = String(body.goalName || body.goal_name || "").trim();
   const goalName = goalNameInput || DEFAULT_GOAL_NAME;
-  const targetAmount = parseMoneyInput(body.targetAmount ?? body.target_amount);
+  let targetAmount = parseMoneyInput(body.targetAmount ?? body.target_amount);
   const currentRaw = body.currentAmount ?? body.current_amount;
-  const currentAmount =
+  let currentAmount =
     currentRaw === undefined || String(currentRaw).trim() === ""
       ? 0
       : parseMoneyInput(currentRaw);
   const goalMonth = budgetStore.normalizeBudgetMonth(
     body.goalMonth || body.goal_month || budgetStore.getCurrentBudgetMonth()
   );
+
+  // Form amounts are in the user's preferred currency; store USD (base) in the database.
+  try {
+    const currencyService = require("./currencyService");
+    const { getRequestCurrency } = require("./requestUserContext");
+    const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+    if (!Number.isNaN(targetAmount)) {
+      targetAmount = currencyService.convertToBase(targetAmount, code);
+    }
+    if (!Number.isNaN(currentAmount)) {
+      currentAmount = currencyService.convertToBase(currentAmount, code);
+    }
+  } catch (error) {
+    errors.push("Unable to convert savings amounts right now. Please try again.");
+  }
 
   if (goalName.length > MAX_GOAL_NAME_LENGTH) {
     errors.push(`Goal name must be ${MAX_GOAL_NAME_LENGTH} characters or less.`);
@@ -189,9 +204,20 @@ function validateSavingsGoalInput(body) {
 
 function validateSavingsProgressInput(body, goal) {
   const errors = [];
-  const amountToAdd = parseMoneyInput(
+  let amountToAdd = parseMoneyInput(
     body.amountToAdd ?? body.amount_to_add ?? body.currentAmount ?? body.current_amount
   );
+
+  try {
+    const currencyService = require("./currencyService");
+    const { getRequestCurrency } = require("./requestUserContext");
+    const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+    if (!Number.isNaN(amountToAdd)) {
+      amountToAdd = currencyService.convertToBase(amountToAdd, code);
+    }
+  } catch (error) {
+    errors.push("Unable to convert the saved amount right now. Please try again.");
+  }
 
   if (goal && goal.isComplete) {
     errors.push("You have already reached your savings target.");
@@ -209,8 +235,17 @@ function validateSavingsProgressInput(body, goal) {
     roundMoney(goal.currentAmount + amountToAdd) > goal.targetAmount
   ) {
     const remaining = roundMoney(goal.targetAmount - goal.currentAmount);
+    let remainingLabel = remaining.toFixed(2);
+    try {
+      const currencyService = require("./currencyService");
+      const { getRequestCurrency } = require("./requestUserContext");
+      const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+      remainingLabel = currencyService.formatFromBase(remaining, code);
+    } catch (error) {
+      // keep numeric fallback
+    }
     errors.push(
-      `Add saved amount cannot exceed the remaining target (${remaining.toFixed(2)}).`
+      `Add saved amount cannot exceed the remaining target (${remainingLabel}).`
     );
   }
 

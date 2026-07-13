@@ -4,6 +4,12 @@
 
   <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
   <%- include('confirm-modal') %>
+  <script>
+    window.SwCurrency = <%- JSON.stringify(typeof currencyConfig !== 'undefined' && currencyConfig
+      ? currencyConfig
+      : { code: 'USD', base: 'USD', rateFromBase: 1 }) %>;
+  </script>
+  <script src="/js/currency-format.js?v=1"></script>
   <script src="/js/app-shell.js"></script>
   <script src="/js/confirm-modal.js?v=1"></script>
 </body>

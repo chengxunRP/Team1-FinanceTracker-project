@@ -352,9 +352,11 @@
     if (budgetFormError) budgetFormError.hidden = true;
     if (selectedCategoryNameEl) selectedCategoryNameEl.textContent = selectedCategoryName || "Category";
     if (budgetSpentNote) {
-      var spentText = selectedCategorySpent % 1 === 0
-        ? "$" + selectedCategorySpent.toLocaleString() + ".00"
-        : "$" + selectedCategorySpent.toFixed(2);
+      var spentText = window.SwCurrencyFormat
+        ? window.SwCurrencyFormat.formatMoney(selectedCategorySpent)
+        : (selectedCategorySpent % 1 === 0
+            ? "$" + selectedCategorySpent.toLocaleString() + ".00"
+            : "$" + selectedCategorySpent.toFixed(2));
       budgetSpentNote.textContent =
         "You've spent " + spentText + " so far in " + currentMonthName +
         ". Your budget will start over at the beginning of every month.";

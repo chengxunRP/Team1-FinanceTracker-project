@@ -1,45 +1,37 @@
-// Purchase Checker form draft — saves item name/price/category in localStorage (not MySQL) until user submits.
+// Purchase Checker form helpers — keep category card + hidden inputs in sync.
+// Drafts are not persisted in localStorage.
 (function () {
   "use strict";
 
-  var DRAFT_KEY = "spendwise_purchase_checker_draft";
+  var LEGACY_DRAFT_KEY = "spendwise_purchase_checker_draft";
 
-  function readDraft() {
+  function clearLegacyDraft() {
     try {
-      var raw = localStorage.getItem(DRAFT_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function writeDraft(draft) {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    } catch (error) {
-      /* ignore quota errors */
-    }
-  }
-
-  function clearDraft() {
-    try {
-      localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(LEGACY_DRAFT_KEY);
     } catch (error) {
       /* ignore */
     }
   }
 
+  function getForm() {
+    return document.getElementById("spcPurchaseForm");
+  }
+
   function getFields() {
+    var form = getForm();
+    if (!form) return null;
     return {
-      form: document.getElementById("spcPurchaseForm"),
-      itemName: document.getElementById("itemName"),
-      itemPrice: document.getElementById("itemPrice"),
-      categoryId: document.getElementById("categoryId"),
-      categoryValue: document.getElementById("spcCategoryValue"),
-      categoryLabel: document.getElementById("expenseCategoryLabel"),
-      categoryIconWrap: document.getElementById("expenseCategoryIconWrap"),
-      clearBtn: document.getElementById("spcClearFormBtn"),
+      form: form,
+      itemName: form.querySelector("#itemName"),
+      itemPrice: form.querySelector("#itemPrice"),
+      categoryId:
+        form.querySelector("#spcCategoryId") ||
+        form.querySelector('[name="categoryId"]'),
+      categoryValue: form.querySelector("#spcCategoryValue"),
+      categoryLabel: form.querySelector("#spcCategoryLabel"),
+      categoryIconWrap: form.querySelector("#spcCategoryIconWrap"),
+      openBtn: form.querySelector("#openExpenseCategoryPicker"),
+      clearBtn: form.querySelector("#spcClearFormBtn"),
     };
   }
 
@@ -54,60 +46,70 @@
     );
   }
 
-  function restoreCategoryIcon(categoryId) {
-    var fields = getFields();
-    if (!fields.categoryIconWrap) return;
-    if (!categoryId) {
-      fields.categoryIconWrap.innerHTML = defaultCategoryIconHtml();
-      return;
-    }
-    var btn = document.querySelector(
-      '.sw-cat-pick-item[data-category-id="' + categoryId + '"], .expense-cat-pick-item[data-category-id="' + categoryId + '"]'
+  function findPickerButton(categoryId) {
+    var overlay = document.getElementById("expenseCategoryOverlay");
+    if (!overlay || !categoryId) return null;
+    return overlay.querySelector(
+      '.sw-cat-pick-item[data-category-id="' +
+        categoryId +
+        '"], .expense-cat-pick-item[data-category-id="' +
+        categoryId +
+        '"]'
     );
-    if (!btn) {
-      fields.categoryIconWrap.innerHTML = defaultCategoryIconHtml();
-      return;
-    }
-    var iconEl = btn.querySelector(".sw-category-icon");
-    fields.categoryIconWrap.innerHTML = iconEl ? iconEl.outerHTML : defaultCategoryIconHtml();
   }
 
   function applyCategorySelection(categoryId, categoryName) {
     var fields = getFields();
-    if (fields.categoryId) fields.categoryId.value = categoryId || "";
-    if (fields.categoryValue) fields.categoryValue.value = categoryName || "";
+    if (!fields) return;
+
+    var id = categoryId ? String(categoryId) : "";
+    var name = categoryName ? String(categoryName) : "";
+
+    if (fields.categoryId) fields.categoryId.value = id;
+    if (fields.categoryValue) fields.categoryValue.value = name;
+
     if (fields.categoryLabel) {
-      fields.categoryLabel.textContent = categoryName || "Choose category";
+      fields.categoryLabel.textContent = name || "Choose category";
       fields.categoryLabel.classList.toggle(
         "expense-txn__category-value--placeholder",
-        !categoryName
+        !name
       );
     }
-    restoreCategoryIcon(categoryId);
-  }
 
-  function collectDraft() {
-    var fields = getFields();
-    return {
-      itemName: fields.itemName ? fields.itemName.value.trim() : "",
-      itemPrice: fields.itemPrice ? fields.itemPrice.value : "",
-      category: fields.categoryValue ? fields.categoryValue.value.trim() : "",
-      categoryId: fields.categoryId ? fields.categoryId.value : "",
-    };
-  }
-
-  function saveDraftFromForm() {
-    writeDraft(collectDraft());
-  }
-
-  function applyDraft(draft) {
-    if (!draft) return;
-    var fields = getFields();
-    if (fields.itemName && draft.itemName) fields.itemName.value = draft.itemName;
-    if (fields.itemPrice && draft.itemPrice !== undefined && draft.itemPrice !== "") {
-      fields.itemPrice.value = draft.itemPrice;
+    if (fields.categoryIconWrap) {
+      if (!id) {
+        fields.categoryIconWrap.innerHTML = defaultCategoryIconHtml();
+      } else {
+        var btn = findPickerButton(id);
+        var iconEl = btn ? btn.querySelector(".sw-category-icon") : null;
+        fields.categoryIconWrap.innerHTML = iconEl
+          ? iconEl.outerHTML
+          : defaultCategoryIconHtml();
+      }
     }
-    applyCategorySelection(draft.categoryId || "", draft.category || "");
+
+    if (fields.form) {
+      if (id) fields.form.setAttribute("data-selected-category-id", id);
+      else fields.form.removeAttribute("data-selected-category-id");
+      if (name) fields.form.setAttribute("data-selected-category-name", name);
+      else fields.form.removeAttribute("data-selected-category-name");
+    }
+
+    if (fields.openBtn) {
+      if (id) fields.openBtn.setAttribute("data-selected-category-id", id);
+      else fields.openBtn.removeAttribute("data-selected-category-id");
+      if (name) fields.openBtn.setAttribute("data-selected-category-name", name);
+      else fields.openBtn.removeAttribute("data-selected-category-name");
+    }
+  }
+
+  function syncFromServerAttributes() {
+    var fields = getFields();
+    if (!fields || !fields.form) return;
+    var id = fields.form.getAttribute("data-selected-category-id") || "";
+    var name = fields.form.getAttribute("data-selected-category-name") || "";
+    if (!id && !name) return;
+    applyCategorySelection(id, name);
   }
 
   function resetResultPanel() {
@@ -130,50 +132,38 @@
 
   function clearForm() {
     var fields = getFields();
+    if (!fields) return;
     if (fields.itemName) fields.itemName.value = "";
     if (fields.itemPrice) fields.itemPrice.value = "";
     applyCategorySelection("", "");
-    clearDraft();
     resetResultPanel();
   }
 
-  function hasServerPrefill(fields) {
-    return Boolean(
-      (fields.itemName && fields.itemName.value.trim()) ||
-        (fields.itemPrice && String(fields.itemPrice.value).trim()) ||
-        (fields.categoryValue && fields.categoryValue.value.trim())
-    );
-  }
-
   document.addEventListener("DOMContentLoaded", function () {
+    clearLegacyDraft();
+
     var fields = getFields();
-    if (!fields.form) return;
+    if (!fields || !fields.form) return;
 
-    if (hasServerPrefill(fields)) {
-      saveDraftFromForm();
-    } else {
-      applyDraft(readDraft());
-    }
-
-    if (fields.itemName) {
-      fields.itemName.addEventListener("input", saveDraftFromForm);
-    }
-    if (fields.itemPrice) {
-      fields.itemPrice.addEventListener("input", saveDraftFromForm);
-    }
+    // Re-apply the server-rendered selected category after any browser form restore.
+    syncFromServerAttributes();
 
     document.addEventListener("sw:category-selected", function (e) {
       var detail = (e && e.detail) || {};
       applyCategorySelection(detail.categoryId, detail.categoryName);
-      saveDraftFromForm();
+    });
+
+    fields.form.addEventListener("submit", function () {
+      var latest = getFields();
+      if (!latest || !latest.form) return;
+      var id = latest.form.getAttribute("data-selected-category-id") || "";
+      var name = latest.form.getAttribute("data-selected-category-name") || "";
+      if (id && latest.categoryId) latest.categoryId.value = id;
+      if (name && latest.categoryValue) latest.categoryValue.value = name;
     });
 
     if (fields.clearBtn) {
       fields.clearBtn.addEventListener("click", clearForm);
     }
-
-    fields.form.addEventListener("submit", function () {
-      saveDraftFromForm();
-    });
   });
 })();

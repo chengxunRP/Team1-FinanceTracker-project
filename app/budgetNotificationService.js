@@ -3,14 +3,18 @@
 const budgetStore = require("./budgetStore");
 const expenseStore = require("./expenseStore");
 const { getBudgetUsageState } = require("./budgetHelpers");
+const currencyService = require("./currencyService");
+const { getRequestCurrency } = require("./requestUserContext");
 
 const CATEGORY_ALERT_VISIBLE_LIMIT = 3;
 
 function formatMoney(value) {
-  const num = Number(value);
-  if (Number.isNaN(num)) return "$0";
-  if (num % 1 === 0) return "$" + num.toLocaleString();
-  return "$" + num.toFixed(2);
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+  try {
+    return currencyService.formatFromBase(value, code);
+  } catch (error) {
+    return currencyService.formatFromBase(value, currencyService.BASE_CURRENCY);
+  }
 }
 
 // Build the title, message, detail text and severity for one budget alert.

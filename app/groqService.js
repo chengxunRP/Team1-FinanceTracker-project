@@ -5,6 +5,7 @@ require("./envConfig");
 const https = require("https");
 
 const { buildFormatRulesForPrompt } = require("./purchaseCheckHelpers");
+const currencyService = require("./currencyService");
 
 const GROQ_API_HOST = "api.groq.com";
 const GROQ_API_PATH = "/openai/v1/chat/completions";
@@ -30,14 +31,22 @@ function buildConversationContext(recentMessages) {
 // Pack the user's current finance numbers into text for Groq.
 // Includes expenses, category budgets, All Categories Budget, remaining amounts,
 // alerts, highest spending category and Everything Else spending for the month.
+// Amounts are converted from base USD into the user's preferred currency for the prompt.
 function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabel, liveSummary, userContext) {
   const currency = (userContext && userContext.currency) || "USD";
+  const money = (amountBase) => {
+    try {
+      return currencyService.formatFromBase(amountBase, currency);
+    } catch (error) {
+      return `${currency} ${Number(amountBase) || 0}`;
+    }
+  };
   const expenseLines = expenses
-    .map((e) => `- ${e.description} (${e.category}): ${currency} ${e.amount}`)
+    .map((e) => `- ${e.description} (${e.category}): ${money(e.amount)}`)
     .join("\n");
 
   const categoryLines = (financeSnapshot.spendingByCategory || [])
-    .map((row) => `- ${row.category}: ${currency} ${row.amount}`)
+    .map((row) => `- ${row.category}: ${money(row.amount)}`)
     .join("\n");
 
   const monthLabel = budgetMonthLabel || "current month";
@@ -62,26 +71,27 @@ function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabe
         : row.budgetReached || row.statusKey === "reached"
           ? "reached"
           : "warning";
-      return `- ${row.displayName || row.name}: ${state} — ${currency} ${row.actual} of ${currency} ${row.availableBudget} (${row.usedPct}% used)`;
+      return `- ${row.displayName || row.name}: ${state} — ${money(row.actual)} of ${money(row.availableBudget)} (${row.usedPct}% used)`;
     })
     .join("\n");
 
   return [
     `User finance data for ${monthLabel} (use only this data in your answer):`,
     `- Currency: ${currency}`,
+    `- All money values below are already in ${currency}. Do not treat them as USD unless currency is USD.`,
     "",
     "Category Budgets (normal category budgets only — do not mix with all-transaction spending):",
-    `- Category budget total: ${currency} ${ls.categoryBudgetTotal != null ? ls.categoryBudgetTotal : 0}`,
-    `- Spent in budgeted categories only: ${currency} ${ls.categoryBudgetSpent != null ? ls.categoryBudgetSpent : 0}`,
-    `- Remaining in category budgets: ${currency} ${ls.categoryBudgetRemaining != null ? ls.categoryBudgetRemaining : 0}`,
-    `- Top budgeted category: ${ls.topBudgetedCategoryName || "—"} (${currency} ${ls.topBudgetedCategorySpent || 0})`,
+    `- Category budget total: ${money(ls.categoryBudgetTotal != null ? ls.categoryBudgetTotal : 0)}`,
+    `- Spent in budgeted categories only: ${money(ls.categoryBudgetSpent != null ? ls.categoryBudgetSpent : 0)}`,
+    `- Remaining in category budgets: ${money(ls.categoryBudgetRemaining != null ? ls.categoryBudgetRemaining : 0)}`,
+    `- Top budgeted category: ${ls.topBudgetedCategoryName || "—"} (${money(ls.topBudgetedCategorySpent || 0)})`,
     "",
     "All Transactions (overall budget and all counted spending):",
-    `- All Transactions budget (available): ${currency} ${ls.allTransactionsBudget != null ? ls.allTransactionsBudget : summary.monthlyBudget}`,
-    `- Total spent across all transactions: ${currency} ${ls.allTransactionsSpent != null ? ls.allTransactionsSpent : summary.totalSpent}`,
-    `- All Transactions remaining: ${currency} ${ls.allTransactionsRemaining != null ? ls.allTransactionsRemaining : summary.remainingBudget}`,
-    `- Everything Else (unbudgeted categories): ${currency} ${ls.everythingElseTotal || 0}`,
-    `- Highest spending category overall: ${financeSnapshot.highestCategory} (${currency} ${financeSnapshot.highestCategoryAmount})`,
+    `- All Transactions budget (available): ${money(ls.allTransactionsBudget != null ? ls.allTransactionsBudget : summary.monthlyBudget)}`,
+    `- Total spent across all transactions: ${money(ls.allTransactionsSpent != null ? ls.allTransactionsSpent : summary.totalSpent)}`,
+    `- All Transactions remaining: ${money(ls.allTransactionsRemaining != null ? ls.allTransactionsRemaining : summary.remainingBudget)}`,
+    `- Everything Else (unbudgeted categories): ${money(ls.everythingElseTotal || 0)}`,
+    `- Highest spending category overall: ${financeSnapshot.highestCategory} (${money(financeSnapshot.highestCategoryAmount)})`,
     "",
     "Savings goals:",
     `- ${savingsGoalSummary}`,
@@ -93,7 +103,7 @@ function buildFinanceContext(summary, financeSnapshot, expenses, budgetMonthLabe
     "- 'How much have I spent this month?' → use All Transactions total spent.",
     "- 'How much did I spend in budget categories?' → use spent in budgeted categories only.",
     "- 'How much budget do I have left?' → mention All Transactions remaining and category budget remaining separately.",
-    "- 'Can I buy $X?' → use All Transactions remaining by default.",
+    `- 'Can I buy an item for X ${currency}?' → use All Transactions remaining by default.`,
     "- Never subtract all-transaction spending from category budget total.",
     "- For improvement/advice questions, name specific stressed categories and amounts from the data above.",
     "- At exactly 100% used, say budget reached — not exceeded. Exceeded only when spent is above budget.",

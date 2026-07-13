@@ -123,30 +123,134 @@ function getFinanceSnapshot(summary, expenses, options) {
   };
 }
 
-function calculateRecommendationScore(result, analysis) {
-  if (result === "Not recommended") {
-    if (analysis.alreadyOverspending) {
-      return 20;
-    }
-    return 30;
-  }
+function clampScore(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
+function getScoreBandForResult(result) {
+  if (result === "Safe to buy") {
+    return { min: 70, max: 100 };
+  }
   if (result === "Risky") {
-    if (analysis.newPercentageUsed >= 90 || analysis.leavesLittleRemaining) {
-      return 50;
+    return { min: 40, max: 69 };
+  }
+  return { min: 0, max: 39 };
+}
+
+function resolveMonthlyBudgetFromAnalysis(analysis) {
+  const newPct = Number(analysis.newPercentageUsed) || 0;
+  const newTotalSpent = Number(analysis.newTotalSpent) || 0;
+  if (newPct > 0 && newTotalSpent > 0) {
+    return (newTotalSpent / newPct) * 100;
+  }
+
+  const totalSpent = Number(analysis.totalSpent) || 0;
+  const remainingBefore = Number(analysis.remainingBudget);
+  if (Number.isFinite(remainingBefore)) {
+    return Math.max(0, totalSpent + remainingBefore);
+  }
+  return Math.max(0, totalSpent);
+}
+
+/**
+ * Dynamic purchase score from financial impact (not a fixed label lookup).
+ * Starts at 100, applies penalties from the analysis object, then clamps into
+ * the band for the final result label (Safe 70–100, Risky 40–69, Not recommended 0–39).
+ */
+function calculateRecommendationScore(result, analysis) {
+  const a = analysis || {};
+  let score = 100;
+
+  const newPct = Math.max(0, Number(a.newPercentageUsed) || 0);
+  const remainingAfter = Number(a.newRemainingBudget);
+  const remainingBefore = Number(a.remainingBudget);
+  const totalSpent = Number(a.totalSpent) || 0;
+  const newTotalSpent = Number(a.newTotalSpent) || 0;
+  const monthlyBudget = resolveMonthlyBudgetFromAnalysis(a);
+  const itemPrice = Math.max(0, newTotalSpent - totalSpent);
+  const sharePct = Number(a.shareOfRemainingPercent);
+
+  // 1. Higher overall budget usage after purchase → lower score
+  score -= Math.min(40, newPct * 0.32);
+  if (newPct > 100) {
+    score -= Math.min(28, (newPct - 100) * 0.35);
+  }
+
+  // 2. Low or negative remaining budget after purchase
+  if (Number.isFinite(remainingAfter)) {
+    if (remainingAfter < 0) {
+      const overspend = Math.abs(remainingAfter);
+      const overspendRatio = monthlyBudget > 0 ? overspend / monthlyBudget : 1;
+      score -= 10 + Math.min(32, overspendRatio * 50);
+    } else if (monthlyBudget > 0) {
+      const remainPct = (remainingAfter / monthlyBudget) * 100;
+      if (remainPct < LITTLE_LEFT_PERCENT) {
+        score -= (LITTLE_LEFT_PERCENT - remainPct) * 0.75;
+      }
+    } else if (remainingAfter === 0) {
+      score -= 6;
     }
-    return 60;
   }
 
-  if (analysis.newPercentageUsed < 50) {
-    return 90;
+  // 3. Item price vs remaining budget before purchase
+  if (Number.isFinite(sharePct) && sharePct > 0) {
+    score -= Math.min(18, sharePct * 0.14);
+  } else if (a.itemExceedsRemaining) {
+    score -= 14;
+    if (Number.isFinite(remainingBefore) && remainingBefore > 0 && itemPrice > remainingBefore) {
+      score -= Math.min(12, ((itemPrice - remainingBefore) / remainingBefore) * 10);
+    } else if (!Number.isFinite(remainingBefore) || remainingBefore <= 0) {
+      score -= 8;
+    }
   }
 
-  return 85;
+  // 4–5. Category budget exceeded (and how far)
+  if (a.categoryExceedsAfterPurchase || a.categoryWouldOverspend) {
+    score -= 8;
+    const categoryBudget = Number(a.categoryBudget) || 0;
+    const newCategoryRemaining = Number(a.newCategoryRemaining);
+    if (
+      categoryBudget > 0 &&
+      Number.isFinite(newCategoryRemaining) &&
+      newCategoryRemaining < 0
+    ) {
+      const categoryOverRatio = Math.abs(newCategoryRemaining) / categoryBudget;
+      score -= Math.min(20, categoryOverRatio * 34);
+    }
+  }
+
+  // 6. Already overspending before this purchase
+  if (a.alreadyOverspending) {
+    score -= 12;
+  }
+
+  // 7. Purchase leaves very little remaining
+  if (a.leavesLittleRemaining) {
+    score -= 6;
+  }
+
+  if (a.isHighSpendCategory) {
+    score -= 2;
+  }
+
+  score = Math.round(clampScore(score, 0, 100));
+
+  const band = getScoreBandForResult(result);
+  return Math.round(clampScore(score, band.min, band.max));
 }
 
 function buildReasons(result, analysis, financeSnapshot, item) {
   const reasons = [];
+  const currencyService = require("./currencyService");
+  const { getRequestCurrency } = require("./requestUserContext");
+  const code = getRequestCurrency() || currencyService.BASE_CURRENCY;
+  const money = (amountBase) => {
+    try {
+      return currencyService.formatFromBase(amountBase, code);
+    } catch (error) {
+      return currencyService.formatFromBase(amountBase, currencyService.BASE_CURRENCY);
+    }
+  };
 
   if (result === "Not recommended") {
     if (analysis.alreadyOverspending) {
@@ -154,7 +258,7 @@ function buildReasons(result, analysis, financeSnapshot, item) {
     }
     if (analysis.itemExceedsRemaining) {
       reasons.push(
-        `This item ($${item.itemPrice}) costs more than your remaining budget ($${analysis.remainingBudget}).`
+        `This item (${money(item.itemPrice)}) costs more than your remaining budget (${money(analysis.remainingBudget)}).`
       );
     }
     if (analysis.exceedsBudget) {
@@ -162,7 +266,7 @@ function buildReasons(result, analysis, financeSnapshot, item) {
     }
     if (analysis.categoryWouldOverspend) {
       reasons.push(
-        `This purchase would exceed your ${item.category} category budget (only $${analysis.categoryRemaining} left in that category).`
+        `This purchase would exceed your ${item.category} category budget (only ${money(analysis.categoryRemaining)} left in that category).`
       );
     }
   }
@@ -183,7 +287,7 @@ function buildReasons(result, analysis, financeSnapshot, item) {
     }
     if (analysis.categoryWouldOverspend && !analysis.itemExceedsRemaining) {
       reasons.push(
-        `Your overall budget can afford this, but ${item.category} only has $${analysis.categoryRemaining} left in its category budget.`
+        `Your overall budget can afford this, but ${item.category} only has ${money(analysis.categoryRemaining)} left in its category budget.`
       );
     }
     if (analysis.isHighSpendCategory) {
@@ -193,7 +297,7 @@ function buildReasons(result, analysis, financeSnapshot, item) {
     }
     if (analysis.leavesLittleRemaining) {
       reasons.push(
-        `This purchase will leave you with only $${analysis.newRemainingBudget}.`
+        `This purchase will leave you with only ${money(analysis.newRemainingBudget)}.`
       );
     }
   }
@@ -201,7 +305,7 @@ function buildReasons(result, analysis, financeSnapshot, item) {
   if (result === "Safe to buy") {
     reasons.push("This item fits within your remaining budget.");
     reasons.push(
-      `After buying, you would still have $${analysis.newRemainingBudget} left (${analysis.newPercentageUsed}% used).`
+      `After buying, you would still have ${money(analysis.newRemainingBudget)} left (${analysis.newPercentageUsed}% used).`
     );
     if (!analysis.isHighSpendCategory) {
       reasons.push(`${item.category} is not heavily overspent in your spending habits.`);

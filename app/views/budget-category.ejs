@@ -20,19 +20,6 @@
   var cat = detail.category || {};
   var monthShort = budgetMonthLabel.split(' ')[0].slice(0, 3) + " '" + (budgetMonthLabel.split(' ')[1] || '').slice(-2);
 
-  function formatMoney(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return '$0';
-    if (num % 1 === 0) return '$' + num.toLocaleString();
-    return '$' + num.toFixed(2);
-  }
-
-  function formatMoneySigned(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return '-$0.00';
-    return '-$' + Math.abs(num).toFixed(2);
-  }
-
   function formatDateShort(dateStr) {
     if (!dateStr) return '';
     var parts = dateStr.split('-');
@@ -263,15 +250,15 @@
         </div>
         <div class="spb-history-metric">
           <span>Average Transaction</span>
-          <strong id="historyMetricAvg"><%= formatMoneySigned(detail.avgTransaction) %></strong>
+          <strong id="historyMetricAvg"><%= formatMoneySigned(-Math.abs(Number(detail.avgTransaction) || 0)) %></strong>
         </div>
         <div class="spb-history-metric">
           <span>Largest Transaction</span>
-          <strong id="historyMetricLargest"><%= formatMoneySigned(detail.largestTransaction) %></strong>
+          <strong id="historyMetricLargest"><%= formatMoneySigned(-Math.abs(Number(detail.largestTransaction) || 0)) %></strong>
         </div>
         <div class="spb-history-metric">
           <span>Total Amount</span>
-          <strong id="historyMetricTotal"><%= formatMoneySigned(detail.totalAmount) %></strong>
+          <strong id="historyMetricTotal"><%= formatMoneySigned(-Math.abs(Number(detail.totalAmount) || 0)) %></strong>
         </div>
       </div>
 
@@ -321,7 +308,7 @@
             <span class="spb-transaction-item__meta">
               <span class="spb-transaction-item__tag"><%= tx.categoryDisplayName || tx.category || cat.displayName || cat.name || 'CASH' %></span>
             </span>
-            <span class="spb-transaction-item__amount"><%= formatMoneySigned(tx.amount) %></span>
+            <span class="spb-transaction-item__amount"><%= formatMoneySigned(-Math.abs(Number(tx.amount) || 0)) %></span>
             <svg class="spb-transaction-item__chevron" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </li>
@@ -363,7 +350,7 @@
     <div class="spb-modal__body pocketguard-style-modal-body">
       <p class="spb-amount-prompt">Budget amount for <strong><%= cat.displayName %></strong></p>
       <div class="spb-amount-input-wrap">
-        <input type="text" inputmode="decimal" id="editBudgetAmount" class="spb-amount-input" value="<%= detail.budgeted %>" autocomplete="off">
+        <input type="text" inputmode="decimal" id="editBudgetAmount" class="spb-amount-input" value="<%= typeof convertFromBase === 'function' ? convertFromBase(detail.budgeted) : detail.budgeted %>" autocomplete="off">
       </div>
       <p class="spb-form-error" id="editBudgetError" hidden></p>
       <button type="button" class="spb-btn spb-btn--save" id="saveEditBudget">Save</button>

@@ -11,13 +11,6 @@
   if (typeof availableCategories === 'undefined') availableCategories = [];
   if (typeof overallBudgetSection === 'undefined') overallBudgetSection = null;
 
-  function formatMoney(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return '$0';
-    if (num % 1 === 0) return '$' + num.toLocaleString();
-    return '$' + num.toFixed(2);
-  }
-
   var currentMonthName = budgetMonthLabel.split(' ')[0] || 'this month';
 %>
 

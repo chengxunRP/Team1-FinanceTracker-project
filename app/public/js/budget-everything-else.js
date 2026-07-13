@@ -113,9 +113,10 @@
   if (!searchInput || !groupsWrap || !matchesSearch) return;
 
   function formatMoneySigned(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return "-$0.00";
-    return "-$" + Math.abs(num).toFixed(2);
+    var num = Math.abs(Number(value) || 0);
+    return window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.formatMoneySigned(-num)
+      : ("-$" + num.toFixed(2));
   }
 
   function setRowVisible(row, visible) {

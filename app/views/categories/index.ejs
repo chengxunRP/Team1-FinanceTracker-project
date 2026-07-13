@@ -46,7 +46,7 @@
                   <span><%= cat.count %> expense<%= cat.count !== 1 ? 's' : '' %></span>
                   <% if (cat.count > 0) { %>
                     <span style="margin:0 0.35rem;opacity:0.4;">·</span>
-                    <span class="js-category-total" data-category-color="<%= cat.color || '' %>" style="font-weight:600;">$<%= cat.total.toFixed(2) %> total</span>
+                    <span class="js-category-total" data-category-color="<%= cat.color || '' %>" style="font-weight:600;"><%= formatMoney(cat.total) %> total</span>
                   <% } %>
                 </div>
               </div>

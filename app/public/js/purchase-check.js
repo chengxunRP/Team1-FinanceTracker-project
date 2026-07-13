@@ -3,7 +3,9 @@
   'use strict';
 
   function money(n){
-    return '$' + (Number(n) || 0).toFixed(2);
+    return window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.formatMoney(n)
+      : ('$' + (Number(n) || 0).toFixed(2));
   }
 
   function renderRecommendation(container, rec){

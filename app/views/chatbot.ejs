@@ -33,13 +33,6 @@
     };
   }
 
-  function formatMoney(value) {
-    var num = Number(value);
-    if (Number.isNaN(num)) return '0';
-    if (num % 1 === 0) return String(num);
-    return num.toFixed(2);
-  }
-
   function remainingValueClass(value) {
     return Number(value) < 0
       ? 'finbot-stat__value--danger'
@@ -70,23 +63,23 @@
             <% if (liveSummary.hasCategoryBudgets || Number(liveSummary.categoryBudgetTotal) > 0) { %>
             <div class="finbot-stat">
               <span class="finbot-stat__label">Budgeted</span>
-              <span class="finbot-stat__value finbot-stat__value--blue">$<%= formatMoney(liveSummary.categoryBudgetTotal) %></span>
+              <span class="finbot-stat__value finbot-stat__value--blue"><%= formatMoney(liveSummary.categoryBudgetTotal) %></span>
               <span class="finbot-stat__sub">Category budgets</span>
             </div>
             <div class="finbot-stat">
               <span class="finbot-stat__label">Spent in budgeted categories</span>
-              <span class="finbot-stat__value finbot-stat__value--purple">$<%= formatMoney(liveSummary.categoryBudgetSpent) %></span>
+              <span class="finbot-stat__value finbot-stat__value--purple"><%= formatMoney(liveSummary.categoryBudgetSpent) %></span>
               <span class="finbot-stat__sub">Excludes unbudgeted spending</span>
             </div>
             <div class="finbot-stat">
               <span class="finbot-stat__label">Remaining</span>
-              <span class="finbot-stat__value <%= remainingValueClass(liveSummary.categoryBudgetRemaining) %>">$<%= formatMoney(liveSummary.categoryBudgetRemaining) %></span>
+              <span class="finbot-stat__value <%= remainingValueClass(liveSummary.categoryBudgetRemaining) %>"><%= formatMoney(liveSummary.categoryBudgetRemaining) %></span>
               <span class="finbot-stat__sub"><%= liveSummary.categoryBudgetPctUsed || 0 %>% of category budgets used</span>
             </div>
             <div class="finbot-stat finbot-stat--highlight">
               <span class="finbot-stat__label">Top budgeted category</span>
               <span class="finbot-stat__value finbot-stat__value--sm"><%= liveSummary.topBudgetedCategoryName || '—' %></span>
-              <span class="finbot-stat__sub">$<%= formatMoney(liveSummary.topBudgetedCategorySpent || 0) %> spent</span>
+              <span class="finbot-stat__sub"><%= formatMoney(liveSummary.topBudgetedCategorySpent || 0) %> spent</span>
             </div>
             <% } else { %>
             <div class="finbot-stat">
@@ -105,7 +98,7 @@
             <% if (liveSummary.hasAllTransactionsBudget || Number(liveSummary.allTransactionsBudget) > 0) { %>
             <div class="finbot-stat">
               <span class="finbot-stat__label">Available budget</span>
-              <span class="finbot-stat__value finbot-stat__value--blue">$<%= formatMoney(liveSummary.allTransactionsBudget) %></span>
+              <span class="finbot-stat__value finbot-stat__value--blue"><%= formatMoney(liveSummary.allTransactionsBudget) %></span>
               <span class="finbot-stat__sub">All Categories Budget</span>
             </div>
             <% } else { %>
@@ -117,19 +110,19 @@
             <% } %>
             <div class="finbot-stat">
               <span class="finbot-stat__label">Total spent</span>
-              <span class="finbot-stat__value finbot-stat__value--purple">$<%= formatMoney(liveSummary.allTransactionsSpent != null ? liveSummary.allTransactionsSpent : liveSummary.spentThisMonth) %></span>
+              <span class="finbot-stat__value finbot-stat__value--purple"><%= formatMoney(liveSummary.allTransactionsSpent != null ? liveSummary.allTransactionsSpent : liveSummary.spentThisMonth) %></span>
               <span class="finbot-stat__sub"><%= liveSummary.expenseCountThisMonth %> expense<%= liveSummary.expenseCountThisMonth === 1 ? '' : 's' %></span>
             </div>
             <% if (liveSummary.hasAllTransactionsBudget || Number(liveSummary.allTransactionsBudget) > 0) { %>
             <div class="finbot-stat">
               <span class="finbot-stat__label">Remaining</span>
-              <span class="finbot-stat__value <%= remainingValueClass(liveSummary.allTransactionsRemaining) %>">$<%= formatMoney(liveSummary.allTransactionsRemaining) %></span>
+              <span class="finbot-stat__value <%= remainingValueClass(liveSummary.allTransactionsRemaining) %>"><%= formatMoney(liveSummary.allTransactionsRemaining) %></span>
               <span class="finbot-stat__sub"><%= liveSummary.allTransactionsPctUsed || 0 %>% of budget used</span>
             </div>
             <% } %>
             <div class="finbot-stat finbot-stat--highlight">
               <span class="finbot-stat__label">Everything Else</span>
-              <span class="finbot-stat__value finbot-stat__value--sm">$<%= formatMoney(liveSummary.everythingElseTotal || 0) %></span>
+              <span class="finbot-stat__value finbot-stat__value--sm"><%= formatMoney(liveSummary.everythingElseTotal || 0) %></span>
               <span class="finbot-stat__sub">Unbudgeted category spending</span>
             </div>
           </div>

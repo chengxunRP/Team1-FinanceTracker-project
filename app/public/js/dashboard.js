@@ -35,9 +35,16 @@
   }
 
   function money(value) {
-    var num = Number(value) || 0;
-    if (num % 1 === 0) return "$" + num.toLocaleString();
-    return "$" + num.toFixed(2);
+    return window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.formatMoney(value)
+      : ("$" + Number(value || 0).toFixed(2));
+  }
+
+  /** Convert a base-currency amount to preferred currency for chart series (numbers only). */
+  function toPreferred(value) {
+    return window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.convertFromBase(value)
+      : Number(value || 0);
   }
 
   function calcUsedPct(spent, budget) {
@@ -139,7 +146,7 @@
       var parts = key.split("-");
       trend.push({
         month: MONTH_SHORT[parseInt(parts[1], 10) - 1],
-        amount: Number(monthData.summary.totalSpent) || 0,
+        amount: toPreferred(Number(monthData.summary.totalSpent) || 0),
       });
     }
 
@@ -231,22 +238,33 @@
     var chart = document.getElementById("dashBarChart");
     if (!chart) return;
 
+    var preferredWeek = [];
+    for (var w = 0; w < week.length; w++) {
+      preferredWeek.push({
+        day: week[w].day,
+        dateLabel: week[w].dateLabel,
+        amountBase: Number(week[w].amount) || 0,
+        amount: toPreferred(week[w].amount),
+      });
+    }
+
     var maxAmount = 0;
-    for (var i = 0; i < week.length; i++) {
-      if (week[i].amount > maxAmount) maxAmount = week[i].amount;
+    for (var i = 0; i < preferredWeek.length; i++) {
+      if (preferredWeek[i].amount > maxAmount) maxAmount = preferredWeek[i].amount;
     }
     if (maxAmount === 0) maxAmount = 1;
 
     var html = "";
-    for (var j = 0; j < week.length; j++) {
+    for (var j = 0; j < preferredWeek.length; j++) {
       var h =
-        week[j].amount > 0
-          ? Math.max(12, Math.round((week[j].amount / maxAmount) * 100))
+        preferredWeek[j].amount > 0
+          ? Math.max(12, Math.round((preferredWeek[j].amount / maxAmount) * 100))
           : 0;
-      var amtLabel = week[j].amount > 0 ? money(week[j].amount) : "";
+      var amtLabel =
+        preferredWeek[j].amountBase > 0 ? money(preferredWeek[j].amountBase) : "";
       html += '<div class="dash-bar-col">';
       html += '<div class="dash-bar-track"><div class="dash-bar-fill" style="height:' + h + '%;"></div></div>';
-      html += '<span class="dash-bar-label">' + (week[j].dateLabel || week[j].day) + "</span>";
+      html += '<span class="dash-bar-label">' + (preferredWeek[j].dateLabel || preferredWeek[j].day) + "</span>";
       html += '<span class="dash-bar-amt">' + amtLabel + "</span>";
       html += "</div>";
     }

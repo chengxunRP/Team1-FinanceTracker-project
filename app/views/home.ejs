@@ -212,15 +212,15 @@
     <div class="stat-grid">
       <article class="stat-card">
         <span class="stat-card__label">Monthly budget</span>
-        <span class="stat-card__value stat-card__value--blue">$<%= summary.monthlyBudget %></span>
+        <span class="stat-card__value stat-card__value--blue"><%= formatMoney(summary.monthlyBudget) %></span>
       </article>
       <article class="stat-card">
         <span class="stat-card__label">Spent this month</span>
-        <span class="stat-card__value stat-card__value--blue">$<%= summary.totalSpent %></span>
+        <span class="stat-card__value stat-card__value--blue"><%= formatMoney(summary.totalSpent) %></span>
       </article>
       <article class="stat-card">
         <span class="stat-card__label">Remaining</span>
-        <span class="stat-card__value stat-card__value--green">$<%= summary.remainingBudget %></span>
+        <span class="stat-card__value stat-card__value--green"><%= formatMoney(summary.remainingBudget) %></span>
       </article>
       <article class="stat-card">
         <span class="stat-card__label">Budget used</span>

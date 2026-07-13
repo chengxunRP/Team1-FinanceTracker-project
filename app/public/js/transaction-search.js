@@ -8,6 +8,14 @@
     var abs = Math.abs(num);
     var fixed2 = abs.toFixed(2);
     var whole = String(Math.round(abs));
+    var preferred = window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.convertFromBase(abs)
+      : abs;
+    var preferredText = window.SwCurrencyFormat
+      ? window.SwCurrencyFormat.formatMoney(abs)
+      : String(preferred);
+    var preferredFixed =
+      typeof preferred === "number" ? preferred.toFixed(2) : String(preferred);
 
     return [
       String(num),
@@ -15,6 +23,9 @@
       fixed2,
       whole,
       "-" + fixed2,
+      preferredText,
+      String(preferred),
+      preferredFixed,
       "$" + fixed2,
       "-$" + fixed2,
       "$" + whole,
