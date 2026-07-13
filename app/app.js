@@ -104,7 +104,7 @@ app.get("/health", function (req, res) {
 
 const session = require("express-session");
 app.use(session({
-  secret: "spendwise-dev-secret-change-me",
+  secret: process.env.SESSION_SECRET || "spendwise-dev-secret-change-me",
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 1000 * 60 * 60 * 24 }, // 1 day
@@ -1837,10 +1837,10 @@ const profileRoutes = require('./routes/profile');
 app.use('/profile', profileRoutes);
 // --- End Expense CRUD routes ---
 
-const server = app.listen(PORT);
+const server = app.listen(PORT, "0.0.0.0");
 
 server.on("listening", () => {
-  console.log(`spendWise running at http://localhost:${PORT}`);
+  console.log(`spendWise running on port ${PORT}`);
 });
 
 server.on("error", (err) => {

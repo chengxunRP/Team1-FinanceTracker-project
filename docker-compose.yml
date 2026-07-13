@@ -4,17 +4,17 @@ services:
     container_name: spendwise-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: finance_tracker
-      MYSQL_USER: finance_user
-      MYSQL_PASSWORD: password123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3307:3306"
     volumes:
       - spendwise_mysql_data:/var/lib/mysql
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "finance_user", "-ppassword123"]
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysqladmin ping -h localhost -u$$MYSQL_USER"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -34,9 +34,9 @@ services:
       PORT: 3000
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USER: finance_user
-      DB_PASSWORD: password123
-      DB_NAME: finance_tracker
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
 
 volumes:
   spendwise_mysql_data:
