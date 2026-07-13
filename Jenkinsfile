@@ -107,7 +107,7 @@ pipeline {
                     sleep 5
                     docker ps -a
                     docker logs spendwise-container || true
-                    docker exec spendwise-container node -e "require('http').get('http://localhost:3000', res => { console.log('STATUS:', res.statusCode); process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', err => { console.error(err); process.exit(1); })"
+                    docker exec spendwise-container node -e "require('http').get('http://localhost:3000/health', res => { console.log('STATUS:', res.statusCode); process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', err => { console.error(err); process.exit(1); })"
                 '''
             }
         }

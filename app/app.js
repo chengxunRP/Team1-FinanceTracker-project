@@ -97,6 +97,11 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Unauthenticated liveness check for Jenkins / container health probes.
+app.get("/health", function (req, res) {
+  res.status(200).json({ status: "ok" });
+});
+
 const session = require("express-session");
 app.use(session({
   secret: "spendwise-dev-secret-change-me",
