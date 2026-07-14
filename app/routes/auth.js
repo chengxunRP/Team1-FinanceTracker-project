@@ -6,6 +6,7 @@ require('../envConfig');
 const db = require('../config/db');
 const { validateRegistrationPassword } = require('../authHelpers');
 const { sendEmail, isEmailConfigured } = require('../emailService');
+const { classifyResetTokenRow } = require('../passwordResetTokenHelpers');
 
 const DEFAULT_RESET_TOKEN_MINUTES = 30;
 const FORGOT_PASSWORD_SAFE_MESSAGE =
@@ -68,6 +69,7 @@ function getDatabaseName() {
   return process.env.DB_NAME || 'finance_tracker';
 }
 
+// Option B: invalidate older unused tokens, then insert a brand-new unused row.
 async function createPasswordResetToken(userId) {
   const rawToken = createResetToken();
   const tokenHash = hashResetToken(rawToken);
@@ -76,23 +78,77 @@ async function createPasswordResetToken(userId) {
 
   try {
     await conn.beginTransaction();
+
+    // Invalidate older unused tokens for this user only. Newest token stays unused.
     await conn.query(
-      'UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE user_id = ? AND used_at IS NULL',
+      `UPDATE password_reset_tokens
+       SET used_at = UTC_TIMESTAMP()
+       WHERE user_id = ?
+         AND used_at IS NULL`,
       [userId]
     );
-    await conn.query(
-      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, created_at)
-       VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? MINUTE), UTC_TIMESTAMP())`,
+
+    const [insertResult] = await conn.query(
+      `INSERT INTO password_reset_tokens
+        (user_id, token_hash, expires_at, used_at, created_at)
+       VALUES (
+         ?,
+         ?,
+         DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? MINUTE),
+         NULL,
+         UTC_TIMESTAMP()
+       )`,
       [userId, tokenHash, expiresInMinutes]
     );
+
+    const insertedId = insertResult && insertResult.insertId;
+    if (insertedId) {
+      // Force unused state on the brand-new row (guards against an unexpected used_at DEFAULT).
+      await conn.query(
+        `UPDATE password_reset_tokens
+         SET used_at = NULL,
+             expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? MINUTE)
+         WHERE id = ?`,
+        [expiresInMinutes, insertedId]
+      );
+
+      const [verifyRows] = await conn.query(
+        `SELECT id,
+                user_id AS userId,
+                used_at AS usedAt,
+                expires_at AS expiresAt,
+                UTC_TIMESTAMP() AS dbNowUtc
+         FROM password_reset_tokens
+         WHERE id = ?
+         LIMIT 1`,
+        [insertedId]
+      );
+
+      const verified = verifyRows[0];
+      const diagnosis = classifyResetTokenRow(verified, getDatabaseName());
+      if (diagnosis.status !== 'valid') {
+        throw new Error(
+          `Newly created reset token is not valid (status=${diagnosis.status})`
+        );
+      }
+
+      console.log('[PasswordReset] token hash stored successfully', {
+        userId,
+        database: getDatabaseName(),
+        expiresInMinutes,
+        hasUsedAt: diagnosis.hasUsedAt,
+        hasExpiresAt: diagnosis.hasExpiresAt,
+        status: diagnosis.status,
+      });
+    } else {
+      console.log('[PasswordReset] token hash stored successfully', {
+        userId,
+        database: getDatabaseName(),
+        expiresInMinutes,
+      });
+    }
+
     await conn.commit();
-
-    console.log('[PasswordReset] token hash stored successfully', {
-      userId,
-      database: getDatabaseName(),
-      expiresInMinutes,
-    });
-
     return rawToken;
   } catch (error) {
     await conn.rollback();
@@ -109,46 +165,26 @@ async function diagnoseResetToken(rawToken) {
     return {
       status: 'invalid_format',
       tokenLength: normalized.length,
+      hasUsedAt: false,
+      hasExpiresAt: false,
     };
   }
 
   const tokenHash = hashResetToken(normalized);
   const [rows] = await db.query(
-    `SELECT id, user_id AS userId, used_at, expires_at,
+    `SELECT id,
+            user_id AS userId,
+            used_at AS usedAt,
+            expires_at AS expiresAt,
             UTC_TIMESTAMP() AS dbNowUtc,
-            (expires_at > UTC_TIMESTAMP()) AS isNotExpired
+            (expires_at IS NOT NULL AND expires_at > UTC_TIMESTAMP()) AS isNotExpired
      FROM password_reset_tokens
      WHERE token_hash = ?
      LIMIT 1`,
     [tokenHash]
   );
 
-  if (!rows.length) {
-    return { status: 'not_found', database: getDatabaseName() };
-  }
-
-  const row = rows[0];
-  if (row.used_at) {
-    return { status: 'already_used', userId: row.userId, database: getDatabaseName() };
-  }
-
-  if (!row.isNotExpired) {
-    return {
-      status: 'expired',
-      userId: row.userId,
-      database: getDatabaseName(),
-      expiresAt: row.expires_at,
-      dbNowUtc: row.dbNowUtc,
-    };
-  }
-
-  return {
-    status: 'valid',
-    userId: row.userId,
-    database: getDatabaseName(),
-    expiresAt: row.expires_at,
-    dbNowUtc: row.dbNowUtc,
-  };
+  return classifyResetTokenRow(rows[0] || null, getDatabaseName());
 }
 
 async function sendPasswordResetEmail(user, rawToken) {
@@ -447,8 +483,10 @@ router.get('/reset-password/:token', async (req, res) => {
       status: diagnosis.status,
       userId: diagnosis.userId || null,
       database: diagnosis.database || getDatabaseName(),
-      expiresAt: diagnosis.expiresAt || null,
-      dbNowUtc: diagnosis.dbNowUtc || null,
+      hasUsedAt: Boolean(diagnosis.hasUsedAt),
+      hasExpiresAt: Boolean(diagnosis.hasExpiresAt),
+      expiresAtPresent: Boolean(diagnosis.expiresAt),
+      dbNowUtcPresent: Boolean(diagnosis.dbNowUtc),
     });
 
     if (diagnosis.status === 'valid') {
@@ -458,11 +496,19 @@ router.get('/reset-password/:token', async (req, res) => {
     } else if (diagnosis.status === 'expired') {
       console.log('[PasswordReset] token expired', { userId: diagnosis.userId || null });
     } else if (diagnosis.status === 'already_used') {
-      console.log('[PasswordReset] token already used', { userId: diagnosis.userId || null });
+      console.log('[PasswordReset] token already used', {
+        userId: diagnosis.userId || null,
+        hasUsedAt: true,
+      });
+    } else if (diagnosis.status === 'invalid') {
+      console.log('[PasswordReset] token invalid (missing expiry)', {
+        userId: diagnosis.userId || null,
+      });
     } else {
       console.log('[PasswordReset] matching token not found');
     }
 
+    // GET only validates and renders the form. It never sets used_at.
     const tokenRow = diagnosis.status === 'valid'
       ? await findValidResetTokenRecord(token)
       : null;
