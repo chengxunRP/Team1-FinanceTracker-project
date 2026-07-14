@@ -1,6 +1,9 @@
 // Shared email delivery: Resend (production) with optional SMTP fallback for local dev.
 require("./envConfig");
 
+const fs = require("fs");
+const path = require("path");
+
 let resendClient = null;
 let smtpTransporter = null;
 
@@ -69,17 +72,103 @@ function getFromAddress(provider) {
   );
 }
 
-function normalizeResendAttachments(attachments = []) {
-  return attachments.map((attachment) => {
-    const item = {
-      filename: attachment.filename,
-      content_id: attachment.cid,
-    };
-    if (attachment.path) item.path = attachment.path;
-    if (attachment.content) item.content = attachment.content;
-    if (attachment.content_type) item.content_type = attachment.content_type;
-    return item;
+function isRemoteAttachmentPath(filePath) {
+  return /^https?:\/\//i.test(String(filePath || "").trim());
+}
+
+function removeUndefinedProps(obj) {
+  const cleaned = {};
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+      cleaned[key] = obj[key];
+    }
   });
+  return cleaned;
+}
+
+/**
+ * Convert Nodemailer-style attachments into Resend-compatible ones.
+ * Local filesystem paths become Base64 `content`. Remote URLs stay as `path`.
+ * Decorative local files that cannot be read are omitted (do not fail the email).
+ */
+function normalizeResendAttachments(attachments = []) {
+  const normalized = [];
+  const list = Array.isArray(attachments) ? attachments : [];
+
+  for (const attachment of list) {
+    if (!attachment) continue;
+
+    const filename = attachment.filename || path.basename(attachment.path || "attachment");
+    const contentId = attachment.content_id || attachment.contentId || attachment.cid;
+    const remotePath =
+      attachment.path && isRemoteAttachmentPath(attachment.path)
+        ? String(attachment.path).trim()
+        : null;
+    const localPath =
+      attachment.path && !isRemoteAttachmentPath(attachment.path)
+        ? attachment.path
+        : null;
+
+    if (remotePath) {
+      const item = removeUndefinedProps({
+        filename,
+        path: remotePath,
+        content_id: contentId,
+        content_type: attachment.content_type || attachment.contentType,
+      });
+      console.log("[Email] attachment mode: remote URL", { filename });
+      normalized.push(item);
+      continue;
+    }
+
+    if (attachment.content) {
+      const item = removeUndefinedProps({
+        filename,
+        content: attachment.content,
+        content_id: contentId,
+        content_type: attachment.content_type || attachment.contentType,
+      });
+      console.log("[Email] attachment mode: local Base64", { filename });
+      normalized.push(item);
+      continue;
+    }
+
+    if (localPath) {
+      try {
+        if (!fs.existsSync(localPath)) {
+          console.warn("[Email] decorative attachment omitted (file missing)", {
+            filename,
+            attachmentMode: "omitted",
+          });
+          continue;
+        }
+
+        const encodedContent = fs.readFileSync(localPath).toString("base64");
+        const item = removeUndefinedProps({
+          filename,
+          content: encodedContent,
+          content_id: contentId,
+          content_type: attachment.content_type || attachment.contentType,
+        });
+        console.log("[Email] attachment mode: local Base64", { filename });
+        normalized.push(item);
+      } catch (error) {
+        console.warn("[Email] decorative attachment omitted (unreadable)", {
+          filename,
+          attachmentMode: "omitted",
+          message: error.message || String(error),
+        });
+      }
+      continue;
+    }
+
+    console.warn("[Email] decorative attachment omitted (no usable source)", {
+      filename,
+      attachmentMode: "omitted",
+    });
+  }
+
+  return normalized;
 }
 
 function logProviderError(provider, error) {
@@ -130,7 +219,10 @@ async function sendEmail({ to, subject, html, text, attachments }) {
     };
 
     if (attachments && attachments.length) {
-      payload.attachments = normalizeResendAttachments(attachments);
+      const resendAttachments = normalizeResendAttachments(attachments);
+      if (resendAttachments.length) {
+        payload.attachments = resendAttachments;
+      }
     }
 
     const result = await resend.emails.send(payload);
@@ -141,6 +233,11 @@ async function sendEmail({ to, subject, html, text, attachments }) {
       logProviderError("resend", error);
       throw error;
     }
+
+    console.log("[Email] send success", {
+      provider: "Resend",
+      hasAttachments: Boolean(payload.attachments && payload.attachments.length),
+    });
 
     return {
       provider: "resend",
@@ -162,7 +259,13 @@ async function sendEmail({ to, subject, html, text, attachments }) {
       subject,
       text,
       html,
+      // Nodemailer keeps local path/cid behaviour unchanged.
       attachments: attachments || [],
+    });
+
+    console.log("[Email] send success", {
+      provider: "SMTP",
+      hasAttachments: Boolean(attachments && attachments.length),
     });
 
     return {
@@ -198,4 +301,6 @@ module.exports = {
   hasSmtpConfig,
   isEmailConfigured,
   getEmailConfigFlags,
+  normalizeResendAttachments,
+  isRemoteAttachmentPath,
 };
