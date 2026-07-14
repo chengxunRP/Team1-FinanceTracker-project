@@ -1,6 +1,5 @@
-// Email Budget Notifications — sends SMTP alerts after real budget/expense changes, not on page refresh.
-// SMTP_USER is the sender account; the recipient comes from the logged-in user's email (or alert_email).
-// Credentials are read from .env via envConfig — never hardcoded in source.
+// Email Budget Notifications — sends alerts after real budget/expense changes, not on page refresh.
+// Resend is preferred in production; SMTP remains an optional local fallback.
 require("./envConfig");
 
 const db = require("./config/db");
@@ -8,47 +7,7 @@ const budgetStore = require("./budgetStore");
 const { getBudgetNotifications } = require("./budgetNotificationService");
 const { buildBudgetAlertEmail } = require("./budgetAlertEmailTemplate");
 const { runWithUserId } = require("./requestUserContext");
-
-let transporter = null;
-
-function getSmtpConfigFlags() {
-  return {
-    hasHost: Boolean(process.env.SMTP_HOST),
-    hasPort: Boolean(process.env.SMTP_PORT),
-    hasUser: Boolean(process.env.SMTP_USER),
-    hasPass: Boolean(process.env.SMTP_PASS),
-    hasFrom: Boolean(process.env.SMTP_FROM || process.env.SMTP_USER),
-  };
-}
-
-function getTransporter() {
-  if (transporter) return transporter;
-
-  const host = process.env.SMTP_HOST;
-  if (!host) return null;
-
-  let nodemailer;
-  try {
-    nodemailer = require("nodemailer");
-  } catch (error) {
-    console.warn("[BudgetEmail] nodemailer is not installed; budget email alerts are disabled.");
-    return null;
-  }
-
-  transporter = nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: process.env.SMTP_USER
-      ? {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS || "",
-        }
-      : undefined,
-  });
-
-  return transporter;
-}
+const { sendEmail, isEmailConfigured, getEmailConfigFlags } = require("./emailService");
 
 function resolveAlertEmail(user) {
   const alertEmail = user.alert_email && String(user.alert_email).trim();
@@ -105,7 +64,7 @@ function filterNewAlerts(alerts, sentKeys) {
 }
 
 // Insert successfully sent alerts into budget_email_alert_logs.
-// Called only after Nodemailer send succeeds, so a failed send can be retried
+// Called only after the email provider confirms success, so a failed send can be retried
 // next time. Prevents the same warning or exceeded email from being repeated.
 async function recordSentAlerts(userId, budgetMonth, alerts) {
   if (!alerts.length) return;
@@ -121,12 +80,12 @@ async function recordSentAlerts(userId, budgetMonth, alerts) {
   }
 }
 
-// Send one budget alert email with Nodemailer.
+// Send one budget alert email via the shared email service.
 // Checks email_alerts_enabled on the users row, chooses alert_email or normal email
 // as the recipient, then sends the subject/text/html built by the template file.
 async function sendBudgetAlertEmail(user, emailContent) {
   if (!user || !Number(user.email_alerts_enabled)) {
-    return { sent: false, skipReason: "email_alerts_enabled off" };
+    return { sent: false, skipReason: "email alerts disabled" };
   }
 
   const to = resolveAlertEmail(user);
@@ -134,24 +93,27 @@ async function sendBudgetAlertEmail(user, emailContent) {
     return { sent: false, skipReason: "user email missing" };
   }
 
-  const mailer = getTransporter();
-  if (!mailer) {
-    return { sent: false, skipReason: "SMTP missing" };
+  if (!isEmailConfigured()) {
+    return { sent: false, skipReason: "email provider missing" };
   }
 
   try {
-    await mailer.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@spendwise.local",
+    const result = await sendEmail({
       to,
       subject: emailContent.subject,
       text: emailContent.text,
       html: emailContent.html,
       attachments: emailContent.attachments || [],
     });
-    return { sent: true, recipient: to, subject: emailContent.subject };
+    return {
+      sent: true,
+      recipient: to,
+      subject: emailContent.subject,
+      provider: result.provider,
+      messageId: result.messageId,
+    };
   } catch (error) {
-    console.error("[BudgetEmail] sendMail failed:", error.message || error);
-    return { sent: false, skipReason: "sendMail failed" };
+    return { sent: false, skipReason: "send failed" };
   }
 }
 
@@ -169,7 +131,7 @@ async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {})
     userId: userId || null,
     affectedMonth: budgetMonth,
     affectedCategoryId: meta.affectedCategoryId || null,
-    smtp: getSmtpConfigFlags(),
+    email: getEmailConfigFlags(),
   });
 
   if (!userId) {
@@ -191,7 +153,7 @@ async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {})
   });
 
   if (!Number(user.email_alerts_enabled)) {
-    console.log("[BudgetEmail] skip: email_alerts_enabled off");
+    console.log("[BudgetEmail] skip: email alerts disabled");
     return;
   }
 
@@ -250,7 +212,7 @@ async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {})
   });
 
   if (!newAlerts.length) {
-    console.log("[BudgetEmail] skip: no new email alerts to send");
+    console.log("[BudgetEmail] skip: alert already sent");
     return;
   }
 
@@ -275,9 +237,10 @@ async function maybeSendBudgetAlertsForUser(userId, budgetMonthInput, meta = {})
     return;
   }
 
-  console.log("[BudgetEmail] email sent", {
+  console.log("[Email] budget-alert email sent successfully", {
     recipient: result.recipient,
     subject: result.subject,
+    provider: result.provider || null,
     alertCount: newAlerts.length,
     alertKeys: newAlerts.map((a) => buildAlertDedupeKey(a)),
   });
