@@ -268,7 +268,7 @@ function buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts, c
 
 // Build the complete budget alert email content (subject, plain text and HTML).
 // Puts the newly triggered alert first and may list other active alerts below.
-// Returns the object that sendBudgetAlertEmail() passes to Nodemailer.
+// Returns the object that sendBudgetAlertEmail() passes to the shared email service.
 // No SMTP sending happens in this file.
 async function buildBudgetAlertEmail(user, budgetMonth, newAlerts, otherActiveAlerts) {
   const iconAttachment = getSpendWiseIconAttachment();

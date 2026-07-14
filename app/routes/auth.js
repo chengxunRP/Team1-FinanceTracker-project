@@ -4,12 +4,11 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('../config/db');
 const { validateRegistrationPassword } = require('../authHelpers');
+const { sendEmail, isEmailConfigured } = require('../emailService');
 
 const RESET_TOKEN_MINUTES = Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES || 30);
 const FORGOT_PASSWORD_SAFE_MESSAGE =
   'If an account with that email exists, we have sent a password reset link.';
-
-let authMailer = null;
 
 function getAppBaseUrl() {
   const raw = String(process.env.APP_BASE_URL || '').trim();
@@ -25,34 +24,8 @@ function createResetToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function getAuthMailer() {
-  if (authMailer) return authMailer;
-  if (!process.env.SMTP_HOST) return null;
-
-  let nodemailer;
-  try {
-    nodemailer = require('nodemailer');
-  } catch (error) {
-    return null;
-  }
-
-  authMailer = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: process.env.SMTP_USER
-      ? {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS || '',
-        }
-      : undefined,
-  });
-  return authMailer;
-}
-
 async function sendPasswordResetEmail(user, rawToken) {
-  const mailer = getAuthMailer();
-  if (!mailer || !user || !user.email) return false;
+  if (!isEmailConfigured() || !user || !user.email) return false;
 
   const resetUrl = `${getAppBaseUrl()}/reset-password/${encodeURIComponent(rawToken)}`;
   const displayName = user.name && String(user.name).trim() ? user.name.trim() : 'there';
@@ -82,16 +55,16 @@ async function sendPasswordResetEmail(user, rawToken) {
   `;
 
   try {
-    await mailer.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@spendwise.local',
+    await sendEmail({
       to: user.email,
       subject,
       text,
       html,
     });
+    console.log('[Email] password-reset email sent successfully');
     return true;
   } catch (error) {
-    console.error('Password reset email send failed:', error.message || error);
+    console.error('[Email] password-reset email send failed:', error.message || error);
     return false;
   }
 }
