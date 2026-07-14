@@ -103,7 +103,6 @@ async function sendBudgetAlertEmail(user, emailContent) {
       subject: emailContent.subject,
       text: emailContent.text,
       html: emailContent.html,
-      attachments: emailContent.attachments || [],
     });
     return {
       sent: true,
