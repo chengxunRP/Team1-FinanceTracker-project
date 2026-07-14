@@ -1,12 +1,7 @@
 // HTML + plain-text bodies for budget alert emails.
 // APP_BASE_URL from .env builds the "Open Spending & Budgets" button link in the email.
-const path = require("path");
-const fs = require("fs");
 const budgetStore = require("./budgetStore");
 const currencyService = require("./currencyService");
-
-const SPENDWISE_LOGO_CID = "spendwise-logo";
-const ICON_PATH = path.join(__dirname, "public", "favicon.svg");
 
 const SEVERITY_STYLES = {
   warning: {
@@ -74,15 +69,6 @@ function buildEmailSubject(newAlerts) {
     return `spendWise Alert: ${newAlerts[0].title}`;
   }
   return `spendWise Alert: ${newAlerts.length} new budget alerts`;
-}
-
-function getSpendWiseIconAttachment() {
-  if (!fs.existsSync(ICON_PATH)) return null;
-  return {
-    filename: "spendwise-icon.svg",
-    path: ICON_PATH,
-    cid: SPENDWISE_LOGO_CID,
-  };
 }
 
 function formatEmailMoney(value, currency) {
@@ -213,21 +199,12 @@ function buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts, c
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;border-collapse:separate;border-spacing:0;">
           <tr>
             <td style="background:linear-gradient(135deg,#2563eb 0%,#0d9488 100%);border-radius:16px 16px 0 0;padding:20px 24px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td width="44" valign="middle" style="padding-right:12px;">
-                    <img src="cid:${SPENDWISE_LOGO_CID}" width="36" height="36" alt="spendWise" style="display:block;border:0;border-radius:8px;">
-                  </td>
-                  <td valign="middle">
-                    <div style="font:700 22px/1.2 Arial,Helvetica,sans-serif;color:#ffffff;">
-                      spend<span style="color:#d1fae5;">Wise</span>
-                    </div>
-                    <div style="font:400 13px/1.4 Arial,Helvetica,sans-serif;color:#e0f2fe;margin-top:4px;">
-                      Budget alert for ${monthLabel}
-                    </div>
-                  </td>
-                </tr>
-              </table>
+              <div style="font:700 22px/1.2 Arial,Helvetica,sans-serif;color:#ffffff;">
+                spend<span style="color:#d1fae5;">Wise</span>
+              </div>
+              <div style="font:400 13px/1.4 Arial,Helvetica,sans-serif;color:#e0f2fe;margin-top:4px;">
+                Budget alert for ${monthLabel}
+              </div>
             </td>
           </tr>
           <tr>
@@ -271,8 +248,6 @@ function buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts, c
 // Returns the object that sendBudgetAlertEmail() passes to the shared email service.
 // No SMTP sending happens in this file.
 async function buildBudgetAlertEmail(user, budgetMonth, newAlerts, otherActiveAlerts) {
-  const iconAttachment = getSpendWiseIconAttachment();
-  const attachments = iconAttachment ? [iconAttachment] : [];
   const actionUrl = buildBudgetPageUrl(budgetMonth);
   const currency =
     user && user.id
@@ -283,7 +258,6 @@ async function buildBudgetAlertEmail(user, budgetMonth, newAlerts, otherActiveAl
     subject: buildEmailSubject(newAlerts),
     text: buildBudgetAlertPlainText(user, budgetMonth, newAlerts, otherActiveAlerts, currency),
     html: buildBudgetAlertHtml(user, budgetMonth, newAlerts, otherActiveAlerts, currency),
-    attachments,
     actionUrl,
   };
 }
