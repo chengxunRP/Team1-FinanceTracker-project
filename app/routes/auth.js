@@ -2,13 +2,22 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+require('../envConfig');
 const db = require('../config/db');
 const { validateRegistrationPassword } = require('../authHelpers');
 const { sendEmail, isEmailConfigured } = require('../emailService');
 
-const RESET_TOKEN_MINUTES = Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES || 30);
+const DEFAULT_RESET_TOKEN_MINUTES = 30;
 const FORGOT_PASSWORD_SAFE_MESSAGE =
   'If an account with that email exists, we have sent a password reset link.';
+
+function getResetTokenMinutes() {
+  const parsed = Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_RESET_TOKEN_MINUTES;
+  }
+  return Math.floor(parsed);
+}
 
 function getAppBaseUrl() {
   const raw = String(process.env.APP_BASE_URL || '').trim();
@@ -24,12 +33,118 @@ function createResetToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function normalizeRawToken(rawToken) {
+  const value = String(rawToken || '').trim();
+  if (!value) return '';
+
+  try {
+    return decodeURIComponent(value).trim();
+  } catch (error) {
+    return value;
+  }
+}
+
+function isValidRawTokenFormat(rawToken) {
+  return /^[a-f0-9]{64}$/i.test(rawToken);
+}
+
+function buildResetPasswordUrl(rawToken) {
+  return `${getAppBaseUrl()}/reset-password/${encodeURIComponent(rawToken)}`;
+}
+
+function getDatabaseName() {
+  return process.env.DB_NAME || 'finance_tracker';
+}
+
+async function createPasswordResetToken(userId) {
+  const rawToken = createResetToken();
+  const tokenHash = hashResetToken(rawToken);
+  const expiresInMinutes = getResetTokenMinutes();
+  const conn = await db.getConnection();
+
+  try {
+    await conn.beginTransaction();
+    await conn.query(
+      'UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE user_id = ? AND used_at IS NULL',
+      [userId]
+    );
+    await conn.query(
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, created_at)
+       VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? MINUTE), UTC_TIMESTAMP())`,
+      [userId, tokenHash, expiresInMinutes]
+    );
+    await conn.commit();
+
+    console.log('[PasswordReset] token hash stored successfully', {
+      userId,
+      database: getDatabaseName(),
+      expiresInMinutes,
+    });
+
+    return rawToken;
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+async function diagnoseResetToken(rawToken) {
+  const normalized = normalizeRawToken(rawToken);
+
+  if (!isValidRawTokenFormat(normalized)) {
+    return {
+      status: 'invalid_format',
+      tokenLength: normalized.length,
+    };
+  }
+
+  const tokenHash = hashResetToken(normalized);
+  const [rows] = await db.query(
+    `SELECT id, user_id AS userId, used_at, expires_at,
+            UTC_TIMESTAMP() AS dbNowUtc,
+            (expires_at > UTC_TIMESTAMP()) AS isNotExpired
+     FROM password_reset_tokens
+     WHERE token_hash = ?
+     LIMIT 1`,
+    [tokenHash]
+  );
+
+  if (!rows.length) {
+    return { status: 'not_found', database: getDatabaseName() };
+  }
+
+  const row = rows[0];
+  if (row.used_at) {
+    return { status: 'already_used', userId: row.userId, database: getDatabaseName() };
+  }
+
+  if (!row.isNotExpired) {
+    return {
+      status: 'expired',
+      userId: row.userId,
+      database: getDatabaseName(),
+      expiresAt: row.expires_at,
+      dbNowUtc: row.dbNowUtc,
+    };
+  }
+
+  return {
+    status: 'valid',
+    userId: row.userId,
+    database: getDatabaseName(),
+    expiresAt: row.expires_at,
+    dbNowUtc: row.dbNowUtc,
+  };
+}
+
 async function sendPasswordResetEmail(user, rawToken) {
   if (!isEmailConfigured() || !user || !user.email) return false;
 
-  const resetUrl = `${getAppBaseUrl()}/reset-password/${encodeURIComponent(rawToken)}`;
+  const resetUrl = buildResetPasswordUrl(rawToken);
   const displayName = user.name && String(user.name).trim() ? user.name.trim() : 'there';
-  const expiryText = `${RESET_TOKEN_MINUTES} minutes`;
+  const expiryText = `${getResetTokenMinutes()} minutes`;
   const subject = 'Reset your spendWise password';
   const text = [
     `Hi ${displayName},`,
@@ -70,14 +185,19 @@ async function sendPasswordResetEmail(user, rawToken) {
 }
 
 async function findValidResetTokenRecord(rawToken) {
-  const tokenHash = hashResetToken(rawToken);
+  const normalized = normalizeRawToken(rawToken);
+  if (!isValidRawTokenFormat(normalized)) {
+    return null;
+  }
+
+  const tokenHash = hashResetToken(normalized);
   const [rows] = await db.query(
     `SELECT prt.id, prt.user_id AS userId, u.name, u.email
      FROM password_reset_tokens prt
      JOIN users u ON u.id = prt.user_id
      WHERE prt.token_hash = ?
        AND prt.used_at IS NULL
-       AND prt.expires_at > NOW()
+       AND prt.expires_at > UTC_TIMESTAMP()
      LIMIT 1`,
     [tokenHash]
   );
@@ -225,6 +345,8 @@ router.get('/forgot-password', (req, res) => {
 router.post('/forgot-password', async (req, res) => {
   const email = String(req.body.email || '').trim();
   const errors = [];
+  console.log('[PasswordReset] reset request received', { database: getDatabaseName() });
+
   if (!email) {
     errors.push('Email is required.');
   }
@@ -247,21 +369,22 @@ router.post('/forgot-password', async (req, res) => {
 
     if (users.length > 0) {
       const user = users[0];
-      const rawToken = createResetToken();
-      const tokenHash = hashResetToken(rawToken);
+      console.log('[PasswordReset] user record found', {
+        userId: user.id,
+        database: getDatabaseName(),
+      });
 
-      await db.query(
-        'UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL',
-        [user.id]
-      );
-
-      await db.query(
-        `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, created_at)
-         VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), NOW())`,
-        [user.id, tokenHash, RESET_TOKEN_MINUTES]
-      );
+      const rawToken = await createPasswordResetToken(user.id);
+      const resetUrl = buildResetPasswordUrl(rawToken);
+      console.log('[PasswordReset] reset email URL route', {
+        route: 'GET /reset-password/:token',
+        pathPrefix: `${getAppBaseUrl()}/reset-password/`,
+        tokenLength: rawToken.length,
+      });
 
       await sendPasswordResetEmail(user, rawToken);
+    } else {
+      console.log('[PasswordReset] user record not found');
     }
 
     return res.render('auth/forgot-password', {
@@ -272,7 +395,7 @@ router.post('/forgot-password', async (req, res) => {
       infoMessage: FORGOT_PASSWORD_SAFE_MESSAGE,
     });
   } catch (error) {
-    console.error('Database error during forgot password:', error);
+    console.error('Database error during forgot password:', error.message || error);
     return res.render('auth/forgot-password', {
       pageTitle: 'Forgot Password',
       activePage: 'login',
@@ -285,7 +408,13 @@ router.post('/forgot-password', async (req, res) => {
 
 // GET /reset-password/:token — show reset form
 router.get('/reset-password/:token', async (req, res) => {
-  const token = String(req.params.token || '').trim();
+  const token = normalizeRawToken(req.params.token);
+  console.log('[PasswordReset] token lookup attempted', {
+    database: getDatabaseName(),
+    tokenLength: token.length,
+    route: 'GET /reset-password/:token',
+  });
+
   if (!token) {
     return res.render('auth/reset-password', {
       pageTitle: 'Reset Password',
@@ -293,12 +422,37 @@ router.get('/reset-password/:token', async (req, res) => {
       errors: ['This reset link is invalid or has expired.'],
       formValues: {},
       tokenValid: false,
+      resetToken: '',
       successMessage: '',
     });
   }
 
   try {
-    const tokenRow = await findValidResetTokenRecord(token);
+    const diagnosis = await diagnoseResetToken(token);
+    console.log('[PasswordReset] token lookup result', {
+      status: diagnosis.status,
+      userId: diagnosis.userId || null,
+      database: diagnosis.database || getDatabaseName(),
+      expiresAt: diagnosis.expiresAt || null,
+      dbNowUtc: diagnosis.dbNowUtc || null,
+    });
+
+    if (diagnosis.status === 'valid') {
+      console.log('[PasswordReset] matching token found and still valid', {
+        userId: diagnosis.userId,
+      });
+    } else if (diagnosis.status === 'expired') {
+      console.log('[PasswordReset] token expired', { userId: diagnosis.userId || null });
+    } else if (diagnosis.status === 'already_used') {
+      console.log('[PasswordReset] token already used', { userId: diagnosis.userId || null });
+    } else {
+      console.log('[PasswordReset] matching token not found');
+    }
+
+    const tokenRow = diagnosis.status === 'valid'
+      ? await findValidResetTokenRecord(token)
+      : null;
+
     if (!tokenRow) {
       return res.render('auth/reset-password', {
         pageTitle: 'Reset Password',
@@ -306,6 +460,7 @@ router.get('/reset-password/:token', async (req, res) => {
         errors: ['This reset link is invalid or has expired.'],
         formValues: {},
         tokenValid: false,
+        resetToken: '',
         successMessage: '',
       });
     }
@@ -316,16 +471,18 @@ router.get('/reset-password/:token', async (req, res) => {
       errors: [],
       formValues: {},
       tokenValid: true,
+      resetToken: token,
       successMessage: '',
     });
   } catch (error) {
-    console.error('Database error loading reset password page:', error);
+    console.error('Database error loading reset password page:', error.message || error);
     return res.render('auth/reset-password', {
       pageTitle: 'Reset Password',
       activePage: 'login',
       errors: ['This reset link is invalid or has expired.'],
       formValues: {},
       tokenValid: false,
+      resetToken: '',
       successMessage: '',
     });
   }
@@ -333,10 +490,16 @@ router.get('/reset-password/:token', async (req, res) => {
 
 // POST /reset-password/:token — update password
 router.post('/reset-password/:token', async (req, res) => {
-  const token = String(req.params.token || '').trim();
+  const token = normalizeRawToken(req.params.token);
   const password = String(req.body.password || '');
   const confirmPassword = String(req.body.confirmPassword || '');
   const errors = [];
+
+  console.log('[PasswordReset] password reset submit received', {
+    database: getDatabaseName(),
+    tokenLength: token.length,
+    route: 'POST /reset-password/:token',
+  });
 
   if (!token) {
     errors.push('This reset link is invalid or has expired.');
@@ -357,7 +520,8 @@ router.post('/reset-password/:token', async (req, res) => {
       activePage: 'login',
       errors,
       formValues: {},
-      tokenValid: true,
+      tokenValid: Boolean(token),
+      resetToken: token,
       successMessage: '',
     });
   }
@@ -373,7 +537,7 @@ router.post('/reset-password/:token', async (req, res) => {
        FROM password_reset_tokens
        WHERE token_hash = ?
          AND used_at IS NULL
-         AND expires_at > NOW()
+         AND expires_at > UTC_TIMESTAMP()
        LIMIT 1
        FOR UPDATE`,
       [tokenHash]
@@ -381,12 +545,14 @@ router.post('/reset-password/:token', async (req, res) => {
 
     if (!rows.length) {
       await conn.rollback();
+      console.log('[PasswordReset] matching token not found on submit');
       return res.render('auth/reset-password', {
         pageTitle: 'Reset Password',
         activePage: 'login',
         errors: ['This reset link is invalid or has expired.'],
         formValues: {},
         tokenValid: false,
+        resetToken: '',
         successMessage: '',
       });
     }
@@ -398,15 +564,20 @@ router.post('/reset-password/:token', async (req, res) => {
       passwordHash,
       tokenRow.userId,
     ]);
-    await conn.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?', [
-      tokenRow.id,
-    ]);
     await conn.query(
-      'UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL',
+      'UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE id = ?',
+      [tokenRow.id]
+    );
+    await conn.query(
+      'UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE user_id = ? AND used_at IS NULL',
       [tokenRow.userId]
     );
 
     await conn.commit();
+    console.log('[PasswordReset] password reset completed', {
+      userId: tokenRow.userId,
+      database: getDatabaseName(),
+    });
     return res.redirect('/login?reset=1');
   } catch (error) {
     if (conn) {
@@ -416,13 +587,14 @@ router.post('/reset-password/:token', async (req, res) => {
         // ignore rollback errors
       }
     }
-    console.error('Database error during password reset:', error);
+    console.error('Database error during password reset:', error.message || error);
     return res.render('auth/reset-password', {
       pageTitle: 'Reset Password',
       activePage: 'login',
       errors: ['Unable to reset password right now. Please try again.'],
       formValues: {},
       tokenValid: true,
+      resetToken: token,
       successMessage: '',
     });
   } finally {
