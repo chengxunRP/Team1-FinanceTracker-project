@@ -20,9 +20,20 @@ function getResetTokenMinutes() {
 }
 
 function getAppBaseUrl() {
-  const raw = String(process.env.APP_BASE_URL || '').trim();
-  if (!raw) return 'http://localhost:3000';
-  return raw.replace(/\/+$/, '');
+  const configured = String(process.env.APP_BASE_URL || '').trim();
+  const baseUrl = (configured || 'http://localhost:3000').replace(/\/+$/, '');
+  return baseUrl;
+}
+
+function getAppBaseUrlDiagnostics() {
+  const configured = Boolean(String(process.env.APP_BASE_URL || '').trim());
+  const baseUrl = getAppBaseUrl();
+  return {
+    appBaseUrlConfigured: configured,
+    baseUrl,
+    route: 'GET /reset-password/:token',
+    pathPrefix: `${baseUrl}/reset-password/`,
+  };
 }
 
 function hashResetToken(token) {
@@ -49,7 +60,8 @@ function isValidRawTokenFormat(rawToken) {
 }
 
 function buildResetPasswordUrl(rawToken) {
-  return `${getAppBaseUrl()}/reset-password/${encodeURIComponent(rawToken)}`;
+  const baseUrl = getAppBaseUrl();
+  return `${baseUrl}/reset-password/${encodeURIComponent(rawToken)}`;
 }
 
 function getDatabaseName() {
@@ -375,10 +387,12 @@ router.post('/forgot-password', async (req, res) => {
       });
 
       const rawToken = await createPasswordResetToken(user.id);
-      const resetUrl = buildResetPasswordUrl(rawToken);
+      const diagnostics = getAppBaseUrlDiagnostics();
       console.log('[PasswordReset] reset email URL route', {
-        route: 'GET /reset-password/:token',
-        pathPrefix: `${getAppBaseUrl()}/reset-password/`,
+        appBaseUrlConfigured: diagnostics.appBaseUrlConfigured,
+        baseUrl: diagnostics.baseUrl,
+        route: diagnostics.route,
+        pathPrefix: diagnostics.pathPrefix,
         tokenLength: rawToken.length,
       });
 
