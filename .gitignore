@@ -2,6 +2,8 @@
 **/node_modules/
 
 # Secrets
+.env
+app/.env
 **/.env
 
 # Local uploads

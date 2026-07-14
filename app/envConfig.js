@@ -1,5 +1,6 @@
 // Loads app/.env before Groq, Resend, or SMTP code runs.
-// GROQ_API_KEY, RESEND_API_KEY, EMAIL_FROM, SMTP_*, and APP_BASE_URL must live in .env.
+// Does NOT overwrite variables already set by the host (Railway, Docker, shell).
+// Local app/.env is for development fallback only.
 const path = require("path");
 const fs = require("fs");
 
@@ -15,6 +16,11 @@ function trimGroqApiKey() {
 
 function loadEnvFileFromDisk() {
   if (!fs.existsSync(ENV_PATH)) {
+    return;
+  }
+
+  // Only fill GROQ_API_KEY when it is still missing after dotenv (never overwrite host env).
+  if (process.env.GROQ_API_KEY) {
     return;
   }
 
@@ -42,7 +48,7 @@ function loadEnvFileFromDisk() {
       value = value.slice(1, -1);
     }
 
-    if (key === "GROQ_API_KEY") {
+    if (key === "GROQ_API_KEY" && !process.env.GROQ_API_KEY) {
       process.env.GROQ_API_KEY = value;
       return;
     }
@@ -50,7 +56,8 @@ function loadEnvFileFromDisk() {
 }
 
 function loadEnvFile() {
-  require("dotenv").config({ path: ENV_PATH, override: true, quiet: true });
+  // Railway / Docker / shell env vars take priority over app/.env
+  require("dotenv").config({ path: ENV_PATH, quiet: true });
   trimGroqApiKey();
 
   if (!process.env.GROQ_API_KEY) {
