@@ -81,7 +81,17 @@ pipeline {
 
         stage('Run New Container') {
             steps {
-                withCredentials([string(credentialsId: 'groq-api-key', variable: 'GROQ_API_KEY')]) {
+                withCredentials([
+                    string(
+                        credentialsId: 'groq-api-key',
+                        variable: 'GROQ_API_KEY'
+                    ),
+                    usernamePassword(
+                        credentialsId: 'spendwise-smtp',
+                        usernameVariable: 'SMTP_USER',
+                        passwordVariable: 'SMTP_PASS'
+                    )
+                ]) {
                     sh '''
                         docker run -d \
                           --name spendwise-container \
@@ -89,6 +99,13 @@ pipeline {
                           -p 3000:3000 \
                           -e PORT=3000 \
                           -e GROQ_API_KEY="$GROQ_API_KEY" \
+                          -e SMTP_HOST="smtp.gmail.com" \
+                          -e SMTP_PORT="587" \
+                          -e SMTP_SECURE="false" \
+                          -e SMTP_USER="$SMTP_USER" \
+                          -e SMTP_PASS="$SMTP_PASS" \
+                          -e SMTP_FROM="SpendWise <$SMTP_USER>" \
+                          -e APP_BASE_URL="http://localhost:3000" \
                           -e DB_HOST=host.docker.internal \
                           -e DB_USER=finance_user \
                           -e DB_PASSWORD=password123 \
