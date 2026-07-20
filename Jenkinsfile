@@ -86,6 +86,10 @@ pipeline {
                         credentialsId: 'groq-api-key',
                         variable: 'GROQ_API_KEY'
                     ),
+                    string(
+                        credentialsId: 'spendwise-db-password',
+                        variable: 'DB_PASSWORD'
+                    ),
                     usernamePassword(
                         credentialsId: 'spendwise-smtp',
                         usernameVariable: 'SMTP_USER',
@@ -106,11 +110,11 @@ pipeline {
                           -e SMTP_PASS="$SMTP_PASS" \
                           -e SMTP_FROM="SpendWise <$SMTP_USER>" \
                           -e APP_BASE_URL="http://localhost:3000" \
-                          -e DB_HOST=host.docker.internal \
-                          -e DB_USER=finance_user \
-                          -e DB_PASSWORD=password123 \
-                          -e DB_NAME=finance_tracker \
-                          -e DB_PORT=3306 \
+                          -e DB_HOST="host.docker.internal" \
+                          -e DB_PORT="3306" \
+                          -e DB_USER="finance_user" \
+                          -e DB_PASSWORD="$DB_PASSWORD" \
+                          -e DB_NAME="finance_tracker" \
                           spendwise-app
                     '''
                 }
@@ -125,6 +129,43 @@ pipeline {
                     docker ps -a
                     docker logs spendwise-container || true
                     docker exec spendwise-container node -e "require('http').get('http://localhost:3000/health', res => { console.log('STATUS:', res.statusCode); process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', err => { console.error(err); process.exit(1); })"
+
+                    echo "Checking database environment variables (PRESENT/MISSING only)..."
+                    docker exec spendwise-container node -e "
+const vars = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+for (const v of vars) {
+  const present = process.env[v] && String(process.env[v]).length > 0;
+  console.log(v + ': ' + (present ? 'PRESENT' : 'MISSING'));
+}
+"
+
+                    echo "Testing database connectivity from spendwise-container..."
+                    docker exec spendwise-container node -e "
+const mysql = require('mysql2/promise');
+(async () => {
+  try {
+    const connection = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT),
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME
+    });
+    const [rows] = await connection.query(
+      'SELECT DATABASE() AS db, CURRENT_USER() AS authenticated_user'
+    );
+    console.log('DATABASE CONNECTION SUCCESSFUL');
+    console.log('Database:', rows[0].db);
+    console.log('Authenticated account:', rows[0].authenticated_user);
+    await connection.end();
+  } catch (error) {
+    console.error('DATABASE CONNECTION FAILED');
+    console.error('Code:', error.code);
+    console.error('Message:', error.message);
+    process.exit(1);
+  }
+})();
+"
                 '''
             }
         }
