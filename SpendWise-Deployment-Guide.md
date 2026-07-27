@@ -1,6 +1,6 @@
 # SpendWise Finance Tracker — Deployment Guide
 
-This guide walks through deploying the SpendWise app to a Linux server (or VM) using the Ansible playbook included in this project. It assumes you're on **Windows** and will use **WSL (Windows Subsystem for Linux)** as your control machine, deploying to a separate Linux target (e.g. a VMware VM).
+This guide walks through deploying the SpendWise app to a Linux server (or VM) using the Ansible playbook included in this project. It assumes you're on **Windows** and will use **WSL (Windows Subsystem for Linux)** as your control machine, deploying to a separate Linux target (e.g. a VMware VM).hi
 
 ---
 
