@@ -1,0 +1,71 @@
+// AWS EC2 deployment pipeline only.
+// CI remains in the root Jenkinsfile — do not mix the two jobs.
+// Replace YOUR_EC2_PUBLIC_IP with your EC2 public IP or DNS before running.
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Deploy to AWS EC2') {
+            steps {
+                sshagent(credentials: ['spendwise_ec2_ssh']) {
+                    sh '''
+                        set -e
+
+                        EC2_HOST="ubuntu@13.236.86.252"
+
+                        ssh -o StrictHostKeyChecking=no "$EC2_HOST" '
+                            set -e
+
+                            cd /opt/Team1-FinanceTracker-project
+
+                            echo "Fetching latest main branch..."
+                            git fetch origin main
+                            git reset --hard origin/main
+
+                            echo "Building Docker image: spendwise-app:aws"
+                            docker build -t spendwise-app:aws .
+
+                            echo "Stopping and removing old container if present..."
+                            if docker ps -a --format "{{.Names}}" | grep -Fxq "spendwise-container"; then
+                                docker stop spendwise-container || true
+                                docker rm spendwise-container || true
+                            else
+                                echo "No existing spendwise-container found. Continuing..."
+                            fi
+
+                            echo "Ensuring uploads directory exists..."
+                            mkdir -p /opt/spendwise/uploads
+
+                            echo "Starting spendwise-container..."
+                            docker run -d \
+                              --name spendwise-container \
+                              --restart unless-stopped \
+                              --env-file app/.env \
+                              -p 3000:3000 \
+                              -v /opt/spendwise/uploads:/usr/src/app/public/uploads \
+                              spendwise-app:aws
+
+                            echo "Waiting for app to start..."
+                            sleep 5
+
+                            echo "Verifying deployment health..."
+                            curl --fail http://localhost:3000/health
+
+                            echo "AWS EC2 deployment verified successfully."
+                        '
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Success: SpendWise deployed to AWS EC2 and health check passed.'
+        }
+        failure {
+            echo 'AWS deployment failed. Review the Deploy to AWS EC2 stage logs above for details.'
+        }
+    }
+}
