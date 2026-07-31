@@ -1,4 +1,4 @@
-# Team1 Finance Tracker Projects
+# Team1 Finance Tracker Project
 
 SpendWise is a finance tracker web application built using Node.js, Express, EJS, MySQL, and Docker.
 
